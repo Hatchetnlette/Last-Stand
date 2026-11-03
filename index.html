@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.7c</title>
+<title>Last Stand — Prototype 0.8a</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -57,6 +57,51 @@ button:disabled{opacity:.4;cursor:default}
 .choice{background:#243328;text-align:left}
 .choice strong{display:block;color:#f2d17d;margin-bottom:3px;font-size:15px}
 .small{font-size:11px;color:#a8b5a0}
+/* 0.8a: Mastery screen (per-class skill trees) */
+.panel.mpanel{padding:14px 12px}
+.mast{text-align:left}
+.mhead{display:flex;justify-content:space-between;align-items:center}
+.mhead h2{margin:0;font-size:22px}
+.ren{color:#ffd86a;font-weight:800;font-size:15px}
+.mtabs{display:flex;gap:6px;margin-top:8px}
+.mtabs button{margin:0;padding:6px 4px;font-size:14px;min-height:46px;line-height:1.15}
+.mtabs button.on{background:#5a4a1e;border-color:#ffd86a;color:#ffe9a8}
+.mtabs small{display:block;font-size:10px;color:#cdbf8f;font-weight:600}
+.mslot{font-size:11px;color:#cdbf8f;margin:6px 2px 0}
+.mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:6px;text-align:center}
+.mcol{display:flex;flex-direction:column;align-items:center;min-width:0}
+.mbt{font-size:12px;font-weight:800;color:#f2d17d;height:20px;line-height:20px;white-space:nowrap}
+.mnode{width:50px;height:50px;border-radius:50%;padding:0;margin:0;font-size:22px;display:flex;
+  align-items:center;justify-content:center;position:relative;background:#1a241c;border:2px solid #4b5a44;flex:none}
+.mnode.cap{width:60px;height:60px;border-radius:16px;font-size:26px}
+.mnode.own{background:#3d5a2e;border-color:#ffd86a;box-shadow:0 0 10px #e8c56a77}
+.mnode.buy{border-color:#ffd86a;animation:mglow 1.4s ease-in-out infinite}
+.mnode.lock,.mnode.next,.mnode.soon{opacity:.5}
+.mnode.poor{border-color:#9a8a5a}
+.mnode.sel{outline:3px solid #fff3d2;outline-offset:2px}
+.mnode.eq{background:#6a5220}
+@keyframes mglow{50%{box-shadow:0 0 14px #ffd86acc}}
+.mbadge{position:absolute;bottom:-5px;right:-8px;font-size:9px;line-height:12px;background:#0c1410;border:1px solid #6a7a5a;
+  border-radius:8px;padding:0 4px;color:#e8d9a8;font-weight:700}
+.mlab{font-size:10px;color:#cfd8c4;height:13px;line-height:13px;margin-top:3px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:100%}
+.mln{width:2px;height:6px;background:#4b5a44}
+.mln.on{background:#ffd86a}
+.msheet{margin-top:8px;background:#0c1410cc;border:1px solid #6a7a5a;border-left:4px solid #e8c56a;border-radius:12px;
+  padding:8px 10px;min-height:98px}
+.msheet .t{color:#ffd86a;font-size:15px;font-weight:800}
+.msheet .m{font-size:11px;color:#cdbf8f}
+.msheet .d{font-size:13px;color:#eef0e2;margin:4px 0 0;line-height:1.35}
+.msheet .bad{color:#ff9a8a;font-size:12px;margin-top:3px}
+.mrow{display:flex;gap:8px}
+.mrow button{min-height:48px;margin-top:8px}
+.mrow #mbuy{flex:2}
+.mrow #mback{flex:1}
+button.mreset{background:none;border:none;color:#e0a896;text-decoration:underline;font-size:13px;padding:8px;
+  margin-top:2px;font-weight:600;text-align:center;min-height:36px}
+body.mopen #toast{top:18px;bottom:auto}
+button.mreset.arm{color:#ff8a6a;text-decoration:none;border:1px solid #ff8a6a}
+.mcap{display:block;color:#ffd86a;font-size:11px;margin-top:2px}
 #toast{position:fixed;left:50%;bottom:160px;transform:translateX(-50%);
   background:#0c1410ee;border:1px solid #6a7a5a;border-radius:10px;
   padding:9px 14px;font-size:13px;display:none;pointer-events:none;z-index:30}
@@ -119,7 +164,7 @@ body.bossOn #buffs{top:122px}
 <div id="overlay">
   <div class="panel" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.7c</div><!-- 0.7a: new art · 0.7b: obstacles · 0.7c: enemy attacks -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.8a</div><!-- 0.7a: new art · 0.7b: obstacles · 0.7c: enemy attacks · 0.8a: Mastery trees -->
     <p>Beyond the old frontier, the dead are stirring. Survive the waves, gather experience, and return with whatever treasure you can carry.</p>
     <p><b>Move:</b> drag left side of screen or WASD / arrows.<br>
        <b>Combat:</b> auto-attacks nearest enemy.<br>
@@ -127,15 +172,16 @@ body.bossOn #buffs{top:122px}
        <b>Special:</b> style ability on cooldown.</p>
     <button class="choice" data-s="melee"><strong>⚔ Melee</strong>
       <span class="small">Tough bruiser · extra health & armour · short range<br>
-      Special: Whirlwind (spin AoE) · Upgrades: Whirlwind, Soul harvest, Granite skin</span></button>
+      Special: Whirlwind (spin AoE) · Upgrades: Whirlwind, Soul harvest, Granite skin</span><span class="mcap" data-mc="melee"></span><!-- 0.8a --></button>
     <button class="choice" data-s="ranged"><strong>🏹 Ranged</strong>
       <span class="small">Fast kiter · long range · crits<br>
-      Special: Barrage (rapid multi-shot) · Upgrades: Twin shot, Ruby bolts, Eagle eye</span></button>
+      Special: Barrage (rapid multi-shot) · Upgrades: Twin shot, Ruby bolts, Eagle eye</span><span class="mcap" data-mc="ranged"></span><!-- 0.8a --></button>
     <button class="choice" data-s="magic"><strong>✨ Magic</strong>
       <span class="small">Glass cannon · splash damage · low health<br>
-      Special: Arcane Nova (big freeze blast) · Upgrades: Blast radius, Ice barrage, Arcane focus</span></button>
+      Special: Arcane Nova (big freeze blast) · Upgrades: Blast radius, Ice barrage, Arcane focus</span><span class="mcap" data-mc="magic"></span><!-- 0.8a --></button>
     <button id="shopbtn"></button>
     <button id="trainbtn"></button>
+    <button id="mastbtn"></button><!-- 0.8a: Mastery trees -->
     <p class="small" id="saveinfo"></p>
   </div>
 </div>
@@ -436,7 +482,84 @@ let bolts = []; // 0.7c: enemy bones and spells in flight
 let bossNext = 300, bossWarned = false, bossWarnAt = 0;
 const sepGrid = new Map(); // 0.6: reused spatial grid for enemy pushback
 let keys = {};
-let save = loadSave();
+/* ========== 0.8a: MASTERY TREES (data) ========== */
+// One tree per class, paid with renown. 3 branches x (4 nodes + 1 capstone), bought in order.
+// Tier costs and the class-skill level each tier needs. Node ids are stable save keys: never renumber.
+// If a later patch changes costs or removes nodes, bump TREE_V: old saves get a free auto-refund.
+const TIER_COST = [15, 25, 35, 50, 80];
+const TIER_GATE = [1, 5, 10, 15, 20];
+const TREE_V = 1;
+const CAPS_LIVE = false; // 0.8a: capstone slots are in the UI; their effects (and buying them) arrive in 0.8b
+// node: [id, name, icon, effect text, apply(p) for simple stat effects (others are checked in the code via player.m)]
+const TREES = {
+  melee: { name: 'Melee', icon: '⚔', skill: 'Attack', branches: [
+    { id: 'zerk', name: 'Berserker', icon: '💢', blurb: 'The lower your HP, the harder you hit.', nodes: [
+      ['zerk1', 'Rage', '😤', '+10% damage while below 60% HP.'],
+      ['zerk2', 'Bloodthirst', '🩸', '+2 HP per kill (stacks with Bloodlust and Soul harvest).', p => p.kh += 2],
+      ['zerk3', 'Reckless swings', '🪓', '+10% attack speed, but you take 5% more damage.', p => { p.rm2 /= 1.10; p.dmgTaken *= 1.05; }],
+      ['zerk4', "Warlord's call", '📯', 'Berserker card upgraded: 40% → 55% HP threshold, +20% → +30% damage. It is offered in each of your first 3 level-ups until you take it.'],
+      ['zerkC', 'Barbarian Fury', '🔥', 'Damage +1% per 2% HP missing (up to +45%). Below 30% HP every hit heals 2 HP and you attack 20% faster.', null, 'Healing from lobsters, chests and the Phoenix is halved.']] },
+    { id: 'guard', name: 'Guardian', icon: '🛡', blurb: 'Stand your ground. Block attacks.', nodes: [
+      ['guard1', 'Iron hide', '🦺', '+5% armour.', p => p.armor = Math.min(0.65, p.armor + 0.05)],
+      ['guard2', 'Stalwart', '💪', '+25 max HP.', p => p.maxHp += 25],
+      ['guard3', 'Shield block', '🛡', 'Every 8s your shield charges and fully blocks the next enemy attack (swing, slam, bone, orb or dragon fire). Touch damage is not blocked.'],
+      ['guard4', 'Retribution', '⚡', 'Enemies touching you take 35% of your weapon damage per second.'],
+      ['guardC', 'Dragon Defender', '🐲', 'Shield recharges every 4s and each block releases a 90px shockwave (120% weapon damage, knockback). Armour cap 65% → 75%.', null, '−8% move speed.']] },
+    { id: 'whirl', name: 'Whirlwind', icon: '🌀', blurb: 'Area damage and a stronger special.', nodes: [
+      ['whirl1', 'Wide arcs', '〰', 'Your swings also hit enemies around you for 40% damage. The Whirlwind card still adds its reach (and makes it 55%).', p => p.sweep += 16],
+      ['whirl2', 'Spin cycle', '🔄', 'Whirlwind special cooldown 8s → 6.5s.', p => p.specialMax = 6.5],
+      ['whirl3', 'Dervish', '🌪', 'Whirlwind radius 95 → 120px, damage 160% → 200%.'],
+      ['whirl4', 'Momentum', '⏩', 'Each enemy hit by Whirlwind cuts its cooldown by 0.2s (up to 3s).'],
+      ['whirlC', 'Cyclone', '🌀', 'Whirlwind becomes a 2s steerable spin: 5 hits at 80% within 115px, 30% less damage taken, +20% speed. Cooldown 10s.', null, 'Normal attacks stop during the spin.']] }
+  ] },
+  ranged: { name: 'Ranged', icon: '🏹', skill: 'Ranged', branches: [
+    { id: 'dead', name: 'Deadeye', icon: '🎯', blurb: 'Huge crits. Elite and boss killer.', nodes: [
+      ['dead1', 'Steady aim', '🎯', '+5% crit chance.', p => p.crit += 0.05],
+      ['dead2', 'Ruby tips', '💎', 'Crit damage 2.4× → 2.7×.', p => p.critMul = 2.7],
+      ['dead3', 'Long shot', '🔭', '+15% damage to targets more than 120px away.'],
+      ['dead4', "Hunter's focus", '🦌', '+20% damage to elites, giants and bosses.'],
+      ['deadC', 'Dragon Hunter Bolt', '🐉', 'Every 4th attack fires a piercing bolt down its whole line. It always crits and does +25% to bosses.', null, 'Base attack speed −8%.']] },
+    { id: 'rapid', name: 'Rapid Fire', icon: '🏹', blurb: 'More arrows, faster.', nodes: [
+      ['rapid1', 'Quick draw', '⚡', '+8% attack speed.', p => p.rm2 /= 1.08],
+      ['rapid2', 'Volley', '🎆', 'Barrage fires 7 arrows instead of 5, and its cooldown drops from 8s to 7s.', p => p.specialMax = 7],
+      ['rapid3', 'Split arrow', '🔱', 'Your attacks hit 1 extra target for 60% damage.', p => p.split = 1],
+      ['rapid4', 'Ammo pouch', '👝', 'Rapid fire card 12% → 15% faster; Twin shot card also gives +10% damage.'],
+      ['rapidC', 'Toxic Blowpipe', '🧪', '+35% attack speed. Hits apply venom (20% weapon damage per second for 4s, stacks 3×).', null, '−20% damage per arrow.']] },
+    { id: 'skirm', name: 'Skirmisher', icon: '👢', blurb: 'Hit and run. Dodging powers you up.', nodes: [
+      ['skirm1', 'Light feet', '🪶', '+6% move speed.', p => p.speed *= 1.06],
+      ['skirm2', 'Roll', '🤸', 'Dash cooldown −0.3s.', p => p.dashMax = Math.max(1.1, p.dashMax - 0.3)],
+      ['skirm3', 'Evasion', '💨', 'Dodging an enemy attack (a wind-up within 60px misses you, or a shot passes within 40px) gives +10% attack speed for 4s. Stacks 3×.'],
+      ['skirm4', 'Ambush', '🗡', 'After a dash, your next 3 attacks deal +35% damage.'],
+      ['skirmC', 'Shadow Step', '🌑', 'Dash has 2 charges and leaves a decoy for 2.5s that enemies chase, then explodes for 150% weapon damage.', null, '−15 max HP.']] }
+  ] },
+  magic: { name: 'Magic', icon: '✨', skill: 'Magic', branches: [
+    { id: 'pyro', name: 'Pyromancer', icon: '🔥', blurb: 'Burn the horde. Bigger splash.', nodes: [
+      ['pyro1', 'Kindling', '🪵', 'Spell splash radius +12px.', p => p.blast += 12],
+      ['pyro2', 'Ignite', '🔥', 'Spells set their target on fire for 3s: 10% of your weapon damage per second (does not stack).'],
+      ['pyro3', 'Fire Blast mastery', '☄', 'Splash damage 48% → 60%.', p => p.splashMul = 0.6],
+      ['pyro4', 'Wildfire', '🌋', 'A burning enemy that dies passes its burn to 1 enemy within 70px.'],
+      ['pyroC', 'Inferno', '♨', 'Kills may leave fire pools; Arcane Nova becomes Fire Wave (+25% damage, ignites everything).', null, 'The Nova no longer slows.']] },
+    { id: 'ice', name: 'Ancient Ice', icon: '❄', blurb: 'Slow and stop attacks before they land.', nodes: [
+      ['ice1', 'Chill', '🧊', 'Spells slow targets by 25% for 1.2s.'],
+      ['ice2', 'Cold snap', '❄', 'Slowed enemies take +12% damage.'],
+      ['ice3', 'Numbing frost', '🥶', 'Slowed enemies wind up their attacks 35% slower.'],
+      ['ice4', 'Deep freeze', '🏔', 'Arcane Nova radius 160 → 190px, slow 2.2s → 3s.'],
+      ['iceC', 'Glacial Tomb', '⚰', 'Every 3rd spell freezes its target solid for 1.2s; frozen enemies that die shatter for 50% damage.', null, '−10% spell damage.']] },
+    { id: 'blood', name: 'Blood Magic', icon: '🩸', blurb: 'Turn damage into health.', nodes: [
+      ['blood1', 'Siphon', '🩸', '+2 HP per kill.', p => p.kh += 2],
+      ['blood2', 'Blood shield', '🛡', '+20 max HP.', p => p.maxHp += 20],
+      ['blood3', 'Sanguine', '🍷', 'Spells heal you for 2% of the damage they deal (up to 4 HP per second).'],
+      ['blood4', 'Blood pact', '📜', 'Arcane Nova costs 8% of your current HP but deals +60% damage.'],
+      ['bloodC', 'Sanguinesti', '🔮', 'Spell healing 2% → 6% (up to 10 HP/s); overhealing fills a fading blood shield.', null, '−20% max HP.']] }
+  ] }
+};
+// flat lookup: NODE[id] = { id, name, icon, desc, apply, bad, cls, br, tier, cap, cost, gate }
+const NODE = {};
+for (const cls in TREES) TREES[cls].branches.forEach(br => br.nodes.forEach((n, tier) => {
+  NODE[n[0]] = { id: n[0], name: n[1], icon: n[2], desc: n[3], apply: n[4] || null, bad: n[5] || '',
+    cls, br, tier, cap: tier === 4, cost: TIER_COST[tier], gate: TIER_GATE[tier] };
+}));
+let save = migrateSave(loadSave()); // 0.8a: migration
 
 /* Audio */
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -525,6 +648,29 @@ function loadSave() {
       shop:{hp:0,arm:0,boots:0,mag:0,coin:0,dash:0}, tal:{might:0,haste:0,wis:0,vit:0} };
   }
 }
+// 0.8a: the merge above is shallow, so fill defaults per key (a new class like Fisher appears in old saves
+// automatically) and add the Mastery trees. Old saves keep all their banked renown. Unknown node ids are dropped.
+function migrateSave(s) {
+  const num = v => (typeof v === 'number' && isFinite(v) && v >= 0) ? v : 0;
+  s.gold = num(s.gold); s.renown = Math.floor(num(s.renown)); s.best = num(s.best);
+  const fill = (o, keys) => { o = (o && typeof o === 'object') ? o : {}; for (const k of keys) o[k] = num(o[k]); return o; };
+  s.sk = fill(s.sk, Object.keys(TREES));
+  s.shop = fill(s.shop, ['hp', 'arm', 'boots', 'mag', 'coin', 'dash']);
+  s.tal = fill(s.tal, ['might', 'haste', 'wis', 'vit']);
+  const old = (s.tree && typeof s.tree === 'object') ? s.tree : {};
+  const bump = s.treeV !== undefined && s.treeV !== TREE_V && Object.keys(old).length > 0; // tree layout changed
+  s.tree = {};
+  let refund = 0;
+  for (const k in TREES) {
+    const t = old[k] || {};
+    const own = Array.isArray(t.own) ? t.own.filter((id, i, a) => NODE[id] && NODE[id].cls === k && a.indexOf(id) === i) : [];
+    if (bump) { refund += own.reduce((a, id) => a + NODE[id].cost, 0); s.tree[k] = { own: [], cap: null }; continue; }
+    s.tree[k] = { own, cap: (t.cap && own.includes(t.cap) && NODE[t.cap].cap) ? t.cap : null };
+  }
+  if (bump) { s.renown += refund; s.treeRefund = refund; } // a toast tells the player once the menu is up
+  s.treeV = TREE_V;
+  return s;
+}
 function persist() {
   localStorage.setItem('laststand_save_v3', JSON.stringify(save));
 }
@@ -554,7 +700,10 @@ function newPlayer() {
     coinBonus: 0, xpMul: 1,
     dashCd: 0, dashMax: 2.4, dashIframes: 0,
     specialCd: 0, specialMax: 8,
-    invuln: 0, facing: 1
+    invuln: 0, facing: 1,
+    // 0.8a: Mastery. m = owned regular nodes for this run's class (m.zerk1 etc.)
+    m: {}, critMul: 2.4, splashMul: 0.48, sweepMul: 0.4, sweepCard: 0, split: 0, dmgTaken: 1,
+    shieldCd: 0, evN: 0, evT: 0, ambush: 0, leech: 0
   };
 }
 
@@ -631,6 +780,7 @@ function start(k) {
   player.rm2 = Math.max(0.32, 1 - tl.haste * 0.045);
   player.xpMul = 1 + tl.wis * 0.12;
   player.dashMax = Math.max(1.4, 2.4 - sh.dash * 0.18);
+  applyMastery(k); // 0.8a: this class's owned tree nodes
 
   enemies = []; orbs = []; shots = []; particles = []; floats = [];
   kills = 0; runGold = 0; elapsed = 0;
@@ -713,13 +863,170 @@ function store(kind) {
   $('back').onclick = () => { $('panel').innerHTML = MENU; bind(); };
 }
 
+/* ========== 0.8a: MASTERY (logic + screen) ========== */
+function applyMastery(k) {
+  const p = player; p.m = {};
+  const t = save.tree[k];
+  if (t) for (const id of t.own) {
+    const n = NODE[id];
+    if (!n || n.cls !== k || n.cap) continue;
+    p.m[id] = true;
+    if (n.apply) try { n.apply(p); } catch (err) {}
+  }
+  if (CAPS_LIVE && t && t.cap) p.m[t.cap] = true; // 0.8b: capstone effects hook in here
+  if (p.m.guard3) p.shieldCd = 0; // shield starts charged
+  p.hp = p.maxHp;
+}
+function treeSpent(cls) { return save.tree[cls].own.reduce((a, id) => a + (NODE[id] ? NODE[id].cost : 0), 0); }
+function nodeState(n) {
+  const t = save.tree[n.cls];
+  if (t.own.includes(n.id)) return 'own';
+  if (n.cap && !CAPS_LIVE) return 'soon';
+  if (n.tier > 0 && !t.own.includes(n.br.nodes[n.tier - 1][0])) return 'next';
+  if (sLvl(n.cls) < n.gate) return 'lock';
+  if (save.renown < n.cost) return 'poor';
+  return 'buy';
+}
+function buyNode(id) {
+  const n = NODE[id];
+  if (!n || nodeState(n) !== 'buy') return false;
+  save.renown -= n.cost;
+  save.tree[n.cls].own.push(id);
+  if (n.cap && !save.tree[n.cls].cap) save.tree[n.cls].cap = id; // first capstone equips itself
+  persist();
+  return true;
+}
+function equipCap(id) { // only one capstone per class is active; tap again to unequip
+  const n = NODE[id];
+  if (!n || !n.cap || !save.tree[n.cls].own.includes(id)) return false;
+  save.tree[n.cls].cap = save.tree[n.cls].cap === id ? null : id;
+  persist();
+  return true;
+}
+function respecTree(cls) { // free: refunds 100% of the renown spent in this class's tree
+  const r = treeSpent(cls);
+  save.renown += r;
+  save.tree[cls] = { own: [], cap: null };
+  persist();
+  return r;
+}
+function mastery(cls, sel) {
+  cls = TREES[cls] ? cls : 'melee';
+  const T = TREES[cls], t = save.tree[cls], lv = sLvl(cls), spent = treeSpent(cls);
+  if (!sel || !NODE[sel] || NODE[sel].cls !== cls) { // default: first thing you can buy, else first node
+    let first = null;
+    for (let tier = 0; tier < 5 && !first; tier++) for (const br of T.branches) { const n = NODE[br.nodes[tier][0]]; if (!first && nodeState(n) === 'buy') first = n.id; }
+    sel = first || T.branches[0].nodes[0][0];
+  }
+  const capN = t.cap ? NODE[t.cap] : null;
+  let h = '<div class="mast"><div class="mhead"><h2>MASTERY</h2><span class="ren" id="mren">✦ ' + save.renown + ' renown</span></div>';
+  h += '<div class="mtabs">' + Object.keys(TREES).map(k => '<button type="button" data-t="' + k + '"' + (k === cls ? ' class="on"' : '') + '>' +
+    TREES[k].icon + ' ' + TREES[k].name + '<small>' + TREES[k].skill + ' ' + sLvl(k) + '</small></button>').join('') + '</div>';
+  h += '<div class="mslot">★ Capstone slot: <b>' + (capN ? capN.icon + ' ' + capN.name : 'empty') + '</b>' + (CAPS_LIVE ? ' · own all 3, equip 1' : ' · capstones coming in 0.8b') + '</div>';
+  h += '<div class="mgrid">' + T.branches.map(br => '<div class="mcol"><div class="mbt">' + br.icon + ' ' + br.name + '</div>' +
+    br.nodes.map((nd, tier) => {
+      const n = NODE[nd[0]], s = nodeState(n);
+      const badge = s === 'own' ? (n.cap ? (t.cap === n.id ? '★' : '✓') : '✓') : s === 'lock' ? 'Lv' + n.gate : s === 'soon' ? '0.8b' : n.cost;
+      return (tier ? '<div class="mln' + (t.own.includes(br.nodes[tier - 1][0]) ? ' on' : '') + '"></div>' : '') +
+        '<button type="button" class="mnode ' + s + (n.cap ? ' cap' : '') + (n.id === sel ? ' sel' : '') + (t.cap === n.id ? ' eq' : '') +
+        '" data-n="' + n.id + '" aria-label="' + n.name + '">' + (s === 'lock' || s === 'next' ? '🔒' : n.icon) +
+        '<span class="mbadge">' + badge + '</span></button><div class="mlab">' + n.name + '</div>';
+    }).join('') + '</div>').join('') + '</div>';
+  // bottom sheet for the selected node
+  const n = NODE[sel], s = nodeState(n);
+  const tierTxt = n.cap ? 'Capstone' : 'Tier ' + (n.tier + 1);
+  let btn = '', why = '';
+  if (s === 'buy') btn = '<button type="button" id="mbuy">BUY · ' + n.cost + ' renown</button>';
+  else if (s === 'own' && n.cap) btn = '<button type="button" id="mbuy">' + (t.cap === n.id ? 'UNEQUIP' : 'EQUIP') + '</button>';
+  else {
+    btn = '<button type="button" id="mbuy" disabled>' + (s === 'own' ? 'OWNED ✓' : s === 'soon' ? 'Coming in 0.8b' : s === 'lock' ? 'Needs ' + T.skill + ' ' + n.gate : s === 'next' ? 'Locked' : 'Need ' + n.cost + ' renown') + '</button>';
+    why = s === 'own' ? 'Active in every ' + T.name + ' run.' : s === 'soon' ? 'Capstones arrive in 0.8b: own all three, equip one at a time.'
+      : s === 'lock' ? 'Your ' + T.skill + ' level is ' + lv + '.' : s === 'next' ? 'Buy ' + n.br.nodes[n.tier - 1][1] + ' first.' : 'You have ' + save.renown + '. Earn renown by surviving, killing and slaying bosses.';
+  }
+  h += '<div class="msheet" id="msheet"><div class="t">' + n.icon + ' ' + n.name + '</div><div class="m">' + n.br.icon + ' ' + n.br.name + ' · ' + tierTxt +
+    ' · ' + n.cost + ' renown · ' + T.skill + ' ' + n.gate + '+</div><div class="d">' + n.desc + '</div>' +
+    (n.bad ? '<div class="bad">Drawback: ' + n.bad + '</div>' : '') + (why ? '<div class="m" style="margin-top:3px">' + why + '</div>' : '') + '</div>';
+  h += '<div class="mrow">' + btn + '<button type="button" id="mback">Back</button></div>';
+  h += spent > 0 ? '<button type="button" class="mreset" id="mreset">Reset ' + T.name + ' tree (+' + spent + ' renown, free)</button>'
+    : '<p class="small" style="text-align:center;margin:6px 0 0">Respec is free between runs. Renown: survive, kill, +8 per boss.</p>';
+  h += '</div>';
+  $('panel').classList.add('mpanel'); document.body.classList.add('mopen'); // mopen: toast moves to the top
+  $('panel').innerHTML = h;
+  const P = $('panel');
+  P.querySelectorAll('[data-t]').forEach(b => b.onclick = () => mastery(b.dataset.t));
+  P.querySelectorAll('[data-n]').forEach(b => b.onclick = () => mastery(cls, b.dataset.n)); // tap = details, never buys
+  $('mbuy').onclick = () => {
+    if (s === 'buy' && buyNode(n.id)) { sfx('level'); toast(n.icon + ' ' + n.name + ' learned'); }
+    else if (s === 'own' && n.cap) equipCap(n.id);
+    mastery(cls, n.id);
+  };
+  $('mback').onclick = () => { $('panel').classList.remove('mpanel'); document.body.classList.remove('mopen'); $('panel').innerHTML = MENU; bind(); };
+  if ($('mreset')) {
+    let armed = 0;
+    $('mreset').onclick = () => {
+      if (!armed) { // confirm step
+        armed = setTimeout(() => { armed = 0; if ($('mreset')) { $('mreset').classList.remove('arm'); $('mreset').textContent = 'Reset ' + T.name + ' tree (+' + spent + ' renown, free)'; } }, 4000);
+        $('mreset').classList.add('arm');
+        $('mreset').textContent = 'Tap again to refund ' + spent + ' renown';
+        return;
+      }
+      clearTimeout(armed);
+      const r = respecTree(cls);
+      toast(T.name + ' tree reset · +' + r + ' renown');
+      mastery(cls);
+    };
+  }
+}
+// level-up card text when a tree node changes a card
+function cardText(u) {
+  const m = player.m || {};
+  if (u[0] === 'Berserker' && m.zerk4) return "Damage increased by 30% while below 55% HP. (Warlord's call)";
+  if (u[0] === 'Rapid fire' && m.rapid4) return 'Attack 15% faster. (Ammo pouch)';
+  if (u[0] === 'Twin shot' && m.rapid4) return 'Fire at one extra target, and +10% damage. (Ammo pouch)';
+  return u[1];
+}
+// one weapon hit before crits/streaks (used by burns and Retribution)
+function wDmg() { return player.damage * STY[player.style].dmg * (1 + (sLvl(player.style) - 1) * 0.045); }
+// 0.8a Guardian: Shield block. Returns true if this attack was blocked.
+function shieldBlock() {
+  if (!player.m.guard3 || player.shieldCd > 0) return false;
+  player.shieldCd = 8;
+  player.invuln = Math.max(player.invuln, 0.25);
+  floats.push({ x: player.x, y: player.y - 26, text: '🛡 blocked', life: 0.8, vy: -36, color: '#9ad0ff' });
+  for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; particles.push({ x: player.x + Math.cos(a) * 18, y: player.y + Math.sin(a) * 18, vx: Math.cos(a) * 80, vy: Math.sin(a) * 80, life: 0.3, color: '#9ad0ff', size: 3 }); }
+  try { sfx('hit'); } catch (err) {}
+  window.__blocks = (window.__blocks || 0) + 1;
+  return true;
+}
+// 0.8a Skirmisher: Evasion (a dodged attack gives +10% attack speed for 4s, up to 3 stacks)
+function dodged() {
+  if (!player.m.skirm3) return;
+  player.evN = Math.min(3, player.evN + 1);
+  player.evT = 4;
+  floats.push({ x: player.x, y: player.y - 26, text: '💨 dodge', life: 0.6, vy: -36, color: '#c8f0b0' });
+  window.__dodges = (window.__dodges || 0) + 1;
+}
+// 0.8a Pyromancer: set an enemy on fire (refreshes, doesn't stack)
+function ignite(e) {
+  e.burn = 3; e.burnDps = Math.max(e.burnDps || 0, wDmg() * 0.10);
+  if (!(e.burnTick > 0)) e.burnTick = 0.5;
+}
 let MENU = $('panel').innerHTML;
+let lastClass = 'melee'; // 0.8a: the Mastery screen opens on the class you last played
 function bind() {
   $('shopbtn').textContent = '🛒 General store · ' + save.gold + ' coins';
   $('trainbtn').textContent = '📜 Training · ' + pts() + ' points';
   $('shopbtn').onclick = () => store('shop');
   $('trainbtn').onclick = () => store('tal');
-  document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => start(b.dataset.s));
+  // 0.8a: Mastery button and per-class tree summary on the class buttons
+  $('mastbtn').textContent = '🌳 Mastery · ' + save.renown + ' renown';
+  $('mastbtn').onclick = () => mastery(lastClass || 'melee');
+  document.querySelectorAll('[data-mc]').forEach(el => {
+    const k = el.dataset.mc, t = save.tree[k], c = t.cap ? NODE[t.cap] : null;
+    el.textContent = t.own.length ? '🌳 Mastery: ' + t.own.length + ' node' + (t.own.length > 1 ? 's' : '') + (c ? ' · ★ ' + c.name : '') : '';
+  });
+  if (save.treeRefund) { toast('Mastery trees changed: +' + save.treeRefund + ' renown refunded'); delete save.treeRefund; persist(); }
+  document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { lastClass = b.dataset.s; start(b.dataset.s); });
   $('saveinfo').textContent = `Saved on this device · Coins ${save.gold} · Best ${fmt(save.best)} · Attack ${sLvl('melee')} · Ranged ${sLvl('ranged')} · Magic ${sLvl('magic')}`;
 }
 bind();
@@ -779,13 +1086,22 @@ function spawn(forceElite = false) {
 }
 
 /* ========== COMBAT ========== */
-function hurt(e, d, isCrit) {
+function hurt(e, d, isCrit, dot) { // 0.8a: dot = burn tick / Retribution (no on-hit effects)
   if (e.dead) return;
   if (buffs.dagger > 0) d = Math.round(d * 2); // 0.5: Dragon dagger = double damage
+  const M = player.m;
+  if (M.ice2 && (e.slow > 0 || e.chill > 0)) d = Math.round(d * 1.12); // 0.8a Cold snap
   e.hp -= d;
-  e.hit = 0.14;
+  e.hit = dot ? Math.max(e.hit, 0.06) : 0.14;
   gain(d);
-  if (player.freeze) e.slow = 1.6;
+  if (!dot) {
+    if (player.freeze) e.slow = 1.6;
+    if (M.ice1) e.chill = Math.max(e.chill || 0, 1.2); // 0.8a Chill: 25% slow
+    if (M.blood3 && player.leech > 0) { // 0.8a Sanguine: 2% of spell damage, max 4 HP/s
+      const hl = Math.min(player.leech, d * 0.02);
+      player.leech -= hl; player.hp = Math.min(player.maxHp, player.hp + hl);
+    }
+  }
 
   floats.push({
     x: e.x + rand(-8, 8),
@@ -793,7 +1109,7 @@ function hurt(e, d, isCrit) {
     text: '-' + d + (isCrit ? '!' : ''),
     life: 0.7,
     vy: -35,
-    color: isCrit ? '#ffd24a' : '#fff2c0'
+    color: isCrit ? '#ffd24a' : dot ? '#ffa860' : '#fff2c0' // 0.8a: burns / Retribution in orange
   });
 
   if (e.hp <= 0 && !e.dead) {
@@ -802,6 +1118,11 @@ function hurt(e, d, isCrit) {
     streak++;
     streakTimer = 2.8;
     if (player.kh) player.hp = Math.min(player.maxHp, player.hp + player.kh);
+    if (e.burn > 0 && M.pyro4) { // 0.8a Wildfire: the burn jumps to 1 enemy within 70px
+      let best = null, bd = 70;
+      for (const o of enemies) { if (o === e || o.hp <= 0 || o.burn > 0) continue; const od = dist(o, e); if (od < bd) { bd = od; best = o; } }
+      if (best) { best.burn = 3; best.burnDps = e.burnDps; best.burnTick = 0.5; window.__spreads = (window.__spreads || 0) + 1; }
+    }
 
     if (e.boss) {
       bossDefeated(e); // 0.6: boss has its own big reward
@@ -831,18 +1152,25 @@ function attack() {
   const targets = enemies
     .filter(e => e.hp > 0 && dist(e, player) < player.range)
     .sort((a, b) => dist(a, player) - dist(b, player))
-    .slice(0, 1 + (player.multi || 0));
+    .slice(0, 1 + (player.multi || 0) + (player.split || 0)); // 0.8a: Split arrow
+  const M = player.m, main = 1 + (player.multi || 0);
 
-  for (const e of targets) {
+  targets.forEach((e, ti) => {
     let d = Math.round(player.damage * S.dmg * (1 + (sLvl(player.style) - 1) * 0.045));
+    if (ti >= main) d = Math.round(d * 0.6); // 0.8a Split arrow: the extra target takes 60%
     // streak bonus
     if (streak >= 8) d = Math.round(d * 1.18);
     else if (streak >= 4) d = Math.round(d * 1.08);
     // 0.4: Berserker now really gives +20% damage while below 40% HP (matches its description)
-    if (player.berserk && player.hp / player.maxHp < 0.4) d = Math.round(d * 1.2);
+    // 0.8a Warlord's call upgrades the card to 55% / +30%
+    if (player.berserk && player.hp / player.maxHp < (M.zerk4 ? 0.55 : 0.4)) d = Math.round(d * (M.zerk4 ? 1.3 : 1.2));
+    if (M.zerk1 && player.hp / player.maxHp < 0.6) d = Math.round(d * 1.1);           // 0.8a Rage
+    if (M.dead3 && dist(e, player) > 120) d = Math.round(d * 1.15);                   // 0.8a Long shot
+    if (M.dead4 && (e.elite || e.boss || e.kind === 2)) d = Math.round(d * 1.2);      // 0.8a Hunter's focus
+    if (M.skirm4 && player.ambush > 0) d = Math.round(d * 1.35);                      // 0.8a Ambush
 
     const isCrit = Math.random() < (player.crit || 0);
-    if (isCrit) d = Math.round(d * 2.4);
+    if (isCrit) d = Math.round(d * (player.critMul || 2.4)); // 0.8a: Ruby tips 2.7x
 
     shots.push({
       x: player.x, y: player.y,
@@ -851,22 +1179,24 @@ function attack() {
     });
 
     hurt(e, d, isCrit);
+    if (M.pyro2 && e.hp > 0) ignite(e); // 0.8a Ignite
 
-    // melee sweep
+    // melee sweep (0.8a: 55% with the Whirlwind card, 40% from Wide arcs alone)
     if (player.sweep) {
       for (const o of enemies) {
         if (o !== e && o.hp > 0 && dist(o, player) < player.r + 28 + player.sweep)
-          hurt(o, Math.round(d * 0.55), false);
+          hurt(o, Math.round(d * (player.sweepCard ? 0.55 : player.sweepMul)), false);
       }
     }
     // magic splash
     if (player.style === 'magic') {
       for (const o of enemies) {
         if (o !== e && o.hp > 0 && dist(o, e) < 55 + (player.blast || 0))
-          hurt(o, Math.round(d * 0.48), false);
+          hurt(o, Math.round(d * (player.splashMul || 0.48)), false); // 0.8a: Fire Blast mastery 60%
       }
     }
-  }
+  });
+  if (targets.length && player.ambush > 0) player.ambush--; // 0.8a Ambush: one charge per attack
 }
 
 /* ========== SPECIALS & DASH ========== */
@@ -886,6 +1216,7 @@ function doDash() {
     pushOutOfProps(player, player.r * PLAYER_FOOT);
   }
   player.dashCd = player.dashMax;
+  if (player.m.skirm4) player.ambush = 3; // 0.8a Ambush
   player.dashIframes = 0.28;
   player.invuln = 0.28;
   sfx('dash');
@@ -907,12 +1238,16 @@ function doSpecial() {
 
   if (player.style === 'melee') {
     // Whirlwind
+    const M = player.m, R = M.whirl3 ? 120 : 95; // 0.8a Dervish: 120px, 200%
+    let hitN = 0;
     for (const e of enemies) {
-      if (e.hp > 0 && dist(e, player) < 95) {
-        const d = Math.round(player.damage * 1.6);
+      if (e.hp > 0 && dist(e, player) < R) {
+        const d = Math.round(player.damage * (M.whirl3 ? 2.0 : 1.6));
         hurt(e, d, false);
+        hitN++;
       }
     }
+    if (M.whirl4) player.specialCd = Math.max(0, player.specialCd - Math.min(3, hitN * 0.2)); // 0.8a Momentum
     for (let i = 0; i < 18; i++) {
       const a = (i / 18) * Math.PI * 2;
       particles.push({
@@ -925,7 +1260,7 @@ function doSpecial() {
   } else if (player.style === 'ranged') {
     // Barrage – rapid multi target
     const targets = enemies.filter(e => e.hp > 0 && dist(e, player) < player.range * 1.15)
-      .sort((a, b) => dist(a, player) - dist(b, player)).slice(0, 5);
+      .sort((a, b) => dist(a, player) - dist(b, player)).slice(0, player.m.rapid2 ? 7 : 5); // 0.8a Volley
     const myRun = runId; // 0.4: remember which run fired this Barrage
     targets.forEach((e, i) => {
       setTimeout(() => {
@@ -939,18 +1274,26 @@ function doSpecial() {
     });
   } else {
     // Arcane Nova
+    const M = player.m;
+    let mul = 1.35;
+    if (M.blood4) { // 0.8a Blood pact: costs 8% of current HP, +60% damage
+      const cost = player.hp * 0.08;
+      player.hp -= cost; mul *= 1.6;
+      floats.push({ x: player.x, y: player.y - 24, text: '-' + Math.round(cost) + ' 🩸', life: 0.7, vy: -38, color: '#ff6a6a' });
+    }
+    const R = M.ice4 ? 190 : 160; // 0.8a Deep freeze
     for (const e of enemies) {
-      if (e.hp > 0 && dist(e, player) < 160) {
-        const d = Math.round(player.damage * 1.35);
+      if (e.hp > 0 && dist(e, player) < R) {
+        const d = Math.round(player.damage * mul);
         hurt(e, d, false);
-        e.slow = 2.2;
+        e.slow = M.ice4 ? 3.0 : 2.2;
       }
     }
     for (let i = 0; i < 24; i++) {
       const a = (i / 24) * Math.PI * 2;
       particles.push({
         x: player.x, y: player.y,
-        vx: Math.cos(a) * 140, vy: Math.sin(a) * 140,
+        vx: Math.cos(a) * 140 * R / 160, vy: Math.sin(a) * 140 * R / 160,
         life: 0.45, color: '#8ec8ff', size: 5
       });
     }
@@ -1080,6 +1423,10 @@ function renderBuffs() {
   let h = '';
   for (const k in BUFFS) if (buffs[k] > 0) h += '<div class="pill">' + BUFFS[k].icon + ' ' + Math.ceil(buffs[k]) + 's</div>';
   if (phoenix) h += '<div class="pill">🔥 Phoenix</div>';
+  // 0.8a: Mastery pills
+  if (player.m.guard3) h += '<div class="pill">🛡 ' + (player.shieldCd > 0 ? Math.ceil(player.shieldCd) + 's' : 'ready') + '</div>';
+  if (player.evN > 0) h += '<div class="pill">💨 ×' + player.evN + '</div>';
+  if (player.ambush > 0) h += '<div class="pill">🗡 ×' + player.ambush + '</div>';
   if (h !== buffsHtml) { buffsHtml = h; $('buffs').innerHTML = h; }
 }
 
@@ -1205,7 +1552,8 @@ function spawnBoss() {
 
 function bossHitPlayer(d) {
   if (player.invuln > 0) return false; // dash i-frames / Phoenix invulnerability dodge it
-  const dmg = d * (1 - player.armor);
+  if (shieldBlock()) return true;      // 0.8a: Shield block (counts as resolved so breath doesn't retry)
+  const dmg = d * (1 - player.armor) * player.dmgTaken;
   player.hp -= dmg;
   shake = Math.max(shake, 0.3);
   floats.push({ x: player.x, y: player.y - 22, text: '-' + Math.round(dmg), life: 0.8, vy: -40, color: '#ff6a4a' });
@@ -1216,7 +1564,8 @@ function bossHitPlayer(d) {
 // an enemy attack connects (bone, spell, swing or slam). Dash i-frames / Phoenix dodge it.
 function enemyHitPlayer(d) {
   if (player.invuln > 0) return false;
-  const dmg = d * (1 - player.armor);
+  if (shieldBlock()) return false;     // 0.8a: Shield block
+  const dmg = d * (1 - player.armor) * player.dmgTaken;
   player.hp -= dmg;
   player.invuln = Math.max(player.invuln, HIT_MERCY);
   shake = Math.max(shake, 0.22);
@@ -1231,7 +1580,7 @@ function atkZone(e) { return e.ak === 'slam' ? e.reach : e.r + e.reach; }
 function enemyAttack(e, ed, dt) {
   if (e.slamT > 0) e.slamT -= dt;
   if (e.windup > 0) {
-    e.windup -= dt;
+    e.windup -= dt * (player.m.ice3 && (e.slow > 0 || e.chill > 0) ? 0.65 : 1); // 0.8a Numbing frost
     if (e.windup <= 0) finishEnemyAttack(e);
     return 0; // feet planted during the wind-up
   }
@@ -1256,11 +1605,13 @@ function finishEnemyAttack(e) {
   const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1;
   if (e.ak === 'melee') {
     e.swing = 0.16;
-    if (d < atkZone(e) + player.r * 0.5) enemyHitPlayer(e.dmg);
+    if (d < atkZone(e) + player.r * 0.5) { if (!enemyHitPlayer(e.dmg) && player.invuln > HIT_MERCY) dodged(); }
+    else if (d < atkZone(e) + 60) dodged(); // 0.8a Evasion: a swing within 60px missed
   } else if (e.ak === 'slam') {
     e.slamT = SLAM_WAVE;
     if (onScreen(e.x, e.y, 0)) shake = Math.max(shake, 0.25);
-    if (d < e.reach + player.r * 0.5) enemyHitPlayer(e.dmg);
+    if (d < e.reach + player.r * 0.5) { if (!enemyHitPlayer(e.dmg) && player.invuln > HIT_MERCY) dodged(); }
+    else if (d < e.reach + 60) dodged();
   } else {
     const magic = e.ak === 'magic', sp = magic ? ORB_SPEED : BONE_SPEED;
     bolts.push({ kind: e.ak, x: e.x + dx / d * (e.r + 4), y: e.y + dy / d * (e.r + 4), vx: dx / d * sp, vy: dy / d * sp,
@@ -1279,18 +1630,22 @@ function updateBolts(dt) {
       b.vx = Math.cos(a) * ORB_SPEED; b.vy = Math.sin(a) * ORB_SPEED;
     }
     b.x += b.vx * dt; b.y += b.vy * dt; b.spin += dt * 14;
+    const pd = Math.hypot(player.x - b.x, player.y - b.y); // 0.8a: closest pass, for Evasion
+    if (!(b.near <= pd)) b.near = pd;
     const col = b.kind === 'magic' ? ATK_COL.magic : ATK_COL.bone;
     if (hitsSolid(b.x, b.y, b.r)) { // obstacles soak up enemy shots
-      b.life = 0;
+      b.life = 0; b.wall = true;
       for (let i = 0; i < 4; i++) particles.push({ x: b.x, y: b.y, vx: rand(-60, 60), vy: rand(-60, 60), life: 0.25, color: col, size: 3 });
       continue;
     }
     if (Math.hypot(player.x - b.x, player.y - b.y) < player.r * 0.8 + b.r) {
-      b.life = 0; // a dash (or Phoenix) through it makes it fizzle harmlessly
-      enemyHitPlayer(b.dmg);
+      b.life = 0; b.done = true; // a dash (or Phoenix) through it makes it fizzle harmlessly
+      if (!enemyHitPlayer(b.dmg) && player.invuln > HIT_MERCY) dodged(); // 0.8a: dashed through it
       for (let i = 0; i < 5; i++) particles.push({ x: b.x, y: b.y, vx: rand(-70, 70), vy: rand(-70, 70), life: 0.3, color: col, size: 3 });
     }
   }
+  // 0.8a Evasion: a shot that flew out (not into a wall) after passing within 40px of you
+  for (const b of bolts) if (b.life <= 0 && !b.done && !b.wall && b.near < player.r * 0.8 + b.r + 40) dodged();
   if (bolts.length) bolts = bolts.filter(b => b.life > 0);
 }
 
@@ -1590,15 +1945,15 @@ const upgrades = [
   ['Critical eye', '+10% crit chance.', p => p.crit = (p.crit || 0) + 0.10],
 
   // style specific
-  ['Whirlwind', 'Your swings also hit every enemy around you.', p => p.sweep = (p.sweep || 0) + 32, 'melee'],
+  ['Whirlwind', 'Your swings also hit every enemy around you.', p => { p.sweep = (p.sweep || 0) + 32; p.sweepCard = 1; }, 'melee'],
   ['Soul harvest', 'Heal 5 health per kill.', p => p.kh = (p.kh || 0) + 5, 'melee'],
   ['Granite skin', 'Take 18% less damage.', p => p.armor = Math.min(0.65, p.armor + 0.18), 'melee'],
   ['Berserker', 'Damage increased by 20% while below 40% HP.', p => p.berserk = true, 'melee'],
 
-  ['Twin shot', 'Fire at one extra target.', p => p.multi = (p.multi || 0) + 1, 'ranged'],
+  ['Twin shot', 'Fire at one extra target.', p => { p.multi = (p.multi || 0) + 1; if (p.m && p.m.rapid4) p.damage = Math.round(p.damage * 1.1); }, 'ranged'], // 0.8a: Ammo pouch
   ['Ruby bolts', '+12% chance to crit for 2.4x damage.', p => p.crit = (p.crit || 0) + 0.12, 'ranged'],
   ['Eagle eye', '+12% range and +18% damage.', p => { p.rm *= 1.12; p.damage = Math.round(p.damage * 1.18); }, 'ranged'],
-  ['Rapid fire', 'Attack 12% faster.', p => p.rm2 = Math.max(0.3, p.rm2 * 0.88), 'ranged'],
+  ['Rapid fire', 'Attack 12% faster.', p => p.rm2 = Math.max(0.3, p.rm2 * (p.m && p.m.rapid4 ? 0.85 : 0.88)), 'ranged'], // 0.8a: Ammo pouch
 
   ['Blast radius', 'Spell splash reaches further.', p => p.blast = (p.blast || 0) + 28, 'magic'],
   ['Ice barrage', 'Enemies you hit are slowed.', p => p.freeze = 1, 'magic'],
@@ -1626,7 +1981,13 @@ function pickUpgrades() {
     if (picks.length >= 3) break;
     if (!picks.includes(u)) picks.push(u);
   }
-  return picks.slice(0, 3);
+  picks = picks.slice(0, 3);
+  // 0.8a Warlord's call: the Berserker card is offered in each of the first 3 level-ups until taken
+  if (player.m && player.m.zerk4 && player.style === 'melee' && !player.berserk && player.level <= 4) {
+    const bz = upgrades.find(u => u[0] === 'Berserker');
+    if (!picks.includes(bz)) picks[0] = bz;
+  }
+  return picks;
 }
 
 function levelUp() {
@@ -1668,7 +2029,7 @@ function levelUp() {
   try {
     $('panel').innerHTML = '<h2>LEVEL UP!</h2><p>Choose one improvement for this run.</p>' +
       picks.map((u, i) => '<button class="choice" type="button" data-i="' + i + '"><strong>' +
-        u[0] + '</strong><span class="small">' + u[1] + '</span></button>').join('');
+        u[0] + '</strong><span class="small">' + cardText(u) + '</span></button>').join(''); // 0.8a: tree-aware text
     $('overlay').style.display = 'flex';
     $('panel').querySelectorAll('button[data-i]').forEach(btn => {
       btn.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); choose(+btn.dataset.i); };
@@ -1706,7 +2067,8 @@ function endRun() {
   sfx('death');
   const earned = Math.floor(runGold + elapsed / 11);
   save.gold += earned;
-  save.renown += Math.max(1, Math.floor(elapsed / 28) + Math.floor(kills / 22));
+  const renownRun = Math.max(1, Math.floor(elapsed / 28) + Math.floor(kills / 22)) + 8 * bossesSlain; // 0.8a: +8 per boss
+  save.renown += renownRun;
   save.best = Math.max(save.best, Math.floor(elapsed));
   persist();
 
@@ -1722,6 +2084,7 @@ function endRun() {
        Bosses slain: <b>${bossesSlain}</b></p><!-- 0.6 -->
     <p>Run coins: <b>${earned}</b><br>
        Permanent coin purse: <b>${save.gold}</b><br>
+       Renown this run: <b>+${renownRun}</b> (spend it in 🌳 Mastery)<br><!-- 0.8a -->
        Permanent renown: <b>${save.renown}</b><br>
        King Black Dragon kills: <b>${save.bossTotal}</b> total · best run <b>${save.bossBest}</b><br><!-- 0.6 -->
        Attack <b>${sLvl('melee')}</b> · Ranged <b>${sLvl('ranged')}</b> · Magic <b>${sLvl('magic')}</b></p>
@@ -1746,6 +2109,10 @@ function update(dt) {
   for (const k in buffs) buffs[k] = Math.max(0, buffs[k] - dt);
   if (bannerTimer > 0) { bannerTimer -= dt; if (bannerTimer <= 0) $('lootBanner').style.opacity = '0'; }
   player.specialCd = Math.max(0, player.specialCd - dt);
+  // 0.8a: Mastery timers
+  if (player.m.guard3) player.shieldCd = Math.max(0, player.shieldCd - dt);
+  if (player.evT > 0) { player.evT -= dt; if (player.evT <= 0) player.evN = 0; }
+  if (player.m.blood3) player.leech = Math.min(4, player.leech + 4 * dt); // Sanguine budget: 4 HP/s
   player.dashIframes = Math.max(0, player.dashIframes - dt);
   player.invuln = Math.max(0, player.invuln - dt);
   streakTimer = Math.max(0, streakTimer - dt);
@@ -1806,7 +2173,7 @@ function update(dt) {
   if (attackClock <= 0) {
     attack();
     // 0.4: removed the Berserker attack-speed change (it now boosts damage in attack() instead)
-    attackClock = STY[player.style].rate * player.rm2;
+    attackClock = STY[player.style].rate * player.rm2 / (1 + 0.1 * player.evN); // 0.8a: Evasion stacks
   }
 
   // enemies
@@ -1817,9 +2184,16 @@ function update(dt) {
     if (e.hp <= 0) continue;
     let edx = player.x - e.x, edy = player.y - e.y;
     let ed = Math.hypot(edx, edy) || 1;
-    let sp = e.speed * (e.slow > 0 ? 0.38 : 1);
+    let sp = e.speed * (e.slow > 0 ? 0.38 : e.chill > 0 ? 0.75 : 1); // 0.8a: Chill = 25% slow
     if (e.boss && e.atk) sp = 0; // 0.6: the dragon plants its feet while breathing fire
     e.slow = Math.max(0, (e.slow || 0) - dt);
+    if (e.chill > 0) e.chill -= dt;
+    if (e.burn > 0) { // 0.8a Ignite: a tick every 0.5s
+      e.burn -= dt; e.burnTick -= dt;
+      if (e.burnTick <= 0) { e.burnTick = 0.5; hurt(e, Math.max(1, Math.round(e.burnDps * 0.5)), false, true); }
+      if (Math.random() < dt * 8) particles.push({ x: e.x + rand(-6, 6), y: e.y - e.r * 0.5, vx: rand(-10, 10), vy: -40, life: 0.35, color: Math.random() < 0.5 ? '#ff7a2a' : '#ffc84a', size: 3 });
+      if (e.hp <= 0) continue;
+    }
     // 0.7c: attacks. move 1 = walk in, 0 = stand (wind-up / holding a shot), -0.6 = back off
     let move = 1;
     if (!e.boss && e.ak) { move = enemyAttack(e, ed, dt); if (e.swing > 0) e.swing -= dt; }
@@ -1847,12 +2221,17 @@ function update(dt) {
     e.hit = Math.max(0, e.hit - dt);
 
     if (ed < e.r + player.r && player.invuln <= 0) {
-      const dmg = e.damage * dt * (1 - player.armor);
+      const dmg = e.damage * dt * (1 - player.armor) * player.dmgTaken; // 0.8a: Reckless swings
       player.hp -= dmg;
       if (Math.random() < 0.08) shake = Math.max(shake, 0.12);
     }
     // 0.5: Ring of recoil: anything touching you takes a hit every 0.4s
     e.recoilCd = Math.max(0, (e.recoilCd || 0) - dt);
+    // 0.8a Retribution: anything touching you takes 35% weapon damage per second (ticks every 0.5s)
+    if (player.m.guard4) {
+      e.retCd = (e.retCd || 0) - dt;
+      if (ed < e.r + player.r + 4 && e.retCd <= 0) { e.retCd = 0.5; hurt(e, Math.max(1, Math.round(wDmg() * 0.35 * 0.5)), false, true); }
+    }
     if (buffs.recoil > 0 && ed < e.r + player.r + 4 && e.recoilCd <= 0) {
       e.recoilCd = 0.4;
       hurt(e, Math.max(1, Math.round(player.damage * 0.7)), false);
