@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.8a</title>
+<title>Last Stand — Prototype 0.8b</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -55,6 +55,9 @@ button{width:100%;padding:13px 12px;margin-top:8px;border:1px solid #b8a56a;
 button:active{transform:scale(.98);background:#3d553c}
 button:disabled{opacity:.4;cursor:default}
 .choice{background:#243328;text-align:left}
+.choice.lock{opacity:.55;border-color:#3a4a3c}
+.choice.lock strong{color:#9aa08a}
+.choice .unlock{display:block;color:#c8b06a;margin-top:4px;font-size:12px}
 .choice strong{display:block;color:#f2d17d;margin-bottom:3px;font-size:15px}
 .small{font-size:11px;color:#a8b5a0}
 /* 0.8a: Mastery screen (per-class skill trees) */
@@ -164,7 +167,7 @@ body.bossOn #buffs{top:122px}
 <div id="overlay">
   <div class="panel" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.8a</div><!-- 0.7a: new art · 0.7b: obstacles · 0.7c: enemy attacks · 0.8a: Mastery trees -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.8b</div><!-- 0.8b: capstones live + Fisher class -->
     <p>Beyond the old frontier, the dead are stirring. Survive the waves, gather experience, and return with whatever treasure you can carry.</p>
     <p><b>Move:</b> drag left side of screen or WASD / arrows.<br>
        <b>Combat:</b> auto-attacks nearest enemy.<br>
@@ -179,6 +182,10 @@ body.bossOn #buffs{top:122px}
     <button class="choice" data-s="magic"><strong>✨ Magic</strong>
       <span class="small">Glass cannon · splash damage · low health<br>
       Special: Arcane Nova (big freeze blast) · Upgrades: Blast radius, Ice barrage, Arcane focus</span><span class="mcap" data-mc="magic"></span><!-- 0.8a --></button>
+    <button class="choice" data-s="fisher" id="fisherBtn"><strong>🎣 Fisher</strong>
+      <span class="small">Mid-range angler · harpoon + nets · lobster feasts<br>
+      Special: Cast Net (slow the pack) · Upgrades: Hooked, Net practice, Fishy treats</span><span class="mcap" data-mc="fisher"></span>
+      <span class="unlock" id="fisherLock" style="display:none">🔒 Reach level 5 with any class to unlock Fisher</span></button><!-- 0.8b -->
     <button id="shopbtn"></button>
     <button id="trainbtn"></button>
     <button id="mastbtn"></button><!-- 0.8a: Mastery trees -->
@@ -489,7 +496,7 @@ let keys = {};
 const TIER_COST = [15, 25, 35, 50, 80];
 const TIER_GATE = [1, 5, 10, 15, 20];
 const TREE_V = 1;
-const CAPS_LIVE = false; // 0.8a: capstone slots are in the UI; their effects (and buying them) arrive in 0.8b
+const CAPS_LIVE = true; // 0.8b: all capstones purchasable and active (own all 3, equip 1)
 // node: [id, name, icon, effect text, apply(p) for simple stat effects (others are checked in the code via player.m)]
 const TREES = {
   melee: { name: 'Melee', icon: '⚔', skill: 'Attack', branches: [
@@ -500,7 +507,7 @@ const TREES = {
       ['zerk4', "Warlord's call", '📯', 'Berserker card upgraded: 40% → 55% HP threshold, +20% → +30% damage. It is offered in each of your first 3 level-ups until you take it.'],
       ['zerkC', 'Barbarian Fury', '🔥', 'Damage +1% per 2% HP missing (up to +45%). Below 30% HP every hit heals 2 HP and you attack 20% faster.', null, 'Healing from lobsters, chests and the Phoenix is halved.']] },
     { id: 'guard', name: 'Guardian', icon: '🛡', blurb: 'Stand your ground. Block attacks.', nodes: [
-      ['guard1', 'Iron hide', '🦺', '+5% armour.', p => p.armor = Math.min(0.65, p.armor + 0.05)],
+      ['guard1', 'Iron hide', '🦺', '+5% armour.', p => p.armor = Math.min(armorCap(), p.armor + 0.05)],
       ['guard2', 'Stalwart', '💪', '+25 max HP.', p => p.maxHp += 25],
       ['guard3', 'Shield block', '🛡', 'Every 8s your shield charges and fully blocks the next enemy attack (swing, slam, bone, orb or dragon fire). Touch damage is not blocked.'],
       ['guard4', 'Retribution', '⚡', 'Enemies touching you take 35% of your weapon damage per second.'],
@@ -551,7 +558,28 @@ const TREES = {
       ['blood3', 'Sanguine', '🍷', 'Spells heal you for 2% of the damage they deal (up to 4 HP per second).'],
       ['blood4', 'Blood pact', '📜', 'Arcane Nova costs 8% of your current HP but deals +60% damage.'],
       ['bloodC', 'Sanguinesti', '🔮', 'Spell healing 2% → 6% (up to 10 HP/s); overhealing fills a fading blood shield.', null, '−20% max HP.']] }
+  ] },
+  fisher: { name: 'Fisher', icon: '🎣', skill: 'Fishing', branches: [
+    { id: 'harp', name: 'Harpoon', icon: '🪝', blurb: 'Big single hits. Reel them in.', nodes: [
+      ['harp1', 'Barbed tip', '🪝', '+12% harpoon damage.', p => p.damage = Math.round(p.damage * 1.12)],
+      ['harp2', 'Strong arm', '💪', 'Attack 10% faster.', p => p.rm2 /= 1.10],
+      ['harp3', 'Reel', '🎣', '30% chance on hit to yank the enemy 45px toward you (not the dragon).'],
+      ['harp4', 'Barb-tail', '🦈', '+8% crit. Crits always reel.', p => p.crit += 0.08],
+      ['harpC', 'Karambwan Spike', '☠', 'Every 4th hit is a power-slash for 220% damage that always reels. Vs elites, giants and the dragon it also bleeds for 2s.', null, '−15 px attack range.']] },
+    { id: 'net', name: 'Big Net', icon: '🕸', blurb: 'Slow and root groups.', nodes: [
+      ['net1', 'Wide mesh', '🕸', 'Cast Net radius 110 → 135px.'],
+      ['net2', 'Tangled', '🧶', 'Cast Net slow 1.8s → 2.8s. Basic attacks apply 0.5s chill.'],
+      ['net3', 'Anchor weights', '⚓', 'Enemies hit by Cast Net are rooted 0.75s (boss immune).'],
+      ['net4', 'Haul', '📦', 'Cast Net cooldown 8s → 6.5s. A second pulse hits for 60% damage 0.35s later.', p => p.specialMax = 6.5],
+      ['netC', 'Rare Fishing Spot', '✨', 'Cast Net becomes a 5.5s spot that pulses every 1s for 70% damage and slows anything inside. Only one at a time.', null, 'You cannot recast until the spot expires.']] },
+    { id: 'cook', name: 'Cook', icon: '🍳', blurb: 'Lobsters keep you fighting.', nodes: [
+      ['cook1', 'Fishy business', '🦞', '"Eat a lobster" heals 55 → 70. In levels 1–4, if you are below 75% HP, it is offered until you take it.'],
+      ['cook2', "Chef's kiss", '💋', 'Lobster heals 70 → 90 and also grants +12 max HP. Card text notes (Chef\'s kiss).'],
+      ['cook3', 'Shark bait', '🦈', '+20 max HP. After eating a lobster, +15% damage for 5s.', p => p.maxHp += 20],
+      ['cook4', 'Gourmand', '🍽', 'Eating a lobster shortens Cast Net cooldown by 3s.'],
+      ['cookC', 'Feast', '🧺', 'Every 28s you automatically eat a shark: heal 22 HP and gain +15% damage for 5s.', null, '−10% weapon damage (food coma).']] }
   ] }
+
 };
 // flat lookup: NODE[id] = { id, name, icon, desc, apply, bad, cls, br, tier, cap, cost, gate }
 const NODE = {};
@@ -703,8 +731,28 @@ function newPlayer() {
     invuln: 0, facing: 1,
     // 0.8a: Mastery. m = owned regular nodes for this run's class (m.zerk1 etc.)
     m: {}, critMul: 2.4, splashMul: 0.48, sweepMul: 0.4, sweepCard: 0, split: 0, dmgTaken: 1,
-    shieldCd: 0, evN: 0, evT: 0, ambush: 0, leech: 0
+    shieldCd: 0, evN: 0, evT: 0, ambush: 0, leech: 0,
+    // 0.8b capstone / Fisher state
+    healMul: 1, armorCap: 0.65, dashCh: 1, dashChMax: 1, dashRegen: 0,
+    cyclone: 0, hitN: 0, spellN: 0, feastT: 0, meatT: 0, meatMul: 1,
+    fireWave: false, leechCap: 4, leechRate: 0.02, bloodShield: 0,
+    netSpot: null, rootIgnore: 0
   };
+}
+let decoys = [];   // 0.8b Shadow Step
+let firePools = []; // 0.8b Inferno
+function armorCap() { return player.armorCap || 0.65; }
+function healAmt(n) { return n * (player.healMul || 1); } // 0.8b Barbarian Fury halves food heals
+function eatLobster(p) { // 0.8b Cook: shared lobster-card apply
+  p.ateLobster = true;
+  const M = p.m || {};
+  let heal = 55;
+  if (M.cook2) heal = 90; else if (M.cook1) heal = 70;
+  p.hp = Math.min(p.maxHp, p.hp + healAmt(heal));
+  if (M.cook2) { p.maxHp += 12; p.hp = Math.min(p.maxHp, p.hp + healAmt(12)); }
+  if (M.cook3 || M.cookC) { p.meatT = 5; p.meatMul = 1.15; }
+  if (M.cook4) p.specialCd = Math.max(0, p.specialCd - 3);
+  floats.push({ x: p.x, y: p.y - 28, text: '🦞 +' + Math.round(healAmt(heal)), life: 0.9, vy: -36, color: '#ffb070' });
 }
 
 const STY = {
@@ -713,9 +761,14 @@ const STY = {
   ranged: { n:'Ranged', sk:'Ranged', w:['Shortbow','Oak shortbow','Willow shortbow','Maple shortbow','Yew shortbow','Magic shortbow'],
             range:200, dmg:0.88, rate:0.68, col:'#9be58a', specialName:'Barrage' },
   magic:  { n:'Magic',  sk:'Magic',  w:['Wind Strike','Water Bolt','Earth Bolt','Fire Blast','Fire Surge','Ice Barrage'],
-            range:225, dmg:1.08, rate:0.95, col:'#7fb8ff', specialName:'Arcane Nova' }
+            range:225, dmg:1.08, rate:0.95, col:'#7fb8ff', specialName:'Arcane Nova' },
+  fisher: { n:'Fisher', sk:'Fishing', w:['Small fishing net','Big fishing net','Fishing rod','Fly fishing rod','Harpoon','Dragon harpoon'],
+            range:165, dmg:1.12, rate:0.80, col:'#5ec8c0', specialName:'Cast Net' } // 0.8b
 };
-const ORDER = ['melee','ranged','magic'];
+const ORDER = ['melee','ranged','magic','fisher'];
+function fisherUnlocked() { // 0.8b: any class at skill level 5 unlocks Fisher (old saves included)
+  return Math.max(sLvl('melee'), sLvl('ranged'), sLvl('magic'), sLvl('fisher') || 0) >= 5;
+}
 
 function lvl(xp) {
   let l = 1, n = 55;
@@ -730,6 +783,7 @@ function applyStyle(k) {
   const l = sLvl(k);
   // 0.4.1: cap range to what's visible on screen so nothing gets shot offscreen
   player.range = Math.max(140, Math.min(d.range * player.rm, 0.48 * Math.min(W, H)));
+  if (player.m && player.m.harpC) player.range = Math.max(80, player.range - 15); // 0.8b Karambwan Spike drawback
   const wIdx = Math.min(5, Math.floor((l - 1) / 5));
   player.attackName = d.w[wIdx] + ' · ' + d.sk + ' ' + l;
 }
@@ -763,6 +817,11 @@ function start(k) {
   } else if (k === 'ranged') {
     player.speed = 205;
     player.crit = 0.12;
+  } else if (k === 'fisher') { // 0.8b Fisher: mid-range angler
+    player.maxHp = player.hp = 110;
+    player.armor = 0.06;
+    player.speed = 195;
+    player.magnet = 100;
   } else {
     player.maxHp = player.hp = 82;
     player.magnet = 125;
@@ -772,7 +831,7 @@ function start(k) {
   const sh = save.shop, tl = save.tal;
   player.maxHp += sh.hp * 12 + tl.vit * 8;
   player.hp = player.maxHp;
-  player.armor = Math.min(0.65, player.armor + sh.arm * 0.035);
+  player.armor = Math.min(armorCap(), player.armor + sh.arm * 0.035);
   player.speed *= 1 + sh.boots * 0.045;
   player.magnet += sh.mag * 18;
   player.coinBonus = sh.coin * 0.12;
@@ -780,7 +839,9 @@ function start(k) {
   player.rm2 = Math.max(0.32, 1 - tl.haste * 0.045);
   player.xpMul = 1 + tl.wis * 0.12;
   player.dashMax = Math.max(1.4, 2.4 - sh.dash * 0.18);
-  applyMastery(k); // 0.8a: this class's owned tree nodes
+  applyMastery(k); // 0.8a/0.8b: tree nodes + equipped capstone
+  player.armor = Math.min(armorCap(), player.armor);
+  if (player.m.guardC) player.armor = Math.min(armorCap(), player.armor); // Defender raises the cap
 
   enemies = []; orbs = []; shots = []; particles = []; floats = [];
   kills = 0; runGold = 0; elapsed = 0;
@@ -795,6 +856,7 @@ function start(k) {
   // 0.6: no boss yet; first King Black Dragon at 5:00
   boss = null; fireballs = []; bossesSlain = 0; bossCount = 0;
   bolts = []; // 0.7c
+  decoys = []; firePools = []; // 0.8b
   bossNext = BOSS_EVERY; bossWarned = false; bossWarnAt = 0;
   showBossBar(false);
   runId++; // 0.4: new run id (old Barrage timers will see a mismatch and do nothing)
@@ -873,8 +935,27 @@ function applyMastery(k) {
     p.m[id] = true;
     if (n.apply) try { n.apply(p); } catch (err) {}
   }
-  if (CAPS_LIVE && t && t.cap) p.m[t.cap] = true; // 0.8b: capstone effects hook in here
-  if (p.m.guard3) p.shieldCd = 0; // shield starts charged
+  // 0.8b: equipped capstone is the only ★ active this run
+  if (CAPS_LIVE && t && t.cap && t.own.includes(t.cap)) {
+    p.m[t.cap] = true;
+    const cn = NODE[t.cap];
+    if (cn && cn.apply) try { cn.apply(p); } catch (err) {}
+    // built-in capstone stat hooks (drawbacks + simple buffs)
+    if (p.m.zerkC) p.healMul = 0.5;                                 // Barbarian Fury: food/chest/phoenix heal halved
+    if (p.m.guardC) { p.speed *= 0.92; p.armorCap = 0.75; }          // Dragon Defender
+    if (p.m.whirlC) p.specialMax = 10;                               // Cyclone base CD
+    if (p.m.deadC) p.rm2 *= 1.08;                                    // Dragon Hunter Bolt: −8% attack speed
+    if (p.m.rapidC) { p.rm2 /= 1.35; p.damage = Math.round(p.damage * 0.80); } // Toxic Blowpipe
+    if (p.m.skirmC) { p.maxHp = Math.max(30, p.maxHp - 15); p.dashChMax = 2; p.dashCh = 2; } // Shadow Step
+    if (p.m.pyroC) p.fireWave = true;                                // Inferno
+    if (p.m.iceC) p.damage = Math.round(p.damage * 0.90);            // Glacial Tomb
+    if (p.m.bloodC) { p.maxHp = Math.max(30, Math.round(p.maxHp * 0.80)); p.leechCap = 10; p.leechRate = 0.06; } // Sanguinesti
+    if (p.m.harpC) p.range = Math.max(80, p.range - 15);             // Karambwan Spike
+    if (p.m.cookC) { p.damage = Math.round(p.damage * 0.90); p.feastT = 28; } // Feast food coma + timer
+  }
+  if (p.m.guard3) p.shieldCd = 0;
+  if (!p.dashChMax) { p.dashChMax = 1; p.dashCh = 1; }
+  p._dmgBase = p.dmgTaken;
   p.hp = p.maxHp;
 }
 function treeSpent(cls) { return save.tree[cls].own.reduce((a, id) => a + (NODE[id] ? NODE[id].cost : 0), 0); }
@@ -983,6 +1064,10 @@ function cardText(u) {
   if (u[0] === 'Berserker' && m.zerk4) return "Damage increased by 30% while below 55% HP. (Warlord's call)";
   if (u[0] === 'Rapid fire' && m.rapid4) return 'Attack 15% faster. (Ammo pouch)';
   if (u[0] === 'Twin shot' && m.rapid4) return 'Fire at one extra target, and +10% damage. (Ammo pouch)';
+  if (u[0] === 'Eat a lobster') { // 0.8b Cook
+    if (m.cook2) return 'Restore 90 health and gain +12 max HP. (Chef\'s kiss)';
+    if (m.cook1) return 'Restore 70 health. (Fishy business)';
+  }
   return u[1];
 }
 // one weapon hit before crits/streaks (used by burns and Retribution)
@@ -990,10 +1075,18 @@ function wDmg() { return player.damage * STY[player.style].dmg * (1 + (sLvl(play
 // 0.8a Guardian: Shield block. Returns true if this attack was blocked.
 function shieldBlock() {
   if (!player.m.guard3 || player.shieldCd > 0) return false;
-  player.shieldCd = 8;
+  player.shieldCd = player.m.guardC ? 4 : 8; // 0.8b Dragon Defender: 4s
   player.invuln = Math.max(player.invuln, 0.25);
   floats.push({ x: player.x, y: player.y - 26, text: '🛡 blocked', life: 0.8, vy: -36, color: '#9ad0ff' });
   for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; particles.push({ x: player.x + Math.cos(a) * 18, y: player.y + Math.sin(a) * 18, vx: Math.cos(a) * 80, vy: Math.sin(a) * 80, life: 0.3, color: '#9ad0ff', size: 3 }); }
+  if (player.m.guardC) { // 0.8b shockwave
+    const sd = Math.round(wDmg() * 1.2);
+    for (const e of enemies) if (e.hp > 0 && dist(e, player) < 90) {
+      hurt(e, sd, false);
+      if (!e.boss) { const k = dist(e, player) || 1; e.x += (e.x - player.x) / k * 60; e.y += (e.y - player.y) / k * 60; }
+    }
+    for (let i = 0; i < 14; i++) { const a = i / 14 * 6.283; particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * 140, vy: Math.sin(a) * 140, life: 0.35, color: '#9ad0ff', size: 4 }); }
+  }
   try { sfx('hit'); } catch (err) {}
   window.__blocks = (window.__blocks || 0) + 1;
   return true;
@@ -1022,12 +1115,23 @@ function bind() {
   $('mastbtn').textContent = '🌳 Mastery · ' + save.renown + ' renown';
   $('mastbtn').onclick = () => mastery(lastClass || 'melee');
   document.querySelectorAll('[data-mc]').forEach(el => {
-    const k = el.dataset.mc, t = save.tree[k], c = t.cap ? NODE[t.cap] : null;
-    el.textContent = t.own.length ? '🌳 Mastery: ' + t.own.length + ' node' + (t.own.length > 1 ? 's' : '') + (c ? ' · ★ ' + c.name : '') : '';
+    const k = el.dataset.mc, t = save.tree[k], c = t && t.cap ? NODE[t.cap] : null;
+    el.textContent = (t && t.own.length) ? '🌳 Mastery: ' + t.own.length + ' node' + (t.own.length > 1 ? 's' : '') + (c ? ' · ★ ' + c.name : '') : '';
   });
   if (save.treeRefund) { toast('Mastery trees changed: +' + save.treeRefund + ' renown refunded'); delete save.treeRefund; persist(); }
-  document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { lastClass = b.dataset.s; start(b.dataset.s); });
-  $('saveinfo').textContent = `Saved on this device · Coins ${save.gold} · Best ${fmt(save.best)} · Attack ${sLvl('melee')} · Ranged ${sLvl('ranged')} · Magic ${sLvl('magic')}`;
+  // 0.8b Fisher unlock gate
+  const fu = fisherUnlocked();
+  const fb = $('fisherBtn');
+  if (fb) {
+    fb.classList.toggle('lock', !fu);
+    const lk = $('fisherLock'); if (lk) lk.style.display = fu ? 'none' : 'block';
+  }
+  document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => {
+    if (b.dataset.s === 'fisher' && !fisherUnlocked()) { toast('Reach level 5 with any class to unlock Fisher'); return; }
+    lastClass = b.dataset.s; start(b.dataset.s);
+  });
+  $('saveinfo').textContent = `Saved on this device · Coins ${save.gold} · Best ${fmt(save.best)} · Attack ${sLvl('melee')} · Ranged ${sLvl('ranged')} · Magic ${sLvl('magic')}` +
+    (fu ? ` · Fishing ${sLvl('fisher')}` : '');
 }
 bind();
 
@@ -1097,9 +1201,13 @@ function hurt(e, d, isCrit, dot) { // 0.8a: dot = burn tick / Retribution (no on
   if (!dot) {
     if (player.freeze) e.slow = 1.6;
     if (M.ice1) e.chill = Math.max(e.chill || 0, 1.2); // 0.8a Chill: 25% slow
-    if (M.blood3 && player.leech > 0) { // 0.8a Sanguine: 2% of spell damage, max 4 HP/s
-      const hl = Math.min(player.leech, d * 0.02);
-      player.leech -= hl; player.hp = Math.min(player.maxHp, player.hp + hl);
+    if ((M.blood3 || M.bloodC) && player.leech > 0) { // 0.8a/0.8b Sanguine / Sanguinesti
+      const rate = player.leechRate || 0.02;
+      let hl = Math.min(player.leech, d * rate);
+      player.leech -= hl;
+      const room = player.maxHp - player.hp;
+      if (hl > room && M.bloodC) { player.bloodShield = Math.min(player.maxHp * 0.25, (player.bloodShield || 0) + (hl - room)); hl = room; }
+      player.hp = Math.min(player.maxHp, player.hp + hl);
     }
   }
 
@@ -1118,10 +1226,16 @@ function hurt(e, d, isCrit, dot) { // 0.8a: dot = burn tick / Retribution (no on
     streak++;
     streakTimer = 2.8;
     if (player.kh) player.hp = Math.min(player.maxHp, player.hp + player.kh);
-    if (e.burn > 0 && M.pyro4) { // 0.8a Wildfire: the burn jumps to 1 enemy within 70px
+    if (e.burn > 0 && M.pyro4) { // 0.8a Wildfire
       let best = null, bd = 70;
       for (const o of enemies) { if (o === e || o.hp <= 0 || o.burn > 0) continue; const od = dist(o, e); if (od < bd) { bd = od; best = o; } }
       if (best) { best.burn = 3; best.burnDps = e.burnDps; best.burnTick = 0.5; window.__spreads = (window.__spreads || 0) + 1; }
+    }
+    if (M.pyroC && Math.random() < 0.35) firePools.push({ x: e.x, y: e.y, r: 65, life: 2.5, dps: wDmg() * 0.40, tick: 0.25 });
+    if (e.freezeT > 0 && M.iceC) {
+      const sd = Math.round(wDmg() * 0.5);
+      for (const o of enemies) if (o !== e && o.hp > 0 && dist(o, e) < 60) hurt(o, sd, false, true);
+      for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; particles.push({ x: e.x, y: e.y, vx: Math.cos(a) * 100, vy: Math.sin(a) * 100, life: 0.35, color: '#b8e8ff', size: 4 }); }
     }
 
     if (e.boss) {
@@ -1148,38 +1262,57 @@ function hurt(e, d, isCrit, dot) { // 0.8a: dot = burn tick / Retribution (no on
 }
 
 function attack() {
+  if (player.cyclone > 0) return; // 0.8b Cyclone: normal attacks pause during the spin
   const S = STY[player.style];
   const targets = enemies
     .filter(e => e.hp > 0 && dist(e, player) < player.range)
     .sort((a, b) => dist(a, player) - dist(b, player))
-    .slice(0, 1 + (player.multi || 0) + (player.split || 0)); // 0.8a: Split arrow
+    .slice(0, 1 + (player.multi || 0) + (player.split || 0));
   const M = player.m, main = 1 + (player.multi || 0);
+  player.hitN = (player.hitN || 0) + 1;
+  const spike = !!(M.harpC && player.hitN % 4 === 0);
+  const bolt = !!(M.deadC && player.hitN % 4 === 0);
 
   targets.forEach((e, ti) => {
     let d = Math.round(player.damage * S.dmg * (1 + (sLvl(player.style) - 1) * 0.045));
-    if (ti >= main) d = Math.round(d * 0.6); // 0.8a Split arrow: the extra target takes 60%
-    // streak bonus
+    if (ti >= main) d = Math.round(d * 0.6);
     if (streak >= 8) d = Math.round(d * 1.18);
     else if (streak >= 4) d = Math.round(d * 1.08);
-    // 0.4: Berserker now really gives +20% damage while below 40% HP (matches its description)
-    // 0.8a Warlord's call upgrades the card to 55% / +30%
     if (player.berserk && player.hp / player.maxHp < (M.zerk4 ? 0.55 : 0.4)) d = Math.round(d * (M.zerk4 ? 1.3 : 1.2));
-    if (M.zerk1 && player.hp / player.maxHp < 0.6) d = Math.round(d * 1.1);           // 0.8a Rage
-    if (M.dead3 && dist(e, player) > 120) d = Math.round(d * 1.15);                   // 0.8a Long shot
-    if (M.dead4 && (e.elite || e.boss || e.kind === 2)) d = Math.round(d * 1.2);      // 0.8a Hunter's focus
-    if (M.skirm4 && player.ambush > 0) d = Math.round(d * 1.35);                      // 0.8a Ambush
+    if (M.zerk1 && player.hp / player.maxHp < 0.6) d = Math.round(d * 1.1);
+    if (M.dead3 && dist(e, player) > 120) d = Math.round(d * 1.15);
+    if (M.dead4 && (e.elite || e.boss || e.kind === 2)) d = Math.round(d * 1.2);
+    if (M.skirm4 && player.ambush > 0) d = Math.round(d * 1.35);
+    if (M.zerkC) { const miss = 1 - player.hp / Math.max(1, player.maxHp); d = Math.round(d * (1 + Math.min(0.45, miss * 0.5))); }
+    if (player.meatT > 0) d = Math.round(d * (player.meatMul || 1.15));
+    if (spike && ti === 0) d = Math.round(d * 2.2);
+    if (bolt && ti === 0 && e.boss) d = Math.round(d * 1.25);
 
-    const isCrit = Math.random() < (player.crit || 0);
-    if (isCrit) d = Math.round(d * (player.critMul || 2.4)); // 0.8a: Ruby tips 2.7x
+    let isCrit = Math.random() < (player.crit || 0);
+    if (bolt && ti === 0) isCrit = true;
+    if (isCrit) d = Math.round(d * (player.critMul || 2.4));
 
-    shots.push({
-      x: player.x, y: player.y,
-      tx: e.x, ty: e.y,
-      life: 0.14, col: S.col, thick: isCrit ? 4 : 2.5
-    });
+    const thick = (bolt && ti === 0) ? 5 : (isCrit ? 4 : (player.style === 'fisher' ? 3.2 : 2.5));
+    shots.push({ x: player.x, y: player.y, tx: e.x, ty: e.y, life: (bolt && ti === 0) ? 0.22 : 0.14, col: S.col, thick });
 
     hurt(e, d, isCrit);
-    if (M.pyro2 && e.hp > 0) ignite(e); // 0.8a Ignite
+    if (M.pyro2 && e.hp > 0) ignite(e);
+    if (M.rapidC && e.hp > 0) { e.venom = Math.min(3, (e.venom || 0) + 1); e.venomT = 4; e.venomDps = wDmg() * 0.20; e.venomTick = 0.5; }
+    if (M.iceC && ti === 0) {
+      player.spellN = (player.spellN || 0) + 1;
+      if (player.spellN % 3 === 0 && e.hp > 0) {
+        if (e.boss) e.slow = Math.max(e.slow || 0, 1.2);
+        else { e.freezeT = e.elite ? 0.6 : 1.2; e.windup = 0; }
+      }
+    }
+    const doReel = (M.harp3 && Math.random() < 0.30) || (M.harp4 && isCrit) || spike;
+    if (doReel && ti === 0 && e.hp > 0 && !e.boss) {
+      const dd = dist(e, player) || 1;
+      e.x -= (e.x - player.x) / dd * 45; e.y -= (e.y - player.y) / dd * 45;
+    }
+    if (spike && ti === 0 && e.hp > 0 && (e.elite || e.boss || e.kind === 2)) { e.bleed = 2; e.bleedDps = wDmg() * 0.10; e.bleedTick = 0.5; }
+    if (M.net2 && e.hp > 0) e.chill = Math.max(e.chill || 0, 0.5);
+    if (M.zerkC && player.hp / player.maxHp < 0.3) player.hp = Math.min(player.maxHp, player.hp + 2);
 
     // melee sweep (0.8a: 55% with the Whirlwind card, 40% from Wide arcs alone)
     if (player.sweep) {
@@ -1197,74 +1330,94 @@ function attack() {
     }
   });
   if (targets.length && player.ambush > 0) player.ambush--; // 0.8a Ambush: one charge per attack
+  // 0.8b Dragon Hunter Bolt: pierce everything along the line to the primary target
+  if (bolt && targets[0]) {
+    const t = targets[0];
+    const len = dist(t, player) || 1, ux = (t.x - player.x) / len, uy = (t.y - player.y) / len;
+    const reach = player.range;
+    for (const o of enemies) {
+      if (o === t || o.hp <= 0) continue;
+      const px = o.x - player.x, py = o.y - player.y;
+      const along = px * ux + py * uy;
+      if (along < 0 || along > reach) continue;
+      const perp = Math.abs(px * uy - py * ux);
+      if (perp < o.r + 14) {
+        let pd = Math.round(player.damage * S.dmg * (1 + (sLvl(player.style) - 1) * 0.045) * (player.critMul || 2.4));
+        if (o.boss) pd = Math.round(pd * 1.25);
+        hurt(o, pd, true);
+      }
+    }
+  }
 }
 
 /* ========== SPECIALS & DASH ========== */
 function doDash() {
-  if (player.dashCd > 0 || player.dashIframes > 0) return;
+  // 0.8b Shadow Step: spend a charge; otherwise classic single dash gated by dashCd
+  if (player.dashIframes > 0) return;
+  if (player.m.skirmC) { if (player.dashCh <= 0) return; }
+  else if (player.dashCd > 0) return;
   ensureAudio();
   let dx = (keys.ArrowRight || keys.d ? 1 : 0) - (keys.ArrowLeft || keys.a ? 1 : 0);
   let dy = (keys.ArrowDown || keys.s ? 1 : 0) - (keys.ArrowUp || keys.w ? 1 : 0);
   if (joystick.active) { dx = joystick.x; dy = joystick.y; }
-  // 0.4: standing still? dash the way you're facing instead of wasting the cooldown
   if (Math.hypot(dx, dy) < 0.05) { dx = player.facing; dy = 0; }
   let mag = Math.hypot(dx, dy) || 1;
-  // 0.7b: dash in 5 small steps so it slides along obstacles instead of jumping into them
+  const ox = player.x, oy = player.y;
   for (let i = 0; i < 5; i++) {
     player.x += (dx / mag) * 19;
     player.y += (dy / mag) * 19;
     pushOutOfProps(player, player.r * PLAYER_FOOT);
   }
-  player.dashCd = player.dashMax;
-  if (player.m.skirm4) player.ambush = 3; // 0.8a Ambush
+  if (player.m.skirmC) {
+    player.dashCh--;
+    if (player.dashRegen <= 0) player.dashRegen = player.dashMax;
+    decoys.push({ x: ox, y: oy, life: 2.5, r: 16 }); // 0.8b decoy
+  } else {
+    player.dashCd = player.dashMax;
+  }
+  if (player.m.skirm4) player.ambush = 3;
   player.dashIframes = 0.28;
   player.invuln = 0.28;
   sfx('dash');
   for (let i = 0; i < 6; i++) {
-    particles.push({
-      x: player.x, y: player.y,
-      vx: rand(-40, 40), vy: rand(-40, 40),
-      life: 0.25, color: '#c8e0b0', size: 3
-    });
+    particles.push({ x: player.x, y: player.y, vx: rand(-40, 40), vy: rand(-40, 40), life: 0.25, color: '#c8e0b0', size: 3 });
   }
 }
 
 function doSpecial() {
   if (player.specialCd > 0) return;
+  // 0.8b Rare Fishing Spot: cannot recast while a spot is active
+  if (player.m.netC && player.netSpot) return;
   ensureAudio();
   player.specialCd = player.specialMax;
   sfx('special');
   shake = 0.25;
+  const M = player.m;
 
   if (player.style === 'melee') {
-    // Whirlwind
-    const M = player.m, R = M.whirl3 ? 120 : 95; // 0.8a Dervish: 120px, 200%
+    if (M.whirlC) { // 0.8b Cyclone: 2s steerable spin
+      player.cyclone = 2.0; player.cycPulse = 0;
+      return;
+    }
+    const R = M.whirl3 ? 120 : 95;
     let hitN = 0;
     for (const e of enemies) {
       if (e.hp > 0 && dist(e, player) < R) {
-        const d = Math.round(player.damage * (M.whirl3 ? 2.0 : 1.6));
-        hurt(e, d, false);
+        hurt(e, Math.round(player.damage * (M.whirl3 ? 2.0 : 1.6)), false);
         hitN++;
       }
     }
-    if (M.whirl4) player.specialCd = Math.max(0, player.specialCd - Math.min(3, hitN * 0.2)); // 0.8a Momentum
+    if (M.whirl4) player.specialCd = Math.max(0, player.specialCd - Math.min(3, hitN * 0.2));
     for (let i = 0; i < 18; i++) {
       const a = (i / 18) * Math.PI * 2;
-      particles.push({
-        x: player.x + Math.cos(a) * 30,
-        y: player.y + Math.sin(a) * 30,
-        vx: Math.cos(a) * 90, vy: Math.sin(a) * 90,
-        life: 0.35, color: '#ffd27a', size: 4
-      });
+      particles.push({ x: player.x + Math.cos(a) * 30, y: player.y + Math.sin(a) * 30, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, life: 0.35, color: '#ffd27a', size: 4 });
     }
   } else if (player.style === 'ranged') {
-    // Barrage – rapid multi target
     const targets = enemies.filter(e => e.hp > 0 && dist(e, player) < player.range * 1.15)
-      .sort((a, b) => dist(a, player) - dist(b, player)).slice(0, player.m.rapid2 ? 7 : 5); // 0.8a Volley
-    const myRun = runId; // 0.4: remember which run fired this Barrage
+      .sort((a, b) => dist(a, player) - dist(b, player)).slice(0, M.rapid2 ? 7 : 5);
+    const myRun = runId;
     targets.forEach((e, i) => {
       setTimeout(() => {
-        // 0.4: skip the arrow if the game is paused, leveling, over, or a new run started
         if (!playing || paused || leveling || myRun !== runId) return;
         if (e.hp <= 0) return;
         const d = Math.round(player.damage * 0.95);
@@ -1272,31 +1425,65 @@ function doSpecial() {
         hurt(e, d, Math.random() < 0.25);
       }, i * 55);
     });
+  } else if (player.style === 'fisher') { // 0.8b Cast Net / Rare Fishing Spot
+    castNet();
   } else {
-    // Arcane Nova
-    const M = player.m;
+    // Arcane Nova / 0.8b Fire Wave
     let mul = 1.35;
-    if (M.blood4) { // 0.8a Blood pact: costs 8% of current HP, +60% damage
+    if (M.blood4) {
       const cost = player.hp * 0.08;
       player.hp -= cost; mul *= 1.6;
       floats.push({ x: player.x, y: player.y - 24, text: '-' + Math.round(cost) + ' 🩸', life: 0.7, vy: -38, color: '#ff6a6a' });
     }
-    const R = M.ice4 ? 190 : 160; // 0.8a Deep freeze
+    if (M.pyroC) mul *= 1.25; // Fire Wave
+    const R = M.ice4 ? 190 : 160;
     for (const e of enemies) {
       if (e.hp > 0 && dist(e, player) < R) {
-        const d = Math.round(player.damage * mul);
-        hurt(e, d, false);
-        e.slow = M.ice4 ? 3.0 : 2.2;
+        hurt(e, Math.round(player.damage * mul), false);
+        if (M.pyroC) ignite(e); // Fire Wave ignites; no slow
+        else e.slow = M.ice4 ? 3.0 : 2.2;
       }
     }
+    const col = M.pyroC ? '#ff8a3c' : '#8ec8ff';
     for (let i = 0; i < 24; i++) {
       const a = (i / 24) * Math.PI * 2;
-      particles.push({
-        x: player.x, y: player.y,
-        vx: Math.cos(a) * 140 * R / 160, vy: Math.sin(a) * 140 * R / 160,
-        life: 0.45, color: '#8ec8ff', size: 5
-      });
+      particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * 140 * R / 160, vy: Math.sin(a) * 140 * R / 160, life: 0.45, color: col, size: 5 });
     }
+  }
+}
+function castNet() { // 0.8b Fisher special
+  const M = player.m;
+  let R = (M.net1 ? 135 : 110) + (player.netBonus || 0);
+  let cx = player.x, cy = player.y;
+  const near = enemies.filter(e => e.hp > 0).sort((a, b) => dist(a, player) - dist(b, player))[0];
+  if (near && dist(near, player) < player.range) {
+    const ang = Math.atan2(near.y - player.y, near.x - player.x);
+    cx += Math.cos(ang) * 40; cy += Math.sin(ang) * 40;
+  }
+  if (M.netC) { // Rare Fishing Spot
+    player.netSpot = { x: cx, y: cy, r: R, life: 5.5, tick: 0 };
+    floats.push({ x: cx, y: cy - 20, text: '✨ Rare spot!', life: 1.0, vy: -30, color: '#5ec8c0' });
+    return;
+  }
+  netPulse(cx, cy, R, 1.0);
+  if (M.net4) {
+    const myRun = runId, x = cx, y = cy, r = R;
+    setTimeout(() => { if (!playing || paused || leveling || myRun !== runId) return; netPulse(x, y, r, 0.6); }, 350);
+  }
+}
+function netPulse(cx, cy, R, mul) {
+  const M = player.m;
+  const slowT = M.net2 ? 2.8 : 1.8;
+  for (const e of enemies) {
+    if (e.hp <= 0 || Math.hypot(e.x - cx, e.y - cy) > R) continue;
+    hurt(e, Math.round(player.damage * 1.30 * mul), false);
+    e.slow = Math.max(e.slow || 0, slowT);
+    if (M.net3 && !e.boss) e.root = Math.max(e.root || 0, 0.75);
+    if (e.hp <= 0) floats.push({ x: e.x, y: e.y - 20, text: 'Caught!', life: 0.7, vy: -34, color: '#5ec8c0' });
+  }
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 20) * Math.PI * 2;
+    particles.push({ x: cx + Math.cos(a) * R * 0.4, y: cy + Math.sin(a) * R * 0.4, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, life: 0.4, color: '#5ec8c0', size: 4 });
   }
 }
 
@@ -1395,7 +1582,8 @@ function giveSpike(k) {
 // 0.5: Phoenix necklace: survive at 50% HP, short invulnerability, and blast enemies back
 function phoenixSave() {
   phoenix = false;
-  player.hp = player.maxHp * 0.5;
+  // 0.8b Barbarian Fury: Phoenix revive heal halved (25% instead of 50%)
+  player.hp = player.maxHp * (player.healMul < 1 ? 0.25 : 0.5);
   player.invuln = 2.5;
   shake = 0.4;
   sfx('special');
@@ -1427,6 +1615,13 @@ function renderBuffs() {
   if (player.m.guard3) h += '<div class="pill">🛡 ' + (player.shieldCd > 0 ? Math.ceil(player.shieldCd) + 's' : 'ready') + '</div>';
   if (player.evN > 0) h += '<div class="pill">💨 ×' + player.evN + '</div>';
   if (player.ambush > 0) h += '<div class="pill">🗡 ×' + player.ambush + '</div>';
+  // 0.8b capstone / Fisher pills
+  if (player.m.skirmC) h += '<div class="pill">🌑 ' + '●'.repeat(player.dashCh) + '○'.repeat(Math.max(0, player.dashChMax - player.dashCh)) + '</div>';
+  if (player.cyclone > 0) h += '<div class="pill">🌀 ' + player.cyclone.toFixed(1) + 's</div>';
+  if (player.meatT > 0) h += '<div class="pill">🍖 ' + Math.ceil(player.meatT) + 's</div>';
+  if (player.bloodShield > 0) h += '<div class="pill">🩸 ' + Math.ceil(player.bloodShield) + '</div>';
+  if (player.netSpot) h += '<div class="pill">✨ spot</div>';
+  if (player.m.cookC) h += '<div class="pill">🦈 ' + Math.ceil(player.feastT) + 's</div>';
   if (h !== buffsHtml) { buffsHtml = h; $('buffs').innerHTML = h; }
 }
 
@@ -1551,9 +1746,10 @@ function spawnBoss() {
 }
 
 function bossHitPlayer(d) {
-  if (player.invuln > 0) return false; // dash i-frames / Phoenix invulnerability dodge it
-  if (shieldBlock()) return true;      // 0.8a: Shield block (counts as resolved so breath doesn't retry)
-  const dmg = d * (1 - player.armor) * player.dmgTaken;
+  if (player.invuln > 0) return false;
+  if (shieldBlock()) return true;
+  let dmg = d * (1 - player.armor) * player.dmgTaken;
+  if (player.bloodShield > 0) { const abs = Math.min(player.bloodShield, dmg); player.bloodShield -= abs; dmg -= abs; }
   player.hp -= dmg;
   shake = Math.max(shake, 0.3);
   floats.push({ x: player.x, y: player.y - 22, text: '-' + Math.round(dmg), life: 0.8, vy: -40, color: '#ff6a4a' });
@@ -1564,8 +1760,9 @@ function bossHitPlayer(d) {
 // an enemy attack connects (bone, spell, swing or slam). Dash i-frames / Phoenix dodge it.
 function enemyHitPlayer(d) {
   if (player.invuln > 0) return false;
-  if (shieldBlock()) return false;     // 0.8a: Shield block
-  const dmg = d * (1 - player.armor) * player.dmgTaken;
+  if (shieldBlock()) return false;
+  let dmg = d * (1 - player.armor) * player.dmgTaken;
+  if (player.bloodShield > 0) { const abs = Math.min(player.bloodShield, dmg); player.bloodShield -= abs; dmg -= abs; }
   player.hp -= dmg;
   player.invuln = Math.max(player.invuln, HIT_MERCY);
   shake = Math.max(shake, 0.22);
@@ -1938,16 +2135,16 @@ const upgrades = [
   ['Stout constitution', 'Gain 30 maximum health and heal 30.', p => { p.maxHp += 30; p.hp = Math.min(p.maxHp, p.hp + 30); }],
   ['Fleet-footed', 'Move 14% faster.', p => p.speed *= 1.14],
   ['Long reach', 'Increase attack range by 18%.', p => p.rm *= 1.18],
-  ['Eat a lobster', 'Restore 55 health.', p => p.hp = Math.min(p.maxHp, p.hp + 55)],
+  ['Eat a lobster', 'Restore 55 health.', p => eatLobster(p)], // 0.8b: Cook nodes upgrade this
   ['Ring of wealth', 'Gain 22% more coins this run.', p => p.coinBonus = (p.coinBonus || 0) + 0.22],
-  ['Thick skin', 'Take 12% less damage.', p => p.armor = Math.min(0.65, p.armor + 0.12)],
+  ['Thick skin', 'Take 12% less damage.', p => p.armor = Math.min(armorCap(), p.armor + 0.12)],
   ['Bloodlust', 'Gain 6 health on every kill.', p => p.kh = (p.kh || 0) + 6],
   ['Critical eye', '+10% crit chance.', p => p.crit = (p.crit || 0) + 0.10],
 
   // style specific
   ['Whirlwind', 'Your swings also hit every enemy around you.', p => { p.sweep = (p.sweep || 0) + 32; p.sweepCard = 1; }, 'melee'],
   ['Soul harvest', 'Heal 5 health per kill.', p => p.kh = (p.kh || 0) + 5, 'melee'],
-  ['Granite skin', 'Take 18% less damage.', p => p.armor = Math.min(0.65, p.armor + 0.18), 'melee'],
+  ['Granite skin', 'Take 18% less damage.', p => p.armor = Math.min(armorCap(), p.armor + 0.18), 'melee'],
   ['Berserker', 'Damage increased by 20% while below 40% HP.', p => p.berserk = true, 'melee'],
 
   ['Twin shot', 'Fire at one extra target.', p => { p.multi = (p.multi || 0) + 1; if (p.m && p.m.rapid4) p.damage = Math.round(p.damage * 1.1); }, 'ranged'], // 0.8a: Ammo pouch
@@ -1958,7 +2155,13 @@ const upgrades = [
   ['Blast radius', 'Spell splash reaches further.', p => p.blast = (p.blast || 0) + 28, 'magic'],
   ['Ice barrage', 'Enemies you hit are slowed.', p => p.freeze = 1, 'magic'],
   ['Arcane focus', '+28% spell damage.', p => p.damage = Math.round(p.damage * 1.28), 'magic'],
-  ['Mana shield', 'Gain 20 max HP and 8% armour.', p => { p.maxHp += 20; p.hp += 20; p.armor = Math.min(0.65, p.armor + 0.08); }, 'magic']
+  ['Mana shield', 'Gain 20 max HP and 8% armour.', p => { p.maxHp += 20; p.hp += 20; p.armor = Math.min(armorCap(), p.armor + 0.08); }, 'magic'],
+
+  // 0.8b Fisher
+  ['Hooked', 'Deal 18% more damage, but attack 8% slower.', p => { p.damage = Math.round(p.damage * 1.18); p.rm2 *= 1.08; }, 'fisher'],
+  ['Net practice', 'Cast Net radius +25px.', p => { p.netBonus = (p.netBonus || 0) + 25; }, 'fisher'],
+  ['Fishy treats', 'Heal 4 health per kill.', p => p.kh = (p.kh || 0) + 4, 'fisher'],
+  ['Angler\'s outfit', 'Move 12% faster and pull loot from further away.', p => { p.speed *= 1.12; p.magnet += 20; }, 'fisher']
 ];
 
 // 0.4: level-up rewritten. The old version built a separate pop-up that froze the game
@@ -1986,6 +2189,11 @@ function pickUpgrades() {
   if (player.m && player.m.zerk4 && player.style === 'melee' && !player.berserk && player.level <= 4) {
     const bz = upgrades.find(u => u[0] === 'Berserker');
     if (!picks.includes(bz)) picks[0] = bz;
+  }
+  // 0.8b Fishy business: force lobster early only when hurt (so it does not steal damage cards at full HP)
+  if (player.m && player.m.cook1 && player.style === 'fisher' && !player.ateLobster && player.level <= 4 && player.hp / player.maxHp < 0.75) {
+    const lb = upgrades.find(u => u[0] === 'Eat a lobster');
+    if (lb && !picks.includes(lb)) picks[0] = lb;
   }
   return picks;
 }
@@ -2112,7 +2320,63 @@ function update(dt) {
   // 0.8a: Mastery timers
   if (player.m.guard3) player.shieldCd = Math.max(0, player.shieldCd - dt);
   if (player.evT > 0) { player.evT -= dt; if (player.evT <= 0) player.evN = 0; }
-  if (player.m.blood3) player.leech = Math.min(4, player.leech + 4 * dt); // Sanguine budget: 4 HP/s
+  if (player.m.blood3 || player.m.bloodC) {
+    const cap = player.leechCap || 4;
+    player.leech = Math.min(cap, player.leech + cap * dt);
+  }
+  if (player.bloodShield > 0) player.bloodShield = Math.max(0, player.bloodShield - 3 * dt); // 0.8b fades 3/s
+  if (player.meatT > 0) player.meatT = Math.max(0, player.meatT - dt);
+  // 0.8b Feast: periodic auto-shark
+  if (player.m.cookC) {
+    player.feastT -= dt;
+    if (player.feastT <= 0) {
+      player.feastT = 28;
+      player.hp = Math.min(player.maxHp, player.hp + healAmt(22));
+      player.meatT = 5; player.meatMul = 1.15;
+      floats.push({ x: player.x, y: player.y - 28, text: '🦈 Feast!', life: 1.0, vy: -36, color: '#ffb070' });
+    }
+  }
+  // 0.8b Shadow Step charge regen
+  if (player.m.skirmC && player.dashCh < player.dashChMax) {
+    player.dashRegen -= dt;
+    if (player.dashRegen <= 0) { player.dashCh++; player.dashRegen = player.dashCh < player.dashChMax ? player.dashMax : 0; }
+  }
+  // 0.8b Cyclone pulses
+  if (player.cyclone > 0) {
+    player.cyclone -= dt; player.cycPulse = (player.cycPulse || 0) - dt;
+    player.dmgTaken = 0.7; // 30% less damage during spin
+    if (player.cycPulse <= 0) {
+      player.cycPulse = 0.4;
+      for (const e of enemies) if (e.hp > 0 && dist(e, player) < 115) hurt(e, Math.round(player.damage * 0.80), false);
+      for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; particles.push({ x: player.x + Math.cos(a) * 40, y: player.y + Math.sin(a) * 40, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, life: 0.25, color: '#ffd27a', size: 4 }); }
+    }
+    if (player.cyclone <= 0) player.dmgTaken = player._dmgBase || (player.m.zerk3 ? 1.05 : 1);
+  }
+  // 0.8b Rare Fishing Spot pulses
+  if (player.netSpot) {
+    const s = player.netSpot; s.life -= dt; s.tick -= dt;
+    if (s.tick <= 0) { s.tick = 1; netPulse(s.x, s.y, s.r, 0.70 / 1.30); } // 70% weapon via mul against castNet's 1.30
+    if (s.life <= 0) player.netSpot = null;
+  }
+  // 0.8b decoys
+  for (let i = decoys.length - 1; i >= 0; i--) {
+    const dcy = decoys[i]; dcy.life -= dt;
+    if (dcy.life <= 0) {
+      const sd = Math.round(wDmg() * 1.5);
+      for (const e of enemies) if (e.hp > 0 && dist(e, dcy) < 80) hurt(e, sd, false);
+      for (let j = 0; j < 16; j++) { const a = j / 16 * 6.283; particles.push({ x: dcy.x, y: dcy.y, vx: Math.cos(a) * 120, vy: Math.sin(a) * 120, life: 0.4, color: '#6a6a8a', size: 4 }); }
+      decoys.splice(i, 1);
+    }
+  }
+  // 0.8b fire pools
+  for (let i = firePools.length - 1; i >= 0; i--) {
+    const fp = firePools[i]; fp.life -= dt; fp.tick -= dt;
+    if (fp.tick <= 0) {
+      fp.tick = 0.25;
+      for (const e of enemies) if (e.hp > 0 && dist(e, fp) < fp.r) hurt(e, Math.round(fp.dps * 0.25), false, true);
+    }
+    if (fp.life <= 0) firePools.splice(i, 1);
+  }
   player.dashIframes = Math.max(0, player.dashIframes - dt);
   player.invuln = Math.max(0, player.invuln - dt);
   streakTimer = Math.max(0, streakTimer - dt);
@@ -2132,7 +2396,8 @@ function update(dt) {
   player.moving = mag > 0.05;
   if (player.moving) player.dir = Math.abs(dx) > Math.abs(dy) ? (dx >= 0 ? 2 : 1) : (dy >= 0 ? 0 : 3);
 
-  const spd = player.speed * (buffs.boots > 0 ? 1.4 : 1); // 0.5: Boots of lightness +40% speed
+  let spd = player.speed * (buffs.boots > 0 ? 1.4 : 1);
+  if (player.cyclone > 0) spd *= 1.20; // 0.8b Cyclone
   player.x += dx * spd * dt;
   player.y += dy * spd * dt;
   // 0.7b: slide along obstacles. Walking almost straight into one gets a gentle sideways nudge
@@ -2173,7 +2438,9 @@ function update(dt) {
   if (attackClock <= 0) {
     attack();
     // 0.4: removed the Berserker attack-speed change (it now boosts damage in attack() instead)
-    attackClock = STY[player.style].rate * player.rm2 / (1 + 0.1 * player.evN); // 0.8a: Evasion stacks
+    let aspd = 1 + 0.1 * player.evN;
+    if (player.m.zerkC && player.hp / player.maxHp < 0.3) aspd *= 1.20; // 0.8b Fury
+    attackClock = STY[player.style].rate * player.rm2 / aspd;
   }
 
   // enemies
@@ -2182,13 +2449,31 @@ function update(dt) {
   for (const e of enemies) if (e.windup > 0 && (e.ak === 'bone' || e.ak === 'magic')) rangedBusy++;
   for (const e of enemies) {
     if (e.hp <= 0) continue;
-    let edx = player.x - e.x, edy = player.y - e.y;
+    let tx = player.x, ty = player.y;
+    if (!e.boss && decoys.length) {
+      let best = null, bd = dist(e, player);
+      for (const dcy of decoys) { const dd = Math.hypot(dcy.x - e.x, dcy.y - e.y); if (dd < bd) { bd = dd; best = dcy; } }
+      if (best) { tx = best.x; ty = best.y; }
+    }
+    let edx = tx - e.x, edy = ty - e.y;
     let ed = Math.hypot(edx, edy) || 1;
-    let sp = e.speed * (e.slow > 0 ? 0.38 : e.chill > 0 ? 0.75 : 1); // 0.8a: Chill = 25% slow
-    if (e.boss && e.atk) sp = 0; // 0.6: the dragon plants its feet while breathing fire
+    let sp = e.speed * (e.slow > 0 ? 0.38 : e.chill > 0 ? 0.75 : 1);
+    if (e.freezeT > 0 || e.root > 0) sp = 0;
+    if (e.boss && e.atk) sp = 0;
     e.slow = Math.max(0, (e.slow || 0) - dt);
     if (e.chill > 0) e.chill -= dt;
-    if (e.burn > 0) { // 0.8a Ignite: a tick every 0.5s
+    if (e.freezeT > 0) { e.freezeT -= dt; e.windup = 0; }
+    if (e.root > 0) e.root -= dt;
+    if (e.venomT > 0) {
+      e.venomT -= dt; e.venomTick -= dt;
+      if (e.venomTick <= 0) { e.venomTick = 0.5; hurt(e, Math.max(1, Math.round((e.venomDps || 0) * (e.venom || 1) * 0.5)), false, true); }
+      if (e.venomT <= 0) e.venom = 0;
+    }
+    if (e.bleed > 0) {
+      e.bleed -= dt; e.bleedTick -= dt;
+      if (e.bleedTick <= 0) { e.bleedTick = 0.5; hurt(e, Math.max(1, Math.round((e.bleedDps || 0) * 0.5)), false, true); }
+    }
+    if (e.burn > 0) {
       e.burn -= dt; e.burnTick -= dt;
       if (e.burnTick <= 0) { e.burnTick = 0.5; hurt(e, Math.max(1, Math.round(e.burnDps * 0.5)), false, true); }
       if (Math.random() < dt * 8) particles.push({ x: e.x + rand(-6, 6), y: e.y - e.r * 0.5, vx: rand(-10, 10), vy: -40, life: 0.35, color: Math.random() < 0.5 ? '#ff7a2a' : '#ffc84a', size: 3 });
@@ -2513,6 +2798,27 @@ function draw() {
     ctx.stroke();
   }
 
+  // 0.8b: fire pools, decoys, rare fishing spot
+  for (const fp of firePools) {
+    ctx.globalAlpha = Math.min(0.45, fp.life * 0.3);
+    ctx.fillStyle = '#ff6a2044'; ctx.beginPath(); ctx.arc(fp.x, fp.y, fp.r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#ff8a3c'; ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.stroke();
+  }
+  for (const dcy of decoys) {
+    ctx.globalAlpha = Math.min(0.7, dcy.life);
+    ctx.fillStyle = '#4a4a6a'; ctx.beginPath(); ctx.arc(dcy.x, dcy.y, 12, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#9a9aba'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#c8c8e0'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('👤', dcy.x, dcy.y + 4);
+  }
+  if (player.netSpot) {
+    const s = player.netSpot;
+    ctx.globalAlpha = 0.25 + 0.1 * Math.sin(elapsed * 6);
+    ctx.fillStyle = '#5ec8c055'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#7ee0d8'; ctx.globalAlpha = 0.7; ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
+
   // player
   if (spriteReady(art.player)) { // 0.7a: 4-direction walking sprite
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -2559,6 +2865,11 @@ function draw() {
   } else if (player.style === 'ranged') {
     ctx.moveTo(player.x - 6, player.y + 2);
     ctx.lineTo(player.x + 14 * player.facing, player.y - 8);
+  } else if (player.style === 'fisher') { // 0.8b rod + line
+    ctx.moveTo(player.x - 2 * player.facing, player.y + 2);
+    ctx.lineTo(player.x + 16 * player.facing, player.y - 18);
+    ctx.moveTo(player.x + 16 * player.facing, player.y - 18);
+    ctx.lineTo(player.x + 22 * player.facing, player.y - 10);
   } else {
     ctx.moveTo(player.x, player.y - 2);
     ctx.lineTo(player.x + 12 * player.facing, player.y - 16);
