@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.8b</title>
+<title>Last Stand — Prototype 0.9a</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -58,6 +58,7 @@ button:disabled{opacity:.4;cursor:default}
 .choice.lock{opacity:.55;border-color:#3a4a3c}
 .choice.lock strong{color:#9aa08a}
 .choice .unlock{display:block;color:#c8b06a;margin-top:4px;font-size:12px}
+#buffs .pill.ev{border-color:#e8c86a;color:#ffe7a0}/* 0.9a */
 .choice strong{display:block;color:#f2d17d;margin-bottom:3px;font-size:15px}
 .small{font-size:11px;color:#a8b5a0}
 /* 0.8a: Mastery screen (per-class skill trees) */
@@ -167,7 +168,7 @@ body.bossOn #buffs{top:122px}
 <div id="overlay">
   <div class="panel" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.8b</div><!-- 0.8b: capstones live + Fisher class -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.9a</div><!-- 0.9a: opt-in Penance Swarm events -->
     <p>Beyond the old frontier, the dead are stirring. Survive the waves, gather experience, and return with whatever treasure you can carry.</p>
     <p><b>Move:</b> drag left side of screen or WASD / arrows.<br>
        <b>Combat:</b> auto-attacks nearest enemy.<br>
@@ -486,6 +487,13 @@ let buffsHtml = '';    // 0.5: last HUD text, so we only touch the page when it 
 // 0.6: boss state. boss = the living King Black Dragon (or null), fireballs = incoming volley
 let boss = null, fireballs = [], bossesSlain = 0, bossCount = 0;
 let bolts = []; // 0.7c: enemy bones and spells in flight
+// 0.9a: opt-in events (Penance Swarm)
+let eventInvite = null; // {x,y,r,life,maxLife}
+let eventFight = null;  // {t,maxT,power,cap,burstDone,trickle,renownPaid,cleared}
+let nextEventAt = 0;
+let renownEvent = 0; // renown earned from events this run (end-screen line)
+let penanceBuff = 0; // adrenaline seconds left
+let penanceDmg = 1;  // damage mul while buffed
 let bossNext = 300, bossWarned = false, bossWarnAt = 0;
 const sepGrid = new Map(); // 0.6: reused spatial grid for enemy pushback
 let keys = {};
@@ -857,6 +865,8 @@ function start(k) {
   boss = null; fireballs = []; bossesSlain = 0; bossCount = 0;
   bolts = []; // 0.7c
   decoys = []; firePools = []; // 0.8b
+  eventInvite = null; eventFight = null; renownEvent = 0; penanceBuff = 0; penanceDmg = 1;
+  nextEventAt = 75 + Math.random() * 15; // 0.9a: first horn ~75–90s
   bossNext = BOSS_EVERY; bossWarned = false; bossWarnAt = 0;
   showBossBar(false);
   runId++; // 0.4: new run id (old Barrage timers will see a mismatch and do nothing)
@@ -1147,21 +1157,198 @@ function fmt(s) { return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).p
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
 /* ========== SPAWN ========== */
-function spawn(forceElite = false) {
+
+/* ========== 0.9a: OPT-IN EVENTS (Penance Swarm) ========== */
+function eventPower() { return 1 + elapsed / 300; } // ~1.3 at 1:30, ~2.2 at 6:00
+function eventTier() {
+  // match how scary the open field is (same breakpoints as spawn composition)
+  let tier = 0;
+  if (elapsed >= 300) tier = 2;
+  else if (elapsed >= 150) tier = 1;
+  // nudge up if the live field is already full of fat enemies
+  let n = 0, sum = 0;
+  for (const e of enemies) if (e.hp > 0 && !e.penance && !e.boss) { n++; sum += e.maxHp; }
+  if (n >= 4 && sum / n > 90) tier = Math.min(2, tier + 1);
+  return tier;
+}
+function eventParams(tier) {
+  // liveCap, burst, trickleInterval, refillBelow, mix weights [fighter,runner,ranger,brute,elite]
+  if (tier <= 0) return { cap: 12, burst: 6, gap: 1.3, refill: 10, mix: [0.80, 0.15, 0.05, 0, 0] };
+  if (tier === 1) return { cap: 16, burst: 8, gap: 1.1, refill: 14, mix: [0.62, 0.15, 0.16, 0.07, 0] };
+  return { cap: 20, burst: 10, gap: 1.0, refill: 17, mix: [0.50, 0.15, 0.18, 0.12, 0.05] }; // 0.9a tune: fewer rangers late
+}
+function pickPenanceKind(mix) {
+  let r = Math.random(), a = 0;
+  const kinds = [0, 0, 1, 2, 3]; // fighter=goblin, runner=goblin, ranger=skel, brute=giant, elite=ogre
+  for (let i = 0; i < mix.length; i++) { a += mix[i]; if (r < a) return { role: i, kind: kinds[i] }; }
+  return { role: 0, kind: 0 };
+}
+function countPenance() { let n = 0; for (const e of enemies) if (e.hp > 0 && e.penance) n++; return n; }
+function spawnPenanceOne(roleKind, ang) {
+  const kind = roleKind.kind, role = roleKind.role;
+  const data = ENEMY_KINDS[kind];
+  const a = ang != null ? ang : rand(0, Math.PI * 2);
+  const distSpawn = 180 + Math.random() * 60;
+  let x = player.x + Math.cos(a) * distSpawn, y = player.y + Math.sin(a) * distSpawn;
+  // nudge out of solids
+  if (typeof hitsSolid === 'function' && hitsSolid(x, y, 20)) {
+    for (let r = 20; r <= 120; r += 20) {
+      let found = false;
+      for (let a2 = 0; a2 < 6.28; a2 += 0.6) {
+        const nx = player.x + Math.cos(a2) * (distSpawn + r), ny = player.y + Math.sin(a2) * (distSpawn + r);
+        if (!hitsSolid(nx, ny, 20)) { x = nx; y = ny; found = true; break; }
+      }
+      if (found) break;
+    }
+  }
+  const tint = role === 1 ? '#d08040' : role === 2 ? '#c89090' : role === 3 ? '#a05040' : role === 4 ? '#8b3030' : '#b85a3a';
+  const e = {
+    x, y, ...data,
+    kind, side: Math.random() < 0.5 ? -1 : 1,
+    maxHp: data.hp, hp: data.hp, hit: 0, slow: 0,
+    cd: rand(0.4, 1.2), windup: 0, windT: 0, slamT: 0, losT: 0, los: false,
+    dead: false, penance: true, color: tint, name: 'Penance ' + (['Fighter','Runner','Ranger','Brute','Ogre'][role] || 'Fighter')
+  };
+  if (role === 1) { // runner: faster, squishier
+    e.speed = data.speed * 1.30;
+    e.hp = e.maxHp = Math.max(8, Math.round(data.hp * 0.80));
+  }
+  enemies.push(e);
+  return e;
+}
+function canSpawnEventInvite() {
+  if (eventInvite || eventFight) return false;
+  if (boss || bossWarned || leveling || paused || !playing) return false;
+  if (elapsed < nextEventAt) return false;
+  if (elapsed >= bossNext - 30) return false; // 0.9a: no horns in the last 30s before the dragon
+  return true;
+}
+function spawnEventInvite() {
   const a = rand(0, Math.PI * 2);
-  const distSpawn = Math.max(W, H) * 0.58 + 60;
-  const x = player.x + Math.cos(a) * distSpawn;
-  const y = player.y + Math.sin(a) * distSpawn;
+  let x = player.x + Math.cos(a) * (140 + Math.random() * 40);
+  let y = player.y + Math.sin(a) * (140 + Math.random() * 40);
+  if (typeof hitsSolid === 'function' && hitsSolid(x, y, 26)) {
+    for (let r = 20; r <= 160; r += 20) {
+      let ok = false;
+      for (let a2 = 0; a2 < 6.28; a2 += 0.5) {
+        const nx = player.x + Math.cos(a2) * (140 + r), ny = player.y + Math.sin(a2) * (140 + r);
+        if (!hitsSolid(nx, ny, 26)) { x = nx; y = ny; ok = true; break; }
+      }
+      if (ok) break;
+    }
+  }
+  eventInvite = { x, y, r: 28, life: 22, maxLife: 22 };
+  banner('📯 Penance horn!', 'Walk into it to call a swarm — or ignore it.', 2.8);
+}
+function triggerPenanceSwarm() {
+  if (!eventInvite || eventFight || leveling) return;
+  eventInvite = null;
+  const power = eventPower();
+  const tier = eventTier();
+  const p = eventParams(tier);
+  eventFight = { t: 30, maxT: 30, power, tier, cap: p.cap, gap: p.gap, refill: p.refill, mix: p.mix,
+    trickle: 0, burstLeft: p.burst, burstAng: 0, renownPaid: 0, cleared: false };
+  shake = Math.max(shake, 0.3);
+  player.invuln = Math.max(player.invuln, 0.55); // 0.9a: brief grace so the burst is readable
+  banner('📯 The Penance pour in!', 'Survive 30s. Clear them for a bonus.', 2.6);
+  try { sfx('special'); } catch (err) {}
+}
+function payoutPenance(cleared) {
+  if (!eventFight || eventFight.renownPaid) return;
+  const power = eventFight.power;
+  const coins = Math.round((22 + elapsed / 6) * (1 + (player.coinBonus || 0)));
+  const renBase = 3 + Math.floor(elapsed / 80);
+  const renClear = cleared ? (2 + Math.floor(power)) : 0;
+  const ren = renBase + renClear;
+  runGold += coins;
+  save.renown += ren;
+  renownEvent += ren;
+  eventFight.renownPaid = ren;
+  // XP orbs
+  const nOrbs = 2 + Math.floor(power);
+  for (let i = 0; i < nOrbs; i++) {
+    const a = (i / nOrbs) * 6.283;
+    orbs.push({ x: player.x + Math.cos(a) * 30, y: player.y + Math.sin(a) * 30,
+      xp: Math.round(70 * 1.2 * power), gold: 0, r: 9, elite: true });
+  }
+  // buff
+  penanceBuff = 18 + 6 * power;
+  penanceDmg = 1.10 + 0.04 * power;
+  if (cleared) {
+    if (!dropChest(player.x + 20, player.y)) {
+      const keys4 = Object.keys(BUFFS);
+      const k = keys4[Math.floor(Math.random() * keys4.length)];
+      buffs[k] = buffs[k] > 0 ? Math.min(BUFF_MAX, buffs[k] + BUFF_TIME) : BUFF_TIME;
+      runGold += Math.round(18 * power);
+    }
+    banner('📯 Swarm cleared!', '+' + coins + ' coins · +' + ren + ' renown · bonus chest · adrenaline', 3.2);
+  } else {
+    banner('📯 Swarm survived!', '+' + coins + ' coins · +' + ren + ' renown · adrenaline', 3.0);
+  }
+  persist();
+}
+function endPenanceFight(flee) {
+  if (!eventFight) return;
+  if (!eventFight.renownPaid && playing && player.hp > 0) {
+    // survived to timer
+    const cleared = countPenance() === 0;
+    payoutPenance(cleared);
+  }
+  if (flee) {
+    for (const e of enemies) if (e.penance && e.hp > 0) { e.hp = 0; e.dead = true; e.penanceFlee = true; }
+  }
+  eventFight = null;
+  nextEventAt = elapsed + 90 + Math.random() * 30;
+}
+function updateEvents(dt) {
+  if (!playing || paused) return;
+  // invite
+  if (eventInvite) {
+    eventInvite.life -= dt;
+    if (eventInvite.life <= 0) {
+      eventInvite = null;
+      nextEventAt = elapsed + 90 + Math.random() * 30;
+    } else if (!leveling && dist(eventInvite, player) < eventInvite.r + player.r) {
+      triggerPenanceSwarm();
+    } else if (window.__evPol === 'trigger' && !leveling) { // bot/test: always take the horn
+      player.x = eventInvite.x; player.y = eventInvite.y;
+      triggerPenanceSwarm();
+    }
+  } else if (canSpawnEventInvite()) {
+    spawnEventInvite();
+  }
+  // fight
+  if (eventFight) {
+    // burst (all in the first frames, evenly around the player)
+    if (eventFight.burstLeft > 0) {
+      const total = eventParams(eventFight.tier).burst;
+      while (eventFight.burstLeft > 0 && enemies.length < 90) {
+        const i = total - eventFight.burstLeft;
+        spawnPenanceOne(pickPenanceKind(eventFight.mix), (i / total) * 6.283);
+        eventFight.burstLeft--;
+      }
+    }
+    eventFight.trickle -= dt;
+    if (eventFight.trickle <= 0) {
+      eventFight.trickle = eventFight.gap;
+      if (countPenance() < eventFight.refill && enemies.length < 90) {
+        spawnPenanceOne(pickPenanceKind(eventFight.mix));
+      }
+    }
+    eventFight.t -= dt;
+    // early clear bonus — stop spawning, pay once, short linger
+    if (!eventFight.cleared && countPenance() === 0 && eventFight.t < eventFight.maxT - 0.5 && eventFight.burstLeft <= 0) {
+      eventFight.cleared = true;
+      eventFight.refill = 0;
+      payoutPenance(true);
+      eventFight.t = Math.min(eventFight.t, 1.2);
+    }
+    if (eventFight.t <= 0) endPenanceFight(true);
+  }
+  if (penanceBuff > 0) penanceBuff = Math.max(0, penanceBuff - dt);
+}
 
-  let t = 0;
-  if (elapsed > 180) t = Math.random() < 0.18 ? 3 : (Math.random() < 0.35 ? 2 : (Math.random() < 0.45 ? 1 : 0));
-  else if (elapsed > 110) t = Math.random() < 0.28 ? 2 : (Math.random() < 0.4 ? 1 : 0);
-  else if (elapsed > 50) t = Math.random() < 0.32 ? 1 : 0;
-  if (elapsed > 110 && t !== 3 && Math.random() < 0.13) t = 4; // 0.7c: cultists join from 1:50
-
-  if (forceElite) t = 3;
-
-  const table = [
+const ENEMY_KINDS = [
     // 0.7c: damage = touch damage per second (was 8/13/22/28). dmg = one attack hit. reach = melee gap past
     // its body / slam radius / throw range. wind = wind-up seconds, rate = seconds between attacks,
     // keep = distance a thrower tries to hold. Skeleton hp 72 -> 64 since it now hangs back and shoots.
@@ -1175,8 +1362,23 @@ function spawn(forceElite = false) {
       ak:'melee', dmg:18, reach:26,  wind:0.6,  rate:1.8 },
     { name:'Cultist',    hp:50,  speed:32, damage:3,  r:12, xp:17, gold:3, color:'#6f6ae0', weak:'melee', // 0.7c: new
       ak:'magic', dmg:9,  reach:270, wind:0.85, rate:3.6, keep:180 }
-  ];
-  const data = table[t];
+];
+function spawn(forceElite = false) {
+  const a = rand(0, Math.PI * 2);
+  const distSpawn = Math.max(W, H) * 0.58 + 60;
+  const x = player.x + Math.cos(a) * distSpawn;
+  const y = player.y + Math.sin(a) * distSpawn;
+
+  let t = 0;
+  if (window.__forceT !== undefined) t = window.__forceT;
+  else if (elapsed > 180) t = Math.random() < 0.18 ? 3 : (Math.random() < 0.35 ? 2 : (Math.random() < 0.45 ? 1 : 0));
+  else if (elapsed > 110) t = Math.random() < 0.28 ? 2 : (Math.random() < 0.4 ? 1 : 0);
+  else if (elapsed > 50) t = Math.random() < 0.32 ? 1 : 0;
+  if (elapsed > 110 && t !== 3 && Math.random() < 0.13) t = 4; // 0.7c: cultists join from 1:50
+
+  if (forceElite) t = 3;
+
+  const data = ENEMY_KINDS[t];
   enemies.push({
     x, y, ...data,
     kind: t, // 0.7a: which sprite sheet to use
@@ -1240,6 +1442,9 @@ function hurt(e, d, isCrit, dot) { // 0.8a: dot = burn tick / Retribution (no on
 
     if (e.boss) {
       bossDefeated(e); // 0.6: boss has its own big reward
+    } else if (e.penance || e.penanceFlee) {
+      // 0.9a: Penance are a win/lose gamble — no XP orbs, coins, or chests on kill.
+      // Survive/clear payout is the only reward. On-kill heals/effects above still run.
     } else {
     const g = Math.max(1, Math.round(e.gold * (1 + (player.coinBonus || 0))));
     orbs.push({ x: e.x, y: e.y, xp: e.xp, gold: g, r: e.elite ? 9 : 6, elite: !!e.elite });
@@ -1285,6 +1490,7 @@ function attack() {
     if (M.skirm4 && player.ambush > 0) d = Math.round(d * 1.35);
     if (M.zerkC) { const miss = 1 - player.hp / Math.max(1, player.maxHp); d = Math.round(d * (1 + Math.min(0.45, miss * 0.5))); }
     if (player.meatT > 0) d = Math.round(d * (player.meatMul || 1.15));
+    if (penanceBuff > 0) d = Math.round(d * penanceDmg); // 0.9a Penance adrenaline
     if (spike && ti === 0) d = Math.round(d * 2.2);
     if (bolt && ti === 0 && e.boss) d = Math.round(d * 1.25);
 
@@ -1622,6 +1828,9 @@ function renderBuffs() {
   if (player.bloodShield > 0) h += '<div class="pill">🩸 ' + Math.ceil(player.bloodShield) + '</div>';
   if (player.netSpot) h += '<div class="pill">✨ spot</div>';
   if (player.m.cookC) h += '<div class="pill">🦈 ' + Math.ceil(player.feastT) + 's</div>';
+  if (eventInvite) h += '<div class="pill ev">📯 ' + Math.ceil(eventInvite.life) + 's</div>';
+  if (eventFight) h += '<div class="pill ev">📯 Swarm ' + Math.ceil(eventFight.t) + 's · ' + countPenance() + '</div>';
+  if (penanceBuff > 0) h += '<div class="pill ev">📯 ' + Math.ceil(penanceBuff) + 's</div>';
   if (h !== buffsHtml) { buffsHtml = h; $('buffs').innerHTML = h; }
 }
 
@@ -1851,6 +2060,8 @@ function updateBoss(dt) {
   if (!boss) {
     if (!bossWarned && elapsed >= bossNext - BOSS_WARN) {
       bossWarned = true; bossWarnAt = elapsed;
+      if (eventFight) endPenanceFight(true); // 0.9a: swarm yields to the dragon
+      eventInvite = null;
       banner('⚠ The ground trembles…', 'Something enormous is coming.', BOSS_WARN, true);
       sfx('boss');
       shake = Math.max(shake, 0.35);
@@ -2276,6 +2487,7 @@ function endRun() {
   const earned = Math.floor(runGold + elapsed / 11);
   save.gold += earned;
   const renownRun = Math.max(1, Math.floor(elapsed / 28) + Math.floor(kills / 22)) + 8 * bossesSlain; // 0.8a: +8 per boss
+  // 0.9a: event renown was already added during the run; still show it. Base run renown is separate.
   save.renown += renownRun;
   save.best = Math.max(save.best, Math.floor(elapsed));
   persist();
@@ -2292,7 +2504,7 @@ function endRun() {
        Bosses slain: <b>${bossesSlain}</b></p><!-- 0.6 -->
     <p>Run coins: <b>${earned}</b><br>
        Permanent coin purse: <b>${save.gold}</b><br>
-       Renown this run: <b>+${renownRun}</b> (spend it in 🌳 Mastery)<br><!-- 0.8a -->
+       Renown this run: <b>+${renownRun + renownEvent}</b> (spend it in 🌳 Mastery)${renownEvent ? ` · events +${renownEvent}` : ''}<br><!-- 0.8a/0.9a -->
        Permanent renown: <b>${save.renown}</b><br>
        King Black Dragon kills: <b>${save.bossTotal}</b> total · best run <b>${save.bossBest}</b><br><!-- 0.6 -->
        Attack <b>${sLvl('melee')}</b> · Ranged <b>${sLvl('ranged')}</b> · Magic <b>${sLvl('magic')}</b></p>
@@ -2316,6 +2528,7 @@ function update(dt) {
   // 0.5: buffs and the banner count down with game time, so they freeze while paused/leveling
   for (const k in buffs) buffs[k] = Math.max(0, buffs[k] - dt);
   if (bannerTimer > 0) { bannerTimer -= dt; if (bannerTimer <= 0) $('lootBanner').style.opacity = '0'; }
+  updateEvents(dt); // 0.9a
   player.specialCd = Math.max(0, player.specialCd - dt);
   // 0.8a: Mastery timers
   if (player.m.guard3) player.shieldCd = Math.max(0, player.shieldCd - dt);
@@ -2398,6 +2611,7 @@ function update(dt) {
 
   let spd = player.speed * (buffs.boots > 0 ? 1.4 : 1);
   if (player.cyclone > 0) spd *= 1.20; // 0.8b Cyclone
+  if (penanceBuff > 0) spd *= 1.08; // 0.9a Penance adrenaline
   player.x += dx * spd * dt;
   player.y += dy * spd * dt;
   // 0.7b: slide along obstacles. Walking almost straight into one gets a gentle sideways nudge
@@ -2426,7 +2640,7 @@ function update(dt) {
 
   // spawn
   // 0.6: normal spawns come 1.8x slower while the boss is alive
-  const spawnRate = Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL; // 0.7c: retune knob
+  const spawnRate = Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL * (eventFight ? 1.5 : 1); // 0.7c + 0.9a: softer normals during Penance Swarm
   if (spawnClock > spawnRate && enemies.length < 90) {
     spawnClock = 0;
     spawn();
@@ -2796,6 +3010,23 @@ function draw() {
     ctx.moveTo(s.x, s.y);
     ctx.lineTo(s.tx, s.ty);
     ctx.stroke();
+  }
+
+  // 0.9a: Penance horn invitation
+  if (eventInvite) {
+    const inv = eventInvite;
+    const pulse = 0.65 + 0.35 * Math.sin(elapsed * 6);
+    ctx.globalAlpha = pulse;
+    ctx.strokeStyle = '#e8c86a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(inv.x, inv.y, 22, 0, 7); ctx.stroke();
+    ctx.globalAlpha = 0.25; ctx.fillStyle = '#e8c86a';
+    ctx.beginPath(); ctx.arc(inv.x, inv.y, 18, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1; ctx.font = '22px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('📯', inv.x, inv.y + 8);
+    ctx.textAlign = 'left';
+    // edge arrow (screen space)
+    const sx = inv.x - player.x + W / 2, sy = inv.y - player.y + H / 2;
+    edgeArrow(sx, sy, '#e8c86a', '#8a7030', 0.9, 1.0);
   }
 
   // 0.8b: fire pools, decoys, rare fishing spot
