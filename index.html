@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.9a</title>
+<title>Last Stand — Prototype 0.9b</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -168,7 +168,7 @@ body.bossOn #buffs{top:122px}
 <div id="overlay">
   <div class="panel" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.9a</div><!-- 0.9a: opt-in Penance Swarm events -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.9b</div><!-- 0.9b: Fisher pierce/splash/net push + faster basic; 0.9a: opt-in Penance Swarm events -->
     <p>Beyond the old frontier, the dead are stirring. Survive the waves, gather experience, and return with whatever treasure you can carry.</p>
     <p><b>Move:</b> drag left side of screen or WASD / arrows.<br>
        <b>Combat:</b> auto-attacks nearest enemy.<br>
@@ -771,7 +771,7 @@ const STY = {
   magic:  { n:'Magic',  sk:'Magic',  w:['Wind Strike','Water Bolt','Earth Bolt','Fire Blast','Fire Surge','Ice Barrage'],
             range:225, dmg:1.08, rate:0.95, col:'#7fb8ff', specialName:'Arcane Nova' },
   fisher: { n:'Fisher', sk:'Fishing', w:['Small fishing net','Big fishing net','Fishing rod','Fly fishing rod','Harpoon','Dragon harpoon'],
-            range:165, dmg:1.12, rate:0.80, col:'#5ec8c0', specialName:'Cast Net' } // 0.8b
+            range:165, dmg:1.12, rate:0.72, col:'#5ec8c0', specialName:'Cast Net' } // 0.8b; 0.9b: 0.80→0.72
 };
 const ORDER = ['melee','ranged','magic','fisher'];
 function fisherUnlocked() { // 0.8b: any class at skill level 5 unlocks Fisher (old saves included)
@@ -1520,6 +1520,26 @@ function attack() {
     if (M.net2 && e.hp > 0) e.chill = Math.max(e.chill || 0, 0.5);
     if (M.zerkC && player.hp / player.maxHp < 0.3) player.hp = Math.min(player.maxHp, player.hp + 2);
 
+    // 0.9b Fisher: harpoon pierces 2 more in a line (65%) + small splash (35% in 38px) so basics clear a packed slow-blob
+    if (player.style === 'fisher' && ti === 0) {
+      const len = dist(e, player) || 1, ux = (e.x - player.x) / len, uy = (e.y - player.y) / len;
+      let pierced = 0;
+      for (const o of enemies) {
+        if (o === e || o.hp <= 0) continue;
+        const along = (o.x - player.x) * ux + (o.y - player.y) * uy;
+        const lat = Math.abs((o.x - player.x) * uy - (o.y - player.y) * ux);
+        if (along > 10 && along < player.range && lat < 20) {
+          hurt(o, Math.round(d * 0.65), false);
+          if (M.net2 && o.hp > 0) o.chill = Math.max(o.chill || 0, 0.5);
+          if (++pierced >= 2) break;
+        }
+      }
+      for (const o of enemies) {
+        if (o === e || o.hp <= 0) continue;
+        if (dist(o, e) < 38) hurt(o, Math.round(d * 0.35), false);
+      }
+    }
+
     // melee sweep (0.8a: 55% with the Whirlwind card, 40% from Wide arcs alone)
     if (player.sweep) {
       for (const o of enemies) {
@@ -1685,6 +1705,13 @@ function netPulse(cx, cy, R, mul) {
     hurt(e, Math.round(player.damage * 1.30 * mul), false);
     e.slow = Math.max(e.slow || 0, slowT);
     if (M.net3 && !e.boss) e.root = Math.max(e.root || 0, 0.75);
+    // 0.9b: shove enemies outward so slows don't glue a blob onto you
+    if (!e.boss) {
+      const dd = Math.hypot(e.x - cx, e.y - cy) || 1;
+      const push = 52;
+      e.x += (e.x - cx) / dd * push;
+      e.y += (e.y - cy) / dd * push;
+    }
     if (e.hp <= 0) floats.push({ x: e.x, y: e.y - 20, text: 'Caught!', life: 0.7, vy: -34, color: '#5ec8c0' });
   }
   for (let i = 0; i < 20; i++) {
