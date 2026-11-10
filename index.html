@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.9b</title>
+<title>Last Stand — Prototype 0.9c</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -142,6 +142,38 @@ body.bossOn #buffs{top:122px}
 #pauseBtn{position:fixed;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:5;
   width:40px;height:40px;border-radius:10px;background:#0c1410cc;border:1px solid #4a5c48;
   color:var(--ink);font-size:16px;pointer-events:auto;display:none}
+
+/* 0.9c: compact class dropdown so Shop/Training/Mastery fit on small phones */
+.classpick{position:relative;margin-top:10px;text-align:left}
+.classdrop{width:100%;padding:14px 14px;margin-top:4px;border:1px solid #b8a56a;
+  border-radius:12px;background:#2f4230;color:#fff3d2;font-weight:700;font-size:16px;
+  text-align:left;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.classdrop .chev{color:#e8c56a;font-size:14px}
+.classlist{position:absolute;left:0;right:0;top:100%;z-index:25;margin-top:4px;
+  background:#1a2a20;border:1px solid #7a8a5e;border-radius:12px;overflow:hidden;
+  box-shadow:0 12px 28px #000c}
+.classlist[hidden]{display:none}
+.classopt{width:100%;margin:0;padding:14px 14px;border:none;border-bottom:1px solid #2a3a2c;
+  border-radius:0;background:#243328;color:#fff3d2;font-weight:700;font-size:15px;
+  text-align:left;min-height:48px}
+.classopt:last-child{border-bottom:none}
+.classopt.on{background:#3d5a2e;border-left:3px solid #e8c56a}
+.classopt.lock{opacity:.55;color:#9aa08a}
+.classopt .unlock{display:inline;color:#c8b06a;font-size:12px;font-weight:600;margin-left:6px}
+.classinfo{text-align:left;background:#0c1410cc;border:1px solid #4a5c48;border-radius:12px;
+  padding:10px 12px;margin-top:8px;min-height:64px}
+.classinfo .cname{color:#f2d17d;font-weight:800;font-size:14px;margin-bottom:2px}
+.classinfo .small{display:block;line-height:1.4}
+#startBtn{margin-top:10px;background:#3d5a2e;border-color:#e8c56a;font-size:16px;min-height:52px}
+.panel.menu-tight{padding:14px 14px 12px}
+.panel.menu-tight p{margin:4px 0;font-size:12px;line-height:1.35}
+.panel.menu-tight h1{font-size:26px;margin-bottom:0}
+.panel.menu-tight .small{font-size:10px}
+.panel.menu-tight button{margin-top:6px;padding:11px 12px;min-height:44px;font-size:14px}
+.panel.menu-tight .classdrop{margin-top:2px;padding:12px 12px;min-height:48px;font-size:15px}
+.panel.menu-tight .classinfo{margin-top:6px;padding:8px 10px;min-height:0}
+.panel.menu-tight #startBtn{margin-top:8px;min-height:48px;font-size:15px}
+.panel.menu-tight .classpick{margin-top:6px}
 </style>
 </head>
 <body>
@@ -166,27 +198,31 @@ body.bossOn #buffs{top:122px}
 <div id="bossBar"><div class="bname">🐉 King Black Dragon</div><div class="bar"><div id="bossFill"></div></div></div><!-- 0.6 -->
 <div id="toast"></div>
 <div id="overlay">
-  <div class="panel" id="panel">
+  <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.9b</div><!-- 0.9b: Fisher pierce/splash/net push + faster basic; 0.9a: opt-in Penance Swarm events -->
-    <p>Beyond the old frontier, the dead are stirring. Survive the waves, gather experience, and return with whatever treasure you can carry.</p>
-    <p><b>Move:</b> drag left side of screen or WASD / arrows.<br>
-       <b>Combat:</b> auto-attacks nearest enemy.<br>
-       <b>Dash:</b> Space or Dash button (short i-frames).<br>
-       <b>Special:</b> style ability on cooldown.</p>
-    <button class="choice" data-s="melee"><strong>⚔ Melee</strong>
-      <span class="small">Tough bruiser · extra health & armour · short range<br>
-      Special: Whirlwind (spin AoE) · Upgrades: Whirlwind, Soul harvest, Granite skin</span><span class="mcap" data-mc="melee"></span><!-- 0.8a --></button>
-    <button class="choice" data-s="ranged"><strong>🏹 Ranged</strong>
-      <span class="small">Fast kiter · long range · crits<br>
-      Special: Barrage (rapid multi-shot) · Upgrades: Twin shot, Ruby bolts, Eagle eye</span><span class="mcap" data-mc="ranged"></span><!-- 0.8a --></button>
-    <button class="choice" data-s="magic"><strong>✨ Magic</strong>
-      <span class="small">Glass cannon · splash damage · low health<br>
-      Special: Arcane Nova (big freeze blast) · Upgrades: Blast radius, Ice barrage, Arcane focus</span><span class="mcap" data-mc="magic"></span><!-- 0.8a --></button>
-    <button class="choice" data-s="fisher" id="fisherBtn"><strong>🎣 Fisher</strong>
-      <span class="small">Mid-range angler · harpoon + nets · lobster feasts<br>
-      Special: Cast Net (slow the pack) · Upgrades: Hooked, Net practice, Fishy treats</span><span class="mcap" data-mc="fisher"></span>
-      <span class="unlock" id="fisherLock" style="display:none">🔒 Reach level 5 with any class to unlock Fisher</span></button><!-- 0.8b -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.9c</div><!-- 0.9c: class dropdown menu; 0.9b: Fisher pierce/splash/net push + faster basic; 0.9a: opt-in Penance Swarm events -->
+    <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, bring treasure home.</p>
+    <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
+    <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
+    <div class="classpick">
+      <div class="small" style="margin:0 0 2px 2px">Choose your class</div>
+      <button type="button" id="classDrop" class="classdrop" aria-haspopup="listbox" aria-expanded="false">
+        <span id="classDropLabel">Class: ⚔ Melee</span><span class="chev">▾</span>
+      </button>
+      <div id="classList" class="classlist" hidden role="listbox">
+        <button type="button" class="classopt" role="option" data-s="melee">⚔ Melee</button>
+        <button type="button" class="classopt" role="option" data-s="ranged">🏹 Ranged</button>
+        <button type="button" class="classopt" role="option" data-s="magic">✨ Magic</button>
+        <button type="button" class="classopt" role="option" data-s="fisher" id="fisherBtn">🎣 Fisher<span class="unlock" id="fisherLock" style="display:none">🔒 Locked — any class level 5</span></button>
+      </div>
+    </div>
+    <div id="classInfo" class="classinfo">
+      <div class="cname" id="classInfoName">⚔ Melee</div>
+      <span class="small" id="classInfoBlurb">Tough bruiser · extra health &amp; armour · short range<br>
+      Special: Whirlwind (spin AoE) · Upgrades: Whirlwind, Soul harvest, Granite skin</span>
+      <span class="mcap" id="classInfoMcap" data-mc="melee"></span>
+    </div>
+    <button type="button" id="startBtn">⚔ Start as Melee</button>
     <button id="shopbtn"></button>
     <button id="trainbtn"></button>
     <button id="mastbtn"></button><!-- 0.8a: Mastery trees -->
@@ -478,7 +514,7 @@ let rafId = 0;
 // 0.4: runId goes up every new run, so delayed Barrage shots from an old run are ignored
 let runId = 0;
 // 0.5: loot chests. chests on the ground, how many opened this run, whether the 90s chest dropped
-let chests = [], chestsOpened = 0, chest90 = false;
+let chests = [], chestsOpened = 0, nextChestAt = 60;
 // 0.5: timed power spikes, in seconds left (ticked with game time, so they pause with the game)
 let buffs = { dagger:0, recoil:0, glory:0, boots:0 };
 let phoenix = false;   // 0.5: Phoenix necklace held (saves you once)
@@ -541,7 +577,7 @@ const TREES = {
       ['rapid4', 'Ammo pouch', '👝', 'Rapid fire card 12% → 15% faster; Twin shot card also gives +10% damage.'],
       ['rapidC', 'Toxic Blowpipe', '🧪', '+35% attack speed. Hits apply venom (20% weapon damage per second for 4s, stacks 3×).', null, '−20% damage per arrow.']] },
     { id: 'skirm', name: 'Skirmisher', icon: '👢', blurb: 'Hit and run. Dodging powers you up.', nodes: [
-      ['skirm1', 'Light feet', '🪶', '+6% move speed.', p => p.speed *= 1.06],
+      ['skirm1', 'Light feet', '🪶', '+6% move speed.', p => addMoveSpeed(p, 0.06)],
       ['skirm2', 'Roll', '🤸', 'Dash cooldown −0.3s.', p => p.dashMax = Math.max(1.1, p.dashMax - 0.3)],
       ['skirm3', 'Evasion', '💨', 'Dodging an enemy attack (a wind-up within 60px misses you, or a shot passes within 40px) gives +10% attack speed for 4s. Stacks 3×.'],
       ['skirm4', 'Ambush', '🗡', 'After a dash, your next 3 attacks deal +35% damage.'],
@@ -724,6 +760,17 @@ addEventListener('resize', resize);
 resize();
 
 /* ========== PLAYER ========== */
+// 0.9c: every speed bonus uses the class base; dash displacement stays separate.
+function addMoveSpeed(p, bonus) {
+  const base = p.baseSpeed || 185;
+  p.moveBonus = (p.moveBonus || 0) + bonus;
+  p.speed = base * (1 + Math.min(0.40, p.moveBonus));
+}
+function moveSpeed() {
+  const base = player.baseSpeed || 185;
+  const temporary = (buffs.boots > 0 ? 0.40 : 0) + (player.cyclone > 0 ? 0.20 : 0) + (penanceBuff > 0 ? 0.08 : 0);
+  return Math.min(base * 1.40, player.speed + base * temporary);
+}
 function newPlayer() {
   return {
     x: W/2, y: H/2, r: 14,
@@ -835,12 +882,15 @@ function start(k) {
     player.magnet = 125;
   }
 
+  // 0.9c: class base is the reference for all additive movement bonuses.
+  player.baseSpeed = player.speed;
+
   // permanent shop / talent bonuses
   const sh = save.shop, tl = save.tal;
   player.maxHp += sh.hp * 12 + tl.vit * 8;
   player.hp = player.maxHp;
   player.armor = Math.min(armorCap(), player.armor + sh.arm * 0.035);
-  player.speed *= 1 + sh.boots * 0.045;
+  addMoveSpeed(player, sh.boots * 0.045); // 0.9c additive, +40% cap
   player.magnet += sh.mag * 18;
   player.coinBonus = sh.coin * 0.12;
   player.damage = Math.round(player.damage * (1 + tl.might * 0.06));
@@ -857,7 +907,7 @@ function start(k) {
   shake = 0; streak = 0; streakTimer = 0;
   playing = true; paused = false; leveling = false;
   // 0.5: fresh chests and buffs every run
-  chests = []; chestsOpened = 0; chest90 = false; phoenix = false; bannerTimer = 0;
+  chests = []; chestsOpened = 0; nextChestAt = 60; phoenix = false; bannerTimer = 0;
   buffs = { dagger:0, recoil:0, glory:0, boots:0 };
   $('lootBanner').style.opacity = '0';
   buffsHtml = ''; $('buffs').innerHTML = '';
@@ -952,7 +1002,7 @@ function applyMastery(k) {
     if (cn && cn.apply) try { cn.apply(p); } catch (err) {}
     // built-in capstone stat hooks (drawbacks + simple buffs)
     if (p.m.zerkC) p.healMul = 0.5;                                 // Barbarian Fury: food/chest/phoenix heal halved
-    if (p.m.guardC) { p.speed *= 0.92; p.armorCap = 0.75; }          // Dragon Defender
+    if (p.m.guardC) { addMoveSpeed(p, -0.08); p.armorCap = 0.75; }          // Dragon Defender
     if (p.m.whirlC) p.specialMax = 10;                               // Cyclone base CD
     if (p.m.deadC) p.rm2 *= 1.08;                                    // Dragon Hunter Bolt: −8% attack speed
     if (p.m.rapidC) { p.rm2 /= 1.35; p.damage = Math.round(p.damage * 0.80); } // Toxic Blowpipe
@@ -1116,30 +1166,86 @@ function ignite(e) {
 }
 let MENU = $('panel').innerHTML;
 let lastClass = 'melee'; // 0.8a: the Mastery screen opens on the class you last played
+// 0.9c: class blurb copy for the compact picker (same info the old stacked buttons showed)
+const CLASS_INFO = {
+  melee:  { icon: '⚔', name: 'Melee',  blurb: 'Tough bruiser · extra health & armour · short range<br>Special: Whirlwind (spin AoE) · Upgrades: Whirlwind, Soul harvest, Granite skin' },
+  ranged: { icon: '🏹', name: 'Ranged', blurb: 'Fast kiter · long range · crits<br>Special: Barrage (rapid multi-shot) · Upgrades: Twin shot, Ruby bolts, Eagle eye' },
+  magic:  { icon: '✨', name: 'Magic',  blurb: 'Glass cannon · splash damage · low health<br>Special: Arcane Nova (big freeze blast) · Upgrades: Blast radius, Ice barrage, Arcane focus' },
+  fisher: { icon: '🎣', name: 'Fisher', blurb: 'Mid-range angler · harpoon + nets · lobster feasts<br>Special: Cast Net (slow the pack) · Upgrades: Hooked, Net practice, Fishy treats' }
+};
+function closeClassList() {
+  const list = $('classList'), drop = $('classDrop');
+  if (list) list.hidden = true;
+  if (drop) drop.setAttribute('aria-expanded', 'false');
+}
+function refreshClassPicker() { // 0.9c: sync dropdown label, blurb, Start button, Fisher lock, mastery line
+  const k = lastClass || 'melee';
+  const info = CLASS_INFO[k] || CLASS_INFO.melee;
+  const fu = fisherUnlocked();
+  const fb = $('fisherBtn');
+  if (fb) {
+    fb.classList.toggle('lock', !fu);
+    const lk = $('fisherLock'); if (lk) lk.style.display = fu ? 'none' : 'inline';
+  }
+  document.querySelectorAll('#classList .classopt').forEach(b => {
+    b.classList.toggle('on', b.dataset.s === k);
+  });
+  if ($('classDropLabel')) $('classDropLabel').textContent = 'Class: ' + info.icon + ' ' + info.name;
+  if ($('classInfoName')) $('classInfoName').textContent = info.icon + ' ' + info.name;
+  if ($('classInfoBlurb')) $('classInfoBlurb').innerHTML = info.blurb;
+  const mcap = $('classInfoMcap');
+  if (mcap) {
+    mcap.dataset.mc = k;
+    const t = save.tree[k], c = t && t.cap ? NODE[t.cap] : null;
+    mcap.textContent = (t && t.own.length) ? '🌳 Mastery: ' + t.own.length + ' node' + (t.own.length > 1 ? 's' : '') + (c ? ' · ★ ' + c.name : '') : '';
+  }
+  if ($('startBtn')) $('startBtn').textContent = info.icon + ' Start as ' + info.name;
+}
 function bind() {
   $('shopbtn').textContent = '🛒 General store · ' + save.gold + ' coins';
   $('trainbtn').textContent = '📜 Training · ' + pts() + ' points';
   $('shopbtn').onclick = () => store('shop');
   $('trainbtn').onclick = () => store('tal');
-  // 0.8a: Mastery button and per-class tree summary on the class buttons
+  // 0.8a: Mastery button — opens on the class you last picked
   $('mastbtn').textContent = '🌳 Mastery · ' + save.renown + ' renown';
   $('mastbtn').onclick = () => mastery(lastClass || 'melee');
-  document.querySelectorAll('[data-mc]').forEach(el => {
-    const k = el.dataset.mc, t = save.tree[k], c = t && t.cap ? NODE[t.cap] : null;
-    el.textContent = (t && t.own.length) ? '🌳 Mastery: ' + t.own.length + ' node' + (t.own.length > 1 ? 's' : '') + (c ? ' · ★ ' + c.name : '') : '';
-  });
   if (save.treeRefund) { toast('Mastery trees changed: +' + save.treeRefund + ' renown refunded'); delete save.treeRefund; persist(); }
-  // 0.8b Fisher unlock gate
-  const fu = fisherUnlocked();
-  const fb = $('fisherBtn');
-  if (fb) {
-    fb.classList.toggle('lock', !fu);
-    const lk = $('fisherLock'); if (lk) lk.style.display = fu ? 'none' : 'block';
+  // 0.9c: dropdown class picker + Start (replaces stacked class buttons)
+  refreshClassPicker();
+  const drop = $('classDrop'), list = $('classList');
+  if (drop && list) {
+    drop.onclick = (e) => {
+      e.stopPropagation();
+      const open = list.hidden;
+      list.hidden = !open;
+      drop.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    list.querySelectorAll('.classopt').forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      const s = b.dataset.s;
+      if (s === 'fisher' && !fisherUnlocked()) {
+        toast('Reach level 5 with any class to unlock Fisher');
+        closeClassList(); // keep current class; close so Start stays tappable
+        return;
+      }
+      lastClass = s;
+      refreshClassPicker();
+      closeClassList();
+    });
   }
-  document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => {
-    if (b.dataset.s === 'fisher' && !fisherUnlocked()) { toast('Reach level 5 with any class to unlock Fisher'); return; }
-    lastClass = b.dataset.s; start(b.dataset.s);
-  });
+  if ($('startBtn')) $('startBtn').onclick = () => {
+    const s = lastClass || 'melee';
+    if (s === 'fisher' && !fisherUnlocked()) {
+      toast('Reach level 5 with any class to unlock Fisher');
+      return;
+    }
+    start(s);
+  };
+  // tap outside closes the list
+  document.onclick = (ev) => {
+    if (!ev.target.closest || !ev.target.closest('.classpick')) closeClassList();
+  };
+  const fu = fisherUnlocked();
   $('saveinfo').textContent = `Saved on this device · Coins ${save.gold} · Best ${fmt(save.best)} · Attack ${sLvl('melee')} · Ranged ${sLvl('ranged')} · Magic ${sLvl('magic')}` +
     (fu ? ` · Fishing ${sLvl('fisher')}` : '');
 }
@@ -1275,13 +1381,12 @@ function payoutPenance(cleared) {
   penanceBuff = 18 + 6 * power;
   penanceDmg = 1.10 + 0.04 * power;
   if (cleared) {
-    if (!dropChest(player.x + 20, player.y)) {
-      const keys4 = Object.keys(BUFFS);
-      const k = keys4[Math.floor(Math.random() * keys4.length)];
-      buffs[k] = buffs[k] > 0 ? Math.min(BUFF_MAX, buffs[k] + BUFF_TIME) : BUFF_TIME;
-      runGold += Math.round(18 * power);
-    }
-    banner('📯 Swarm cleared!', '+' + coins + ' coins · +' + ren + ' renown · bonus chest · adrenaline', 3.2);
+    // 0.9c: preserve clear reward as the existing buff/coin fallback, not a chest source.
+    const keys4 = Object.keys(BUFFS);
+    const k = keys4[Math.floor(Math.random() * keys4.length)];
+    buffs[k] = buffs[k] > 0 ? Math.min(BUFF_MAX, buffs[k] + BUFF_TIME) : BUFF_TIME;
+    runGold += Math.round(18 * power);
+    banner('📯 Swarm cleared!', '+' + coins + ' coins · +' + ren + ' renown · bonus buff/coins · adrenaline', 3.2);
   } else {
     banner('📯 Swarm survived!', '+' + coins + ' coins · +' + ren + ' renown · adrenaline', 3.0);
   }
@@ -1449,8 +1554,7 @@ function hurt(e, d, isCrit, dot) { // 0.8a: dot = burn tick / Retribution (no on
     const g = Math.max(1, Math.round(e.gold * (1 + (player.coinBonus || 0))));
     orbs.push({ x: e.x, y: e.y, xp: e.xp, gold: g, r: e.elite ? 9 : 6, elite: !!e.elite });
     // 0.5: chest drop chance: Elite Ogre always, Hill giant 6%, everyone else 1.5%
-    const chestChance = e.elite ? 1 : (e.name === 'Hill giant' ? 0.03 : 0.008); // 0.7b: now 3% / 0.8% (was 6% / 1.5%)
-    if (Math.random() < chestChance) dropChest(e.x, e.y);
+    // 0.9c: ordinary enemies/elites never drop chests; minute timer and dragon only.
     }
 
     for (let i = 0; i < (e.elite ? 10 : 5); i++) {
@@ -1721,28 +1825,33 @@ function netPulse(cx, cy, R, mul) {
 }
 
 /* ========== 0.5: LOOT CHESTS ========== */
-const MAX_CHESTS = 3;      // 0.5: at most 3 chests on the ground
+// 0.9c: minute chests persist until collected (no despawn/cap).
 const BUFF_TIME = 30;      // 0.5: power spikes last 30 seconds
 const BUFF_MAX = 60;       // 0.5: grabbing the same spike again adds 30s, up to 60s
 const BUFFS = {
   dagger: { n:'Dragon dagger',      icon:'🗡', d:'Double damage for 30s!' },
   recoil: { n:'Ring of recoil',     icon:'💍', d:'Enemies that touch you get hurt for 30s!' },
   glory:  { n:'Amulet of glory',    icon:'📿', d:'Double XP and coins from orbs for 30s!' },
-  boots:  { n:'Boots of lightness', icon:'👢', d:'+40% speed and faster dash for 30s!' }
+  boots:  { n:'Boots of lightness', icon:'👢', d:'+40% additive speed (total capped at +40%) and faster dash for 30s!' }
 };
 
-function dropChest(x, y) {
-  if (chests.length >= MAX_CHESTS) return false;
-  // 0.7b: never inside (or touching) a solid prop: spiral outward to the nearest free spot
-  if (hitsSolid(x, y, 26)) {
-    let found = false;
-    for (let r = 20; r <= 200 && !found; r += 15) for (let a = 0; a < 6.283; a += 0.5) {
+function dropChest(x, y, royal) {
+  // 0.9c: search until the complete chest footprint is on walkable ground.
+  let found = !hitsSolid(x, y, 26);
+  for (let r = 20; !found && r <= 1600; r += 20) {
+    for (let a = 0; a < Math.PI * 2; a += 0.25) {
       const nx = x + Math.cos(a) * r, ny = y + Math.sin(a) * r;
       if (!hitsSolid(nx, ny, 26)) { x = nx; y = ny; found = true; break; }
     }
   }
-  chests.push({ x, y, t: Math.random() * 6 });
+  if (!found) return false;
+  chests.push({ x, y, t: Math.random() * 6, royal: !!royal, rolls: royal ? 1 : TIMED_CHEST_ROLLS });
   return true;
+}
+const TIMED_CHEST_ROLLS = 4; // 0.9c: old 15.92 opens/run vs minute-chest pilot 4.00; 4 rolls ≈ old total loot
+function spawnMinuteChest() {
+  const a = Math.random() * Math.PI * 2;
+  return dropChest(player.x + Math.cos(a) * 220, player.y + Math.sin(a) * 220);
 }
 
 // 0.5: big banner in the middle of the screen (no pause, fades by itself)
@@ -1756,8 +1865,12 @@ function banner(title, sub, time, danger) {
 }
 
 // 0.5: open a chest instantly. "force" is only for testing a specific loot type.
-function openChest(c, force) {
-  chestsOpened++;
+function openChest(c, force, extraRoll) {
+  // 0.9c: richer timed chests retain the original per-roll table.
+  if (!extraRoll) {
+    chestsOpened++;
+    for (let i = 1; i < (c.rolls || 1); i++) openChest(c, force, true);
+  }
   sfx('chest');
   shake = Math.max(shake, 0.2);
   for (let i = 0; i < 26; i++) {
@@ -1793,6 +1906,7 @@ function openChest(c, force) {
     phoenix = true;
     banner('🔥 Phoenix necklace!', 'The next time you would die this run, you rise again.');
   }
+  if (!extraRoll && c.rolls > 1) $('lootBanner').querySelector('b').textContent = '🎁 Rich chest · ' + c.rolls + ' loot rolls!';
 }
 
 // 0.6: helpers shared by normal and royal chests
@@ -2187,8 +2301,8 @@ function bossDefeated(e) {
     const a = (i / N) * 6.283, r = rand(20, 55);
     orbs.push({ x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r, xp: xp / N, gold: coins / N, r: 9, elite: true });
   }
-  // royal chest always drops (ignores the 3-chest cap) and waits 1.5s so you see the banner first
-  chests.push({ x: e.x, y: e.y, t: 0, royal: true, wait: 1.5 });
+  // 0.9c: royal chest is immediate; no ground-chest cap or expiry.
+  dropChest(e.x, e.y, true); // 0.9c: immediate royal reward, walkable ground
   for (let i = 0; i < 60; i++) {
     const a = Math.random() * 6.283, v = rand(60, 260);
     particles.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.6 + Math.random() * 0.5,
@@ -2371,7 +2485,7 @@ const upgrades = [
   ['Keen edge', 'Increase weapon damage by 22%.', p => p.damage = Math.round(p.damage * 1.22)],
   ['Quick hands', 'Attack 16% faster.', p => p.rm2 = Math.max(0.3, p.rm2 * 0.84)],
   ['Stout constitution', 'Gain 30 maximum health and heal 30.', p => { p.maxHp += 30; p.hp = Math.min(p.maxHp, p.hp + 30); }],
-  ['Fleet-footed', 'Move 14% faster.', p => p.speed *= 1.14],
+  ['Fleet-footed', 'Move 14% faster.', p => addMoveSpeed(p, 0.14)],
   ['Long reach', 'Increase attack range by 18%.', p => p.rm *= 1.18],
   ['Eat a lobster', 'Restore 55 health.', p => eatLobster(p)], // 0.8b: Cook nodes upgrade this
   ['Ring of wealth', 'Gain 22% more coins this run.', p => p.coinBonus = (p.coinBonus || 0) + 0.22],
@@ -2399,7 +2513,7 @@ const upgrades = [
   ['Hooked', 'Deal 18% more damage, but attack 8% slower.', p => { p.damage = Math.round(p.damage * 1.18); p.rm2 *= 1.08; }, 'fisher'],
   ['Net practice', 'Cast Net radius +25px.', p => { p.netBonus = (p.netBonus || 0) + 25; }, 'fisher'],
   ['Fishy treats', 'Heal 4 health per kill.', p => p.kh = (p.kh || 0) + 4, 'fisher'],
-  ['Angler\'s outfit', 'Move 12% faster and pull loot from further away.', p => { p.speed *= 1.12; p.magnet += 20; }, 'fisher']
+  ['Angler\'s outfit', 'Move 12% faster and pull loot from further away.', p => { addMoveSpeed(p, 0.12); p.magnet += 20; }, 'fisher']
 ];
 
 // 0.4: level-up rewritten. The old version built a separate pop-up that froze the game
@@ -2433,7 +2547,9 @@ function pickUpgrades() {
     const lb = upgrades.find(u => u[0] === 'Eat a lobster');
     if (lb && !picks.includes(lb)) picks[0] = lb;
   }
-  return picks;
+  // 0.9c: keep non-speed benefits visible, but explain the movement cap.
+  return picks.map(u => /Fleet-footed|Angler.s outfit/.test(u[0]) && moveSpeed() >= player.baseSpeed * 1.40 - 0.001
+    ? [u[0], u[0] === 'Fleet-footed' ? 'Speed maxed (+40%).' : 'Speed maxed (+40%); still increases loot pickup range.', u[2], u[3]] : u);
 }
 
 function levelUp() {
@@ -2636,9 +2752,7 @@ function update(dt) {
   player.moving = mag > 0.05;
   if (player.moving) player.dir = Math.abs(dx) > Math.abs(dy) ? (dx >= 0 ? 2 : 1) : (dy >= 0 ? 0 : 3);
 
-  let spd = player.speed * (buffs.boots > 0 ? 1.4 : 1);
-  if (player.cyclone > 0) spd *= 1.20; // 0.8b Cyclone
-  if (penanceBuff > 0) spd *= 1.08; // 0.9a Penance adrenaline
+  let spd = moveSpeed(); // 0.9c: additive, at most class base × 1.40
   player.x += dx * spd * dt;
   player.y += dy * spd * dt;
   // 0.7b: slide along obstacles. Walking almost straight into one gets a gentle sideways nudge
@@ -2659,10 +2773,10 @@ function update(dt) {
   }
 
   // 0.5: guaranteed chest around 90 seconds in, dropped a short walk from the player
-  if (!chest90 && elapsed >= 90) {
-    chest90 = true;
-    const a = rand(0, Math.PI * 2);
-    dropChest(player.x + Math.cos(a) * 150, player.y + Math.sin(a) * 150);
+  // 0.9c: no missed minute rewards after a large simulation step.
+  while (elapsed >= nextChestAt) {
+    spawnMinuteChest();
+    nextChestAt += 60;
   }
 
   // spawn
