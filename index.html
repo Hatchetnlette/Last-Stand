@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.9c</title>
+<title>Last Stand — Prototype 0.10a</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -174,6 +174,35 @@ body.bossOn #buffs{top:122px}
 .panel.menu-tight .classinfo{margin-top:6px;padding:8px 10px;min-height:0}
 .panel.menu-tight #startBtn{margin-top:8px;min-height:48px;font-size:15px}
 .panel.menu-tight .classpick{margin-top:6px}
+
+/* 0.10a: 5-slot bag HUD — right side, clear of pause and dash/special */
+#bagHud{position:fixed;top:calc(58px + env(safe-area-inset-top));right:12px;z-index:8;
+  display:none;flex-direction:column;gap:4px;pointer-events:auto}
+.bagslot{width:40px;height:40px;margin:0;padding:0;border-radius:10px;border:1px solid #7a8a5e;
+  background:#0c1410cc;color:#ffe9a8;font-size:18px;display:flex;align-items:center;justify-content:center;
+  position:relative;flex:none}
+.bagslot.on{border-color:#e8c56a;box-shadow:0 0 8px #e8c56a66}
+.bagslot .bq{position:absolute;bottom:-2px;right:-2px;font-size:9px;line-height:12px;background:#0c1410;
+  border:1px solid #6a7a5a;border-radius:6px;padding:0 3px;color:#ffe9a8;font-weight:800}
+#bagTip{position:fixed;right:58px;top:calc(58px + env(safe-area-inset-top));z-index:9;
+  width:min(210px,56vw);background:#0c1410ee;border:1px solid #e8c56a;border-radius:12px;
+  padding:8px 10px;color:#f3efe0;display:none;pointer-events:auto;text-align:left;
+  box-shadow:0 8px 24px #000c}
+#bagTip .tn{color:#ffd86a;font-weight:800;font-size:13px}
+#bagTip .td{font-size:12px;color:#eef0e2;margin:4px 0 0;line-height:1.35}
+#bagTip button{margin-top:8px;padding:8px 10px;min-height:36px;font-size:13px}
+#bagFull{position:fixed;inset:0;background:#07100be6;display:none;align-items:flex-end;justify-content:center;
+  padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));z-index:40}
+#bagFull .sheet{width:min(480px,100%);background:linear-gradient(165deg,#243528,#121c16);
+  border:1px solid #7a8a5e;border-radius:18px;padding:16px 14px;text-align:center}
+#bagFull h2{font-size:20px;margin:0 0 6px}
+#bagFull .newitem{color:#ffd86a;font-weight:800;font-size:16px;margin:6px 0 2px}
+#bagFull .slots{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:10px 0}
+#bagFull .slots button{width:56px;height:56px;margin:0;padding:0;flex:none;font-size:22px;border-radius:12px}
+#bagFull #bagLeave{background:#3d2a20;border-color:#b88a6a}
+@media(max-height:680px){
+  .bagslot{width:36px;height:36px;font-size:16px}
+}
 </style>
 </head>
 <body>
@@ -197,10 +226,21 @@ body.bossOn #buffs{top:122px}
 <div id="buffs"></div><!-- 0.5 -->
 <div id="bossBar"><div class="bname">🐉 King Black Dragon</div><div class="bar"><div id="bossFill"></div></div></div><!-- 0.6 -->
 <div id="toast"></div>
+
+<div id="bagHud"></div>
+<div id="bagTip"></div>
+<div id="bagFull"><div class="sheet">
+  <h2>BAG FULL</h2>
+  <p>Choose a slot to swap, or leave the find on the ground.</p>
+  <div class="newitem" id="bagFullName"></div>
+  <div class="small" id="bagFullDesc"></div>
+  <div class="slots" id="bagFullSlots"></div>
+  <button type="button" id="bagLeave">Leave it on the ground</button>
+</div></div>
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.9c</div><!-- 0.9c: class dropdown menu; 0.9b: Fisher pierce/splash/net push + faster basic; 0.9a: opt-in Penance Swarm events -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.10a</div><!-- 0.10a: in-run items + 5-slot bag; 0.9c: class dropdown menu; 0.9b: Fisher pierce/splash/net push + faster basic; 0.9a: opt-in Penance Swarm events -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, bring treasure home.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -515,6 +555,13 @@ let rafId = 0;
 let runId = 0;
 // 0.5: loot chests. chests on the ground, how many opened this run, whether the 90s chest dropped
 let chests = [], chestsOpened = 0, nextChestAt = 60;
+let bag = [];           // 0.10a: up to BAG_SLOTS in-run items {id, qty}
+let groundItems = [];   // 0.10a: items left on the floor {x,y,id,qty,t}
+let bagging = false;    // 0.10a: swap-or-leave sheet is open (run paused)
+let bagQueue = [];      // 0.10a: items waiting on a full bag
+let bagPending = [];    // 0.10a: items rolled from the chest being opened
+let bagTipIdx = -1;
+const BAG_SLOTS = 5;
 // 0.5: timed power spikes, in seconds left (ticked with game time, so they pause with the game)
 let buffs = { dagger:0, recoil:0, glory:0, boots:0 };
 let phoenix = false;   // 0.5: Phoenix necklace held (saves you once)
@@ -840,13 +887,16 @@ function applyStyle(k) {
   player.range = Math.max(140, Math.min(d.range * player.rm, 0.48 * Math.min(W, H)));
   if (player.m && player.m.harpC) player.range = Math.max(80, player.range - 15); // 0.8b Karambwan Spike drawback
   const wIdx = Math.min(5, Math.floor((l - 1) / 5));
-  player.attackName = d.w[wIdx] + ' · ' + d.sk + ' ' + l;
+  const uniq = player.itemUnique;
+  player.attackName = (uniq ? uniq.n : d.w[wIdx]) + ' · ' + d.sk + ' ' + l;
+  // 0.10a: item range (crystal bow, d'hide) after the screen cap, still keep it on-screen
+  if (player.itemRange) player.range = Math.min(0.48 * Math.min(W, H), player.range + player.itemRange);
 }
 
 function gain(d) {
   const k = player.style;
   const before = sLvl(k);
-  save.sk[k] += d * 0.55 * (player.xpMul || 1);
+  save.sk[k] += d * 0.55 * ((player.xpMul || 1) + (player.itemGloryX || 0));
   const after = sLvl(k);
   if (after > before) {
     toast('Congratulations! Your ' + STY[k].sk + ' level is now ' + after + '.');
@@ -908,6 +958,12 @@ function start(k) {
   playing = true; paused = false; leveling = false;
   // 0.5: fresh chests and buffs every run
   chests = []; chestsOpened = 0; nextChestAt = 60; phoenix = false; bannerTimer = 0;
+  bag = []; groundItems = []; bagging = false; bagQueue = []; bagPending = []; bagTipIdx = -1;
+  player.lifeUsed = false; player.chewLock = 0; player.maulCd = 0;
+  player.potAtk = 0; player.potPray = 0; player.potBrew = 0; player.potStam = 0; player.brewOver = 0;
+  if ($('bagFull')) $('bagFull').style.display = 'none';
+  if ($('bagTip')) $('bagTip').style.display = 'none';
+  hideToast();
   buffs = { dagger:0, recoil:0, glory:0, boots:0 };
   $('lootBanner').style.opacity = '0';
   buffsHtml = ''; $('buffs').innerHTML = '';
@@ -924,6 +980,8 @@ function start(k) {
 
   $('overlay').style.display = 'none';
   $('pauseBtn').style.display = 'block';
+  if (typeof refreshItems === 'function') refreshItems();
+  else if (typeof renderBag === 'function') renderBag();
   $('dashBtn').style.display = 'flex';
   $('abilityBtn').style.display = 'flex';
   // 0.4: stop any old loop, then start exactly one new loop
@@ -1252,7 +1310,24 @@ function bind() {
 bind();
 
 /* ========== UTIL ========== */
+function hideToast() {
+  const el = $('toast');
+  if (el) el.style.display = 'none';
+  clearTimeout(toast.t);
+}
+/* 0.10a: never draw a toast over the bag-full sheet, level-up, pause, or end-run overlay.
+   Menu/Mastery/Shop toasts still show (those overlays are not in a run). Toasts are not queued. */
+function toastBlocked() {
+  if (bagging) return true;
+  const bf = $('bagFull');
+  if (bf && bf.style.display === 'flex') return true;
+  if (leveling || paused) return true;
+  const ov = $('overlay');
+  if (playing && ov && ov.style.display === 'flex') return true;
+  return false;
+}
 function toast(s) {
+  if (toastBlocked()) return;
   $('toast').textContent = s;
   $('toast').style.display = 'block';
   clearTimeout(toast.t);
@@ -1362,7 +1437,7 @@ function triggerPenanceSwarm() {
 function payoutPenance(cleared) {
   if (!eventFight || eventFight.renownPaid) return;
   const power = eventFight.power;
-  const coins = Math.round((22 + elapsed / 6) * (1 + (player.coinBonus || 0)));
+  const coins = Math.round((22 + elapsed / 6) * coinMul()); // 0.10a
   const renBase = 3 + Math.floor(elapsed / 80);
   const renClear = cleared ? (2 + Math.floor(power)) : 0;
   const ren = renBase + renClear;
@@ -1551,7 +1626,7 @@ function hurt(e, d, isCrit, dot) { // 0.8a: dot = burn tick / Retribution (no on
       // 0.9a: Penance are a win/lose gamble — no XP orbs, coins, or chests on kill.
       // Survive/clear payout is the only reward. On-kill heals/effects above still run.
     } else {
-    const g = Math.max(1, Math.round(e.gold * (1 + (player.coinBonus || 0))));
+    const g = Math.max(1, Math.round(e.gold * coinMul())); // 0.10a
     orbs.push({ x: e.x, y: e.y, xp: e.xp, gold: g, r: e.elite ? 9 : 6, elite: !!e.elite });
     // 0.5: chest drop chance: Elite Ogre always, Hill giant 6%, everyone else 1.5%
     // 0.9c: ordinary enemies/elites never drop chests; minute timer and dragon only.
@@ -1595,6 +1670,15 @@ function attack() {
     if (M.zerkC) { const miss = 1 - player.hp / Math.max(1, player.maxHp); d = Math.round(d * (1 + Math.min(0.45, miss * 0.5))); }
     if (player.meatT > 0) d = Math.round(d * (player.meatMul || 1.15));
     if (penanceBuff > 0) d = Math.round(d * penanceDmg); // 0.9a Penance adrenaline
+    if (player.itemDmg && player.itemDmg !== 1) d = Math.round(d * player.itemDmg);
+    if (player.potAtk > 0) d = Math.round(d * (1 + (player.potAtkMul || 0.15)));
+    if (player.potBrew > 0) d = Math.round(d * 0.92);
+    // 0.10a Dharok 3-piece: more damage the lower your HP, up to +45%. Don't stack with Berserker — take the better.
+    if ((player.itemDharok || 0) >= 3) {
+      const dh = 1 + 0.45 * (1 - player.hp / Math.max(1, player.maxHp));
+      const bz = (player.berserk && player.hp / player.maxHp < (M.zerk4 ? 0.55 : 0.4)) ? (M.zerk4 ? 1.3 : 1.2) : 1;
+      if (dh > bz) d = Math.round(d / bz * dh);
+    }
     if (spike && ti === 0) d = Math.round(d * 2.2);
     if (bolt && ti === 0 && e.boss) d = Math.round(d * 1.25);
 
@@ -1622,6 +1706,7 @@ function attack() {
     }
     if (spike && ti === 0 && e.hp > 0 && (e.elite || e.boss || e.kind === 2)) { e.bleed = 2; e.bleedDps = wDmg() * 0.10; e.bleedTick = 0.5; }
     if (M.net2 && e.hp > 0) e.chill = Math.max(e.chill || 0, 0.5);
+    if (player.itemChill && e.hp > 0) e.chill = Math.max(e.chill || 0, player.itemChill);
     if (M.zerkC && player.hp / player.maxHp < 0.3) player.hp = Math.min(player.maxHp, player.hp + 2);
 
     // 0.9b Fisher: harpoon pierces 2 more in a line (65%) + small splash (35% in 38px) so basics clear a packed slow-blob
@@ -1635,7 +1720,7 @@ function attack() {
         if (along > 10 && along < player.range && lat < 20) {
           hurt(o, Math.round(d * 0.65), false);
           if (M.net2 && o.hp > 0) o.chill = Math.max(o.chill || 0, 0.5);
-          if (++pierced >= 2) break;
+          if (++pierced >= (player.itemPierce || 2)) break;
         }
       }
       for (const o of enemies) {
@@ -1654,11 +1739,19 @@ function attack() {
     // magic splash
     if (player.style === 'magic') {
       for (const o of enemies) {
-        if (o !== e && o.hp > 0 && dist(o, e) < 55 + (player.blast || 0))
+        if (o !== e && o.hp > 0 && dist(o, e) < 55 + (player.blast || 0) + (player.itemBlast || 0))
           hurt(o, Math.round(d * (player.splashMul || 0.48)), false); // 0.8a: Fire Blast mastery 60%
       }
     }
   });
+  if (player.itemDarkbow && targets[0] && player.hitN % 6 === 0) {
+    const t = targets[0];
+    if (t.hp > 0) {
+      const extra = Math.round(player.damage * STY[player.style].dmg * (1 + (sLvl(player.style) - 1) * 0.045) * 0.70 * (player.itemDmg || 1));
+      shots.push({ x: player.x, y: player.y, tx: t.x, ty: t.y, life: 0.14, col: '#c070ff', thick: 3.5 });
+      hurt(t, extra, false);
+    }
+  }
   if (targets.length && player.ambush > 0) player.ambush--; // 0.8a Ambush: one charge per attack
   // 0.8b Dragon Hunter Bolt: pierce everything along the line to the primary target
   if (bolt && targets[0]) {
@@ -1682,6 +1775,7 @@ function attack() {
 
 /* ========== SPECIALS & DASH ========== */
 function doDash() {
+  if (player.chewLock > 0) return; // 0.10a: brief bite after eating
   // 0.8b Shadow Step: spend a charge; otherwise classic single dash gated by dashCd
   if (player.dashIframes > 0) return;
   if (player.m.skirmC) { if (player.dashCh <= 0) return; }
@@ -1719,7 +1813,7 @@ function doSpecial() {
   // 0.8b Rare Fishing Spot: cannot recast while a spot is active
   if (player.m.netC && player.netSpot) return;
   ensureAudio();
-  player.specialCd = player.specialMax;
+  player.specialCd = player.specialMax * (player.itemCd || 1);
   sfx('special');
   shake = 0.25;
   const M = player.m;
@@ -1783,7 +1877,7 @@ function doSpecial() {
 }
 function castNet() { // 0.8b Fisher special
   const M = player.m;
-  let R = (M.net1 ? 135 : 110) + (player.netBonus || 0);
+  let R = (M.net1 ? 135 : 110) + (player.netBonus || 0) + (player.itemNet || 0);
   let cx = player.x, cy = player.y;
   const near = enemies.filter(e => e.hp > 0).sort((a, b) => dist(a, player) - dist(b, player))[0];
   if (near && dist(near, player) < player.range) {
@@ -1835,6 +1929,369 @@ const BUFFS = {
   boots:  { n:'Boots of lightness', icon:'👢', d:'+40% additive speed (total capped at +40%) and faster dash for 30s!' }
 };
 
+
+/* ========== 0.10a: IN-RUN ITEMS + 5-SLOT BAG ========== */
+// Hatch: in-run only, 5 slots all classes, items only from timed/royal chests.
+const ITEMS = {
+  iron_plate:    { id:'iron_plate',    n:'Iron platebody',     icon:'🛡️', kind:'equip', slot:'body',   tier:'common',    armor:0.04, d:'+4% armour.' },
+  iron_helm:     { id:'iron_helm',     n:'Iron helm',          icon:'⛑️', kind:'equip', slot:'helm',   tier:'common',    armor:0.02, d:'+2% armour.' },
+  steel_plate:   { id:'steel_plate',   n:'Steel platebody',    icon:'🛡️', kind:'equip', slot:'body',   tier:'common',    armor:0.06, d:'+6% armour.' },
+  steel_helm:    { id:'steel_helm',    n:'Steel helm',         icon:'⛑️', kind:'equip', slot:'helm',   tier:'common',    armor:0.03, d:'+3% armour.' },
+  mith_plate:    { id:'mith_plate',    n:'Mithril platebody',  icon:'🛡️', kind:'equip', slot:'body',   tier:'uncommon',  armor:0.08, d:'+8% armour.' },
+  mith_helm:     { id:'mith_helm',     n:'Mithril helm',       icon:'⛑️', kind:'equip', slot:'helm',   tier:'uncommon',  armor:0.04, d:'+4% armour.' },
+  addy_plate:    { id:'addy_plate',    n:'Adamant platebody',  icon:'🛡️', kind:'equip', slot:'body',   tier:'uncommon',  armor:0.10, d:'+10% armour.' },
+  addy_helm:     { id:'addy_helm',     n:'Adamant helm',       icon:'⛑️', kind:'equip', slot:'helm',   tier:'uncommon',  armor:0.05, d:'+5% armour.' },
+  rune_plate:    { id:'rune_plate',    n:'Rune platebody',     icon:'🛡️', kind:'equip', slot:'body',   tier:'rare',      armor:0.12, d:'+12% armour.' },
+  rune_helm:     { id:'rune_helm',     n:'Rune med helm',      icon:'⛑️', kind:'equip', slot:'helm',   tier:'rare',      armor:0.06, d:'+6% armour.' },
+  dragon_med:    { id:'dragon_med',    n:'Dragon med helm',    icon:'🐉', kind:'equip', slot:'helm',   tier:'rare',      armor:0.08, dmg:0.05, d:'+8% armour, +5% damage.' },
+  green_dhide:   { id:'green_dhide',   n:"Green d'hide body",  icon:'🟢', kind:'equip', slot:'body',   tier:'uncommon',  dmg:0.06, range:8,  d:'+6% damage, +8 range.' },
+  red_dhide:     { id:'red_dhide',     n:"Red d'hide body",    icon:'🔴', kind:'equip', slot:'body',   tier:'uncommon',  dmg:0.08, range:12, d:'+8% damage, +12 range.' },
+  black_dhide:   { id:'black_dhide',   n:"Black d'hide body",  icon:'⬛', kind:'equip', slot:'body',   tier:'rare',      dmg:0.10, range:16, d:'+10% damage, +16 range.' },
+  mystic_top:    { id:'mystic_top',    n:'Mystic top',         icon:'✨', kind:'equip', slot:'body',   tier:'uncommon',  dmg:0.10, blast:10, d:'+10% damage, +10% splash radius.' },
+  angler_jack:   { id:'angler_jack',   n:'Angler jacket',      icon:'🎣', kind:'equip', slot:'body',   tier:'uncommon',  dmg:0.08, magnet:20, d:'+8% damage, +20 pickup range.' },
+  amulet_str:    { id:'amulet_str',    n:'Amulet of strength', icon:'📕', kind:'equip', slot:'jewelry',tier:'uncommon',  dmg:0.10, d:'+10% damage.' },
+  amulet_def:    { id:'amulet_def',    n:'Amulet of defence',  icon:'📘', kind:'equip', slot:'jewelry',tier:'uncommon',  armor:0.06, d:'+6% armour.' },
+  amulet_pow:    { id:'amulet_pow',    n:'Amulet of power',    icon:'📙', kind:'equip', slot:'jewelry',tier:'rare',      dmg:0.06, armor:0.04, d:'+6% damage, +4% armour.' },
+  amulet_glory:  { id:'amulet_glory',  n:'Amulet of glory',    icon:'📿', kind:'equip', slot:'jewelry',tier:'rare',      glory:1, d:'+15% coins and skill XP this run.' },
+  ring_life:     { id:'ring_life',     n:'Ring of life',       icon:'💚', kind:'equip', slot:'jewelry',tier:'rare',      life:1, d:'Once, survive a killing blow at 1 HP.' },
+  ring_wealth:   { id:'ring_wealth',   n:'Ring of wealth',     icon:'💍', kind:'equip', slot:'jewelry',tier:'uncommon',  wealth:0.18, d:'+18% coins this run (uses the better of this and coin cards).' },
+  cape_sara:     { id:'cape_sara',     n:'Saradomin cape',     icon:'🟦', kind:'equip', slot:'cape',   tier:'rare',      dmg:0.08, hp:8, d:'+8% damage, +8 max HP.' },
+  cape_zam:      { id:'cape_zam',      n:'Zamorak cape',       icon:'🟥', kind:'equip', slot:'cape',   tier:'rare',      dmg:0.08, taken:0.05, d:'+8% damage, but you take 5% more.' },
+  cape_guth:     { id:'cape_guth',     n:'Guthix cape',        icon:'🟩', kind:'equip', slot:'cape',   tier:'rare',      dmg:0.08, cd:0.95, d:'+8% damage, special cools 5% faster.' },
+  fire_cape:     { id:'fire_cape',     n:'Fire cape',          icon:'🔥', kind:'equip', slot:'cape',   tier:'unique',    dmg:0.12, d:'+12% damage.' },
+  abyssal_whip:  { id:'abyssal_whip',  n:'Abyssal whip',       icon:'〰️', kind:'equip', slot:'weapon', tier:'unique',    cls:'melee',  dmg:0.18, aspd:0.10, d:'Overrides your weapon. +18% damage, +10% attack speed (80% if not Melee).' },
+  dark_bow:      { id:'dark_bow',      n:'Dark bow',           icon:'🏹', kind:'equip', slot:'weapon', tier:'unique',    cls:'ranged', darkbow:1, d:'Overrides your weapon. Every 6th attack fires a second shot at 70%.' },
+  ancient_staff: { id:'ancient_staff', n:'Ancient staff',      icon:'🪵', kind:'equip', slot:'weapon', tier:'unique',    cls:'magic',  dmg:0.12, chill:0.4, d:'Overrides your weapon. +12% damage; hits chill 0.4s.' },
+  heavy_harp:    { id:'heavy_harp',    n:'Heavy harpoon',      icon:'🔱', kind:'equip', slot:'weapon', tier:'unique',    cls:'fisher', dmg:0.15, pierce:3, net:15, d:'Overrides your weapon. +15% damage, pierces 3, Cast Net +15 px.' },
+  crystal_bow:   { id:'crystal_bow',   n:'Crystal bow',        icon:'💎', kind:'equip', slot:'weapon', tier:'unique',    cls:'ranged', dmg:0.12, range:20, d:'Overrides your weapon. +12% damage, +20 range.' },
+  granite_maul:  { id:'granite_maul',  n:'Granite maul',       icon:'🔨', kind:'equip', slot:'weapon', tier:'unique',    cls:'melee',  maul:1, d:'Overrides your weapon. Every 12s, a 70px knockback pulse.' },
+  dharok_helm:   { id:'dharok_helm',   n:"Dharok's helm",      icon:'💀', kind:'set',   slot:'helm',   tier:'unique',    set:'dharok', d:'Dharok set. 1pc +4% dmg, 2pc +8%, 3pc more damage the lower your HP (up to +45%).' },
+  dharok_body:   { id:'dharok_body',   n:"Dharok's platebody", icon:'💀', kind:'set',   slot:'body',   tier:'unique',    set:'dharok', d:'Dharok set. 1pc +4% dmg, 2pc +8%, 3pc more damage the lower your HP (up to +45%).' },
+  dharok_axe:    { id:'dharok_axe',    n:"Dharok's greataxe",  icon:'🪓', kind:'set',   slot:'weapon', tier:'unique',    set:'dharok', cls:'melee', d:'Overrides your weapon. Counts as a Dharok piece.' },
+  trout:         { id:'trout',         n:'Trout',              icon:'🐟', kind:'food',  slot:'food',   tier:'common',    heal:20, d:'Eat to restore 20 HP.' },
+  lobster:       { id:'lobster',       n:'Lobster',            icon:'🦞', kind:'food',  slot:'food',   tier:'common',    heal:35, d:'Eat to restore 35 HP.' },
+  swordfish:     { id:'swordfish',     n:'Swordfish',          icon:'🐟', kind:'food',  slot:'food',   tier:'uncommon',  heal:45, d:'Eat to restore 45 HP.' },
+  shark:         { id:'shark',         n:'Shark',              icon:'🦈', kind:'food',  slot:'food',   tier:'rare',      heal:60, d:'Eat to restore 60 HP.' },
+  manta:         { id:'manta',         n:'Manta ray',          icon:'🪸', kind:'food',  slot:'food',   tier:'unique',    heal:75, d:'Eat to restore 75 HP.' },
+  att_pot:       { id:'att_pot',       n:'Attack potion',      icon:'🧪', kind:'potion',slot:'potion', tier:'common',    pot:'atk',  mul:0.15, dur:20, d:'+15% damage for 20s.' },
+  super_att:     { id:'super_att',     n:'Super attack',       icon:'🧪', kind:'potion',slot:'potion', tier:'uncommon',  pot:'atk',  mul:0.25, dur:20, d:'+25% damage for 20s.' },
+  super_rest:    { id:'super_rest',    n:'Super restore',      icon:'🧪', kind:'potion',slot:'potion', tier:'rare',      pot:'restore', d:'Heal 30 and shorten special cooldown by 2s.' },
+  pray_pot:      { id:'pray_pot',      n:'Prayer potion',      icon:'🙏', kind:'potion',slot:'potion', tier:'rare',      pot:'pray', dur:8, d:'8s of +20% damage reduction.' },
+  brew:          { id:'brew',          n:'Saradomin brew',     icon:'🍺', kind:'potion',slot:'potion', tier:'rare',      pot:'brew', d:'+40 HP (can overheal 20). −8% damage for 15s.' },
+  stamina:       { id:'stamina',       n:'Stamina potion',     icon:'💛', kind:'potion',slot:'potion', tier:'uncommon',  pot:'stam', dur:8, d:'8s of faster dash recharge (does not raise move-speed cap).' }
+};
+const ITEM_POOL = {
+  common:    ['iron_plate','iron_helm','steel_plate','steel_helm','trout','lobster','att_pot'],
+  uncommon:  ['mith_plate','mith_helm','addy_plate','addy_helm','green_dhide','red_dhide','mystic_top','angler_jack','amulet_str','amulet_def','ring_wealth','swordfish','super_att','stamina'],
+  rare:      ['rune_plate','rune_helm','dragon_med','black_dhide','amulet_pow','amulet_glory','ring_life','cape_sara','cape_zam','cape_guth','shark','super_rest','pray_pot','brew'],
+  unique:    ['fire_cape','abyssal_whip','dark_bow','ancient_staff','heavy_harp','crystal_bow','granite_maul','dharok_helm','dharok_body','dharok_axe','manta']
+};
+
+function itemDef(id) { return ITEMS[id] || ITEMS[id && id.id] || null; }
+function itemClone(id, qty) { return { id: typeof id === 'string' ? id : id.id, qty: qty || 1 }; }
+
+function rollItemTier(royal) {
+  const t = elapsed, r = Math.random();
+  if (royal) {
+    if (r < 0.20) return 'uncommon';
+    if (r < 0.75) return 'rare';
+    return 'unique';
+  }
+  if (t < 300) { // 0–4:59
+    if (r < 0.80) return 'common';
+    if (r < 0.98) return 'uncommon';
+    return 'rare';
+  }
+  if (t < 600) { // 5–9:59
+    if (r < 0.55) return 'common';
+    if (r < 0.90) return 'uncommon';
+    if (r < 0.99) return 'rare';
+    return 'unique';
+  }
+  if (r < 0.35) return 'common';
+  if (r < 0.75) return 'uncommon';
+  if (r < 0.95) return 'rare';
+  return 'unique';
+}
+function rollItem(royal) {
+  const tier = rollItemTier(royal);
+  const pool = ITEM_POOL[tier];
+  const id = pool[Math.floor(Math.random() * pool.length)];
+  return itemClone(id, 1);
+}
+
+function wornOf(slot) {
+  let best = null, bestI = -1;
+  bag.forEach((it, i) => {
+    const d = itemDef(it.id);
+    if (!d || d.slot !== slot || (d.kind !== 'equip' && d.kind !== 'set')) return;
+    if (it.pin || bestI < 0) { best = it; bestI = i; }
+  });
+  // last-tapped pin wins; otherwise the last item of that slot in the bag
+  const pinned = bag.find(it => it.pin && itemDef(it.id) && itemDef(it.id).slot === slot);
+  if (pinned) return pinned;
+  for (let i = bag.length - 1; i >= 0; i--) {
+    const d = itemDef(bag[i].id);
+    if (d && d.slot === slot && (d.kind === 'equip' || d.kind === 'set')) return bag[i];
+  }
+  return null;
+}
+
+function refreshItems() {
+  const st = {
+    armor:0, dmg:1, aspd:1, range:0, magnet:0, wealth:0, gloryCoin:0, gloryXp:0,
+    taken:0, cd:1, blast:0, net:0, pierce:0, chill:0, darkbow:0, maul:0, hp:0,
+    unique:null, dharok:0
+  };
+  const seen = {};
+  for (const slot of ['body','helm','jewelry','cape','weapon']) {
+    const it = wornOf(slot);
+    if (!it) continue;
+    const d = itemDef(it.id);
+    if (!d) continue;
+    seen[slot] = d;
+    if (d.set === 'dharok') st.dharok++;
+    let scale = 1;
+    if (d.slot === 'weapon' && d.cls && d.cls !== player.style) scale = 0.80;
+    st.armor += d.armor || 0;
+    st.dmg += (d.dmg || 0) * scale;
+    st.aspd += (d.aspd || 0) * scale;
+    st.range += d.range || 0;
+    st.magnet += d.magnet || 0;
+    if (d.wealth) st.wealth = Math.max(st.wealth, d.wealth);
+    if (d.glory) { st.gloryCoin = 0.15; st.gloryXp = 0.15; }
+    st.taken += d.taken || 0;
+    if (d.cd) st.cd *= d.cd;
+    st.blast += d.blast || 0;
+    st.net += d.net || 0;
+    if (d.pierce) st.pierce = d.pierce;
+    if (d.chill) st.chill = d.chill;
+    if (d.darkbow) st.darkbow = 1;
+    if (d.maul) st.maul = 1;
+    if (d.hp) st.hp += d.hp;
+    if (d.slot === 'weapon') st.unique = d;
+  }
+  if (st.dharok === 1) st.dmg += 0.04;
+  else if (st.dharok >= 2) st.dmg += 0.08;
+  player.itemArmor = st.armor;
+  player.itemDmg = st.dmg;
+  player.itemAspd = st.aspd;
+  player.itemRange = st.range;
+  player.itemMagnet = st.magnet;
+  player.itemWealth = st.wealth;
+  player.itemGloryC = st.gloryCoin;
+  player.itemGloryX = st.gloryXp;
+  player.itemTaken = st.taken;
+  player.itemCd = st.cd;
+  player.itemBlast = st.blast;
+  player.itemNet = st.net;
+  player.itemPierce = st.pierce;
+  player.itemChill = st.chill;
+  player.itemDarkbow = st.darkbow;
+  player.itemMaul = st.maul;
+  player.itemHp = st.hp;
+  player.itemUnique = st.unique;
+  player.itemDharok = st.dharok;
+  if (st.hp && player.maxHp && player._itemHpApplied !== st.hp) {
+    const delta = st.hp - (player._itemHpApplied || 0);
+    player.maxHp += delta;
+    player.hp = Math.max(1, player.hp + Math.max(0, delta));
+    player._itemHpApplied = st.hp;
+  } else if (!st.hp && player._itemHpApplied) {
+    player.maxHp = Math.max(1, player.maxHp - player._itemHpApplied);
+    player.hp = Math.min(player.hp, player.maxHp);
+    player._itemHpApplied = 0;
+  }
+  if (typeof applyStyle === 'function' && player.style) applyStyle(player.style);
+  renderBag();
+}
+
+function coinMul() {
+  return 1 + Math.max(Number(player.coinBonus)||0, Number(player.itemWealth)||0, Number(player.itemGloryC)||0);
+}
+function armorNow() {
+  return Math.min(armorCap(), (player.armor || 0) + (player.itemArmor || 0));
+}
+function dmgTakenNow() {
+  let m = (player.dmgTaken || 1) * (1 + (player.itemTaken || 0));
+  if (player.potPray > 0) m *= 0.80;
+  return m;
+}
+
+function canStack(it) {
+  const d = itemDef(it.id);
+  return d && (d.kind === 'food' || d.kind === 'potion');
+}
+function tryAddItem(it) {
+  const d = itemDef(it.id);
+  if (!d) return true;
+  // same-or-worse body/helm already worn → convert to a little treasure so the bag is not clogged
+  if ((d.slot === 'body' || d.slot === 'helm') && (d.kind === 'equip' || d.kind === 'set')) {
+    const have = wornOf(d.slot);
+    const rank = { common:1, uncommon:2, rare:3, unique:4 };
+    if (have && (rank[itemDef(have.id).tier] || 0) >= (rank[d.tier] || 0) && itemDef(have.id).slot === d.slot && d.tier !== 'unique') {
+      const coins = Math.round((12 + elapsed / 8) * coinMul());
+      runGold += coins;
+      floats.push({ x: player.x, y: player.y - 24, text: '+' + coins + ' ◆', life: 0.8, vy: -34, color: '#ffd24a' });
+      toast(d.n + ' sold for coins (you already have equal or better).');
+      return true;
+    }
+  }
+  if (canStack(it)) {
+    const ex = bag.find(b => b.id === it.id);
+    if (ex && ex.qty < 3) { ex.qty = Math.min(3, ex.qty + (it.qty || 1)); refreshItems(); toast(d.n + ' added to bag'); return true; }
+    if (ex && ex.qty >= 3 && bag.length >= BAG_SLOTS) return false;
+    if (ex && ex.qty >= 3) { /* need a new slot? treat as full stack, convert extras to coins if no room later */ }
+  }
+  if (bag.length >= BAG_SLOTS) return false;
+  bag.push({ id: it.id, qty: it.qty || 1 });
+  refreshItems();
+  toast('Found: ' + d.n);
+  return true;
+}
+
+function dropItemOnGround(it, x, y) {
+  groundItems.push({ x: x, y: y, id: it.id, qty: it.qty || 1, t: 0 });
+}
+
+function offerItem(it) {
+  if (tryAddItem(it)) return;
+  bagQueue.push(it);
+  if (!bagging) openBagFull();
+}
+
+function openBagFull() {
+  if (!bagQueue.length) return;
+  bagging = true;
+  hideToast();
+  stopLoop();
+  resetJoystick();
+  const it = bagQueue[0], d = itemDef(it.id);
+  $('bagFullName').textContent = (d.icon || '') + ' ' + d.n;
+  $('bagFullDesc').textContent = d.d;
+  const row = $('bagFullSlots');
+  row.innerHTML = bag.map((b, i) => {
+    const bd = itemDef(b.id);
+    return '<button type="button" data-swap="' + i + '" title="' + (bd ? bd.n : '') + '">' + (bd ? bd.icon : '?') + (b.qty > 1 ? '<span class="bq">' + b.qty + '</span>' : '') + '</button>';
+  }).join('');
+  row.querySelectorAll('[data-swap]').forEach(btn => btn.onclick = () => {
+    const i = +btn.dataset.swap;
+    const incoming = bagQueue.shift();
+    const evicted = bag[i];
+    bag[i] = { id: incoming.id, qty: incoming.qty || 1 };
+    dropItemOnGround(evicted, player.x + 18, player.y + 8);
+    refreshItems();
+    closeBagFullOrNext();
+    if (!toastBlocked()) toast((itemDef(evicted.id) || evicted).n ? (itemDef(evicted.id).n + ' left on the ground') : 'Item left on the ground');
+  });
+  $('bagLeave').onclick = () => {
+    const incoming = bagQueue.shift();
+    dropItemOnGround(incoming, player.x + 18, player.y + 8);
+    closeBagFullOrNext();
+    if (!toastBlocked()) toast((itemDef(incoming.id).n) + ' left on the ground');
+  };
+  $('bagFull').style.display = 'flex';
+}
+function closeBagFullOrNext() {
+  if (bagQueue.length) { openBagFull(); return; }
+  bagging = false;
+  $('bagFull').style.display = 'none';
+  if (playing && !paused && !leveling) startLoop();
+}
+
+function renderBag() {
+  const el = $('bagHud');
+  if (!el) return;
+  if (!playing) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  let h = '';
+  for (let i = 0; i < BAG_SLOTS; i++) {
+    const it = bag[i], d = it && itemDef(it.id);
+    const on = bagTipIdx === i ? ' on' : '';
+    h += '<button type="button" class="bagslot' + on + '" data-bag="' + i + '">' +
+      (d ? d.icon : '') + (d && it.qty > 1 ? '<span class="bq">' + it.qty + '</span>' : '') + '</button>';
+  }
+  el.innerHTML = h;
+  el.querySelectorAll('[data-bag]').forEach(btn => btn.onclick = ev => {
+    ev.stopPropagation();
+    tapBagSlot(+btn.dataset.bag);
+  });
+}
+function hideBagTip() {
+  bagTipIdx = -1;
+  if ($('bagTip')) $('bagTip').style.display = 'none';
+  renderBag();
+}
+function tapBagSlot(i) {
+  const it = bag[i], d = it && itemDef(it.id);
+  if (!d) { hideBagTip(); return; }
+  if (bagTipIdx === i && (d.kind === 'food' || d.kind === 'potion')) { useBagItem(i); return; }
+  bagTipIdx = i;
+  // last-tapped equip of a slot becomes the worn one
+  if (d.kind === 'equip' || d.kind === 'set') {
+    bag.forEach(b => { if (itemDef(b.id) && itemDef(b.id).slot === d.slot) b.pin = false; });
+    it.pin = true;
+    refreshItems();
+  }
+  const tip = $('bagTip');
+  tip.innerHTML = '<div class="tn">' + d.icon + ' ' + d.n + (it.qty > 1 ? ' ×' + it.qty : '') + '</div>' +
+    '<div class="td">' + d.d + ((d.kind === 'equip' || d.kind === 'set') ? ' Worn while in your bag.' : ' Tap again or Use to consume.') + '</div>' +
+    ((d.kind === 'food' || d.kind === 'potion') ? '<button type="button" id="bagUse">Use</button>' : '') +
+    '<button type="button" id="bagDrop">Drop</button>';
+  tip.style.display = 'block';
+  if ($('bagUse')) $('bagUse').onclick = ev => { ev.stopPropagation(); useBagItem(i); };
+  if ($('bagDrop')) $('bagDrop').onclick = ev => {
+    ev.stopPropagation();
+    const gone = bag.splice(i, 1)[0];
+    dropItemOnGround(gone, player.x + 18, player.y + 8);
+    hideBagTip(); refreshItems();
+    toast(itemDef(gone.id).n + ' left on the ground');
+  };
+  renderBag();
+}
+function useBagItem(i) {
+  const it = bag[i], d = it && itemDef(it.id);
+  if (!d || (d.kind !== 'food' && d.kind !== 'potion')) return;
+  if (d.kind === 'food') {
+    player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + d.heal);
+    player.chewLock = 0.4;
+    floats.push({ x: player.x, y: player.y - 26, text: '+' + d.heal, life: 0.8, vy: -36, color: '#7ec978' });
+  } else if (d.pot === 'atk') {
+    player.potAtk = d.dur; player.potAtkMul = d.mul;
+  } else if (d.pot === 'restore') {
+    player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + 30);
+    player.specialCd = Math.max(0, (player.specialCd || 0) - 2);
+    floats.push({ x: player.x, y: player.y - 26, text: '+30', life: 0.8, vy: -36, color: '#7ec978' });
+  } else if (d.pot === 'pray') {
+    player.potPray = d.dur;
+  } else if (d.pot === 'brew') {
+    player.hp += 40;
+    const over = Math.max(0, player.hp - player.maxHp);
+    player.brewOver = Math.min(20, over);
+    player.hp = Math.min(player.maxHp + 20, player.hp);
+    player.potBrew = 15;
+  } else if (d.pot === 'stam') {
+    player.potStam = d.dur;
+  }
+  it.qty = (it.qty || 1) - 1;
+  if (it.qty <= 0) bag.splice(i, 1);
+  hideBagTip();
+  refreshItems();
+}
+
+function drawGroundItems() {
+  for (const g of groundItems) {
+    const d = itemDef(g.id);
+    const bob = Math.sin((g.t || 0) * 3) * 2;
+    ctx.font = '16px system-ui,Segoe UI,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(g.x, g.y + 8, 9, 4, 0, 0, 7); ctx.fill();
+    ctx.fillText(d ? d.icon : '?', g.x, g.y + bob);
+  }
+}
+
 function dropChest(x, y, royal) {
   // 0.9c: search until the complete chest footprint is on walkable ground.
   let found = !hitsSolid(x, y, 26);
@@ -1878,18 +2335,22 @@ function openChest(c, force, extraRoll) {
     particles.push({ x: c.x, y: c.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
       life: 0.5 + Math.random() * 0.4, color: Math.random() < 0.7 ? '#ffd24a' : '#fff3b0', size: 4 });
   }
-  // 0.5: loot table. 30% free upgrade, 45% power spike, 15% treasure, 10% Phoenix necklace
+  // 0.10a: 25% item, 25% upgrade, 30% spike, 15% treasure, 5% Phoenix. Royal still pays upgrade+spike, plus a rare+ item.
   let kind = force || (c.royal ? 'royal' : null); // 0.6: boss chest = guaranteed good loot
   if (!kind) {
     const r = Math.random();
-    kind = r < 0.30 ? 'upgrade' : r < 0.75 ? 'spike' : r < 0.90 ? 'treasure' : 'phoenix';
+    kind = r < 0.25 ? 'item' : r < 0.50 ? 'upgrade' : r < 0.80 ? 'spike' : r < 0.95 ? 'treasure' : 'phoenix';
   }
   if (kind === 'phoenix' && phoenix) kind = 'spike'; // already holding one: give a spike instead
 
+  if (kind === 'item') {
+    bagPending.push(rollItem(false));
+  }
   if (kind === 'royal') {
     // 0.6: King Black Dragon's chest: free upgrade AND a 30s power spike
     const u = giveFreeUpgrade(), k = giveSpike();
     banner('👑 Royal chest!', 'Free upgrade: ' + u[0] + ' + ' + BUFFS[k].icon + ' ' + BUFFS[k].n + ' (30s)', 3.2);
+    bagPending.push(rollItem(true)); // 0.10a: guaranteed rare-or-better item, still walk to the chest
   } else if (kind === 'upgrade') {
     const u = giveFreeUpgrade(); // 0.6: moved into a helper so the royal chest can share it
     banner('Free upgrade: ' + u[0] + '!', u[1]);
@@ -1897,7 +2358,7 @@ function openChest(c, force, extraRoll) {
     const k = giveSpike(BUFFS[kind] ? kind : null);
     banner(BUFFS[k].icon + ' ' + BUFFS[k].n + '!', BUFFS[k].d);
   } else if (kind === 'treasure') {
-    const coins = Math.round((25 + elapsed / 4) * (1 + (player.coinBonus || 0)));
+    const coins = Math.round((25 + elapsed / 4) * coinMul()); // 0.10a
     const xp = Math.round(player.next * 0.5);
     runGold += coins;
     player.xp += xp; // if this fills the bar, the normal level-up menu opens next frame
@@ -1907,6 +2368,16 @@ function openChest(c, force, extraRoll) {
     banner('🔥 Phoenix necklace!', 'The next time you would die this run, you rise again.');
   }
   if (!extraRoll && c.rolls > 1) $('lootBanner').querySelector('b').textContent = '🎁 Rich chest · ' + c.rolls + ' loot rolls!';
+  if (!extraRoll) {
+    const found = bagPending.slice();
+    bagPending = [];
+    const names = found.map(it => (itemDef(it.id) || {}).n).filter(Boolean);
+    if (names.length) {
+      const sub = $('lootBanner').querySelector('span');
+      if (sub) sub.textContent = (sub.textContent ? sub.textContent + ' · ' : '') + 'Found: ' + names.join(', ');
+    }
+    found.forEach(offerItem);
+  }
 }
 
 // 0.6: helpers shared by normal and royal chests
@@ -1972,6 +2443,11 @@ function renderBuffs() {
   if (eventInvite) h += '<div class="pill ev">📯 ' + Math.ceil(eventInvite.life) + 's</div>';
   if (eventFight) h += '<div class="pill ev">📯 Swarm ' + Math.ceil(eventFight.t) + 's · ' + countPenance() + '</div>';
   if (penanceBuff > 0) h += '<div class="pill ev">📯 ' + Math.ceil(penanceBuff) + 's</div>';
+  if (player.potAtk > 0) h += '<div class="pill">🧪 ' + Math.ceil(player.potAtk) + 's</div>';
+  if (player.potPray > 0) h += '<div class="pill">🙏 ' + Math.ceil(player.potPray) + 's</div>';
+  if (player.potBrew > 0) h += '<div class="pill">🍺 ' + Math.ceil(player.potBrew) + 's</div>';
+  if (player.potStam > 0) h += '<div class="pill">💛 ' + Math.ceil(player.potStam) + 's</div>';
+  if ((player.itemDharok || 0) >= 3) h += '<div class="pill">💀 ' + Math.round(45 * (1 - player.hp / Math.max(1, player.maxHp))) + '%</div>';
   if (h !== buffsHtml) { buffsHtml = h; $('buffs').innerHTML = h; }
 }
 
@@ -2098,7 +2574,7 @@ function spawnBoss() {
 function bossHitPlayer(d) {
   if (player.invuln > 0) return false;
   if (shieldBlock()) return true;
-  let dmg = d * (1 - player.armor) * player.dmgTaken;
+  let dmg = d * (1 - armorNow()) * dmgTakenNow();
   if (player.bloodShield > 0) { const abs = Math.min(player.bloodShield, dmg); player.bloodShield -= abs; dmg -= abs; }
   player.hp -= dmg;
   shake = Math.max(shake, 0.3);
@@ -2111,7 +2587,7 @@ function bossHitPlayer(d) {
 function enemyHitPlayer(d) {
   if (player.invuln > 0) return false;
   if (shieldBlock()) return false;
-  let dmg = d * (1 - player.armor) * player.dmgTaken;
+  let dmg = d * (1 - armorNow()) * dmgTakenNow();
   if (player.bloodShield > 0) { const abs = Math.min(player.bloodShield, dmg); player.bloodShield -= abs; dmg -= abs; }
   player.hp -= dmg;
   player.invuln = Math.max(player.invuln, HIT_MERCY);
@@ -2294,7 +2770,7 @@ function bossDefeated(e) {
   shake = 0.9;
   sfx('boss');
   // big coin stack + lots of XP, sprayed as glowing orbs around the body
-  const coins = Math.round((150 + elapsed / 2) * (1 + (player.coinBonus || 0)));
+  const coins = Math.round((150 + elapsed / 2) * coinMul()); // 0.10a
   const xp = Math.round(player.next * 1.6);
   const N = 12;
   for (let i = 0; i < N; i++) {
@@ -2562,6 +3038,7 @@ function levelUp() {
   leveling = true;
   playing = false;
   paused = false;
+  hideToast();
 
   // 0.4: choose the 3 upgrades; if anything goes wrong, fall back to the first 3 general ones
   let picks;
@@ -2621,6 +3098,11 @@ function levelUp() {
 /* ========== END RUN ========== */
 function endRun() {
   playing = false;
+  bag = []; groundItems = []; bagging = false; bagQueue = []; bagPending = []; // 0.10a: items are in-run only
+  if ($('bagHud')) $('bagHud').style.display = 'none';
+  if ($('bagTip')) $('bagTip').style.display = 'none';
+  if ($('bagFull')) $('bagFull').style.display = 'none';
+  hideToast();
   bannerTimer = 0; $('lootBanner').style.opacity = '0'; // 0.5: clear the loot banner
   showBossBar(false); fireballs = []; // 0.6: hide boss bar
   save.bossTotal = (save.bossTotal || 0) + bossesSlain;            // 0.6: lifetime boss kills
@@ -2661,13 +3143,14 @@ function endRun() {
 
 /* ========== UPDATE ========== */
 function update(dt) {
-  if (paused) return;
+  if (paused || bagging) return; // 0.10a: bag-full sheet pauses the run
+
 
   elapsed += dt;
   spawnClock += dt;
   attackClock -= dt;
   // 0.5: Boots of lightness make the dash cooldown tick twice as fast (= halved)
-  player.dashCd = Math.max(0, player.dashCd - dt * (buffs.boots > 0 ? 2 : 1));
+  player.dashCd = Math.max(0, player.dashCd - dt * ((buffs.boots > 0 ? 2 : 1) * (player.potStam > 0 ? 2 : 1)));
   // 0.5: buffs and the banner count down with game time, so they freeze while paused/leveling
   for (const k in buffs) buffs[k] = Math.max(0, buffs[k] - dt);
   if (bannerTimer > 0) { bannerTimer -= dt; if (bannerTimer <= 0) $('lootBanner').style.opacity = '0'; }
@@ -2795,7 +3278,7 @@ function update(dt) {
     // 0.4: removed the Berserker attack-speed change (it now boosts damage in attack() instead)
     let aspd = 1 + 0.1 * player.evN;
     if (player.m.zerkC && player.hp / player.maxHp < 0.3) aspd *= 1.20; // 0.8b Fury
-    attackClock = STY[player.style].rate * player.rm2 / aspd;
+    attackClock = STY[player.style].rate * player.rm2 / aspd / (player.itemAspd || 1);
   }
 
   // enemies
@@ -2861,7 +3344,7 @@ function update(dt) {
     e.hit = Math.max(0, e.hit - dt);
 
     if (ed < e.r + player.r && player.invuln <= 0) {
-      const dmg = e.damage * dt * (1 - player.armor) * player.dmgTaken; // 0.8a: Reckless swings
+      const dmg = e.damage * dt * (1 - armorNow()) * dmgTakenNow(); // 0.8a: Reckless swings
       player.hp -= dmg;
       if (Math.random() < 0.08) shake = Math.max(shake, 0.12);
     }
@@ -2893,8 +3376,8 @@ function update(dt) {
   // orbs
   for (const o of orbs) {
     const d = dist(player, o);
-    if (d < player.magnet) {
-      const k = (1 - d / player.magnet) * 5 + 1.2;
+    if (d < player.magnet + (player.itemMagnet || 0)) {
+      const k = (1 - d / (player.magnet + (player.itemMagnet || 0))) * 5 + 1.2;
       const ox = player.x - o.x, oy = player.y - o.y;
       const od = d || 1;
       o.x += ox / od * 195 * k * dt;
@@ -2915,7 +3398,7 @@ function update(dt) {
   orbs = orbs.filter(o => !o.got);
 
   // 0.5: chests get pulled in like orbs (shorter range) and open the moment you touch one
-  const chestPull = player.magnet * 0.6;
+  const chestPull = (player.magnet + (player.itemMagnet || 0)) * 0.6;
   for (const c of chests) {
     c.t += dt;
     if (c.wait > 0) { c.wait -= dt; continue; } // 0.6: royal chest settles before it can be grabbed
@@ -2928,15 +3411,54 @@ function update(dt) {
     if (d < player.r + 16) { c.got = true; openChest(c); }
   }
   chests = chests.filter(c => !c.got);
-  renderBuffs();
 
-  if (player.xp >= player.next && !leveling) {
+  // 0.10a: walk over ground items (left from a full bag or a manual drop)
+  const itemPull = (player.magnet || 0) + (player.itemMagnet || 0);
+  for (const g of groundItems) {
+    g.t = (g.t || 0) + dt;
+    const d = dist(player, g);
+    if (d < itemPull) {
+      const od = d || 1;
+      g.x += (player.x - g.x) / od * 150 * dt;
+      g.y += (player.y - g.y) / od * 150 * dt;
+    }
+    if (d < player.r + 16 && !bagging) { g.got = true; offerItem({ id: g.id, qty: g.qty || 1 }); }
+  }
+  groundItems = groundItems.filter(g => !g.got);
+
+  if (player.chewLock > 0) player.chewLock = Math.max(0, player.chewLock - dt);
+  if (player.potAtk > 0) player.potAtk = Math.max(0, player.potAtk - dt);
+  if (player.potPray > 0) player.potPray = Math.max(0, player.potPray - dt);
+  if (player.potStam > 0) player.potStam = Math.max(0, player.potStam - dt);
+  if (player.potBrew > 0) player.potBrew = Math.max(0, player.potBrew - dt);
+  if (player.brewOver > 0) {
+    player.brewOver = Math.max(0, player.brewOver - dt * 2);
+    if (player.hp > player.maxHp + player.brewOver) player.hp = player.maxHp + player.brewOver;
+  }
+  if (player.maulCd > 0) player.maulCd = Math.max(0, player.maulCd - dt);
+  if (player.itemMaul && player.maulCd <= 0) {
+    player.maulCd = 12;
+    for (const e of enemies) {
+      if (e.hp <= 0 || e.boss) continue;
+      const dd = dist(e, player);
+      if (dd < 70 && dd > 0) {
+        e.x += (e.x - player.x) / dd * 42;
+        e.y += (e.y - player.y) / dd * 42;
+      }
+    }
+    floats.push({ x: player.x, y: player.y - 20, text: '🔨', life: 0.5, vy: -30, color: '#c0b090' });
+  }
+
+  renderBuffs();
+  if (typeof renderBag === 'function' && playing) renderBag();
+
+  if (player.xp >= player.next && !leveling && !bagging) {
     levelUp();
     return;
   }
 
   // While leveling, just sit still (the modal is already on screen)
-  if (leveling) return;
+  if (leveling || bagging) return;
 
   // particles & floats
   for (const p of particles) {
@@ -2975,6 +3497,15 @@ function update(dt) {
   }
 
   if (player.hp <= 0) {
+    // 0.10a Ring of life: one save at 1 HP. Phoenix is a separate, later save if you have both.
+    if (!player.lifeUsed && bag.some(b => itemDef(b.id) && itemDef(b.id).life)) {
+      player.lifeUsed = true;
+      player.hp = 1;
+      player.invuln = 1.5;
+      shake = 0.3;
+      banner('💚 Ring of life!', 'You cling to 1 HP.', 2.2);
+      return;
+    }
     if (phoenix) { phoenixSave(); return; } // 0.5: Phoenix necklace cheats death once
     endRun();
     return;
@@ -3062,6 +3593,7 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(x, y + 7); ctx.lineTo(x + 26, y + 7); ctx.stroke();
     ctx.fillStyle = '#ffd24a'; ctx.fillRect(c.x - 3, y + 5, 6, 6); // lock
   }
+  if (typeof drawGroundItems === 'function') drawGroundItems();
 
   // 0.7b: obstacles in view
   {
@@ -3276,6 +3808,7 @@ function draw() {
   // 0.5: gold arrows at the screen edge pointing toward any chest you can't see
   // 0.6: (now shared edgeArrow helper) + a bigger red arrow for the boss
   for (const c of chests) edgeArrow(c.x + ox, c.y + oy, '#ffd24a', '#5e3818', 0.75 + 0.25 * Math.sin(c.t * 5), 1);
+  for (const g of groundItems) edgeArrow(g.x + ox, g.y + oy, '#c8e8a0', '#3a5a30', 0.7 + 0.2 * Math.sin((g.t || 0) * 5), 0.85);
   if (boss) edgeArrow(boss.x + ox, boss.y + oy, '#ff3a2a', '#3a0d0a', 0.8 + 0.2 * Math.sin(elapsed * 6), 1.35);
   if (boss) $('bossFill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%'; // 0.6
 
@@ -3294,16 +3827,17 @@ function draw() {
 // rafId makes sure there is never more than one loop running at a time.
 function loop(now) {
   rafId = 0;
-  if (!playing || paused) return;
+  if (!playing || paused || bagging) return; // 0.10a
   const dt = Math.min(0.04, (now - last) / 1000 || 0);
   last = now;
   update(dt);
   draw();
-  if (playing && !paused) rafId = requestAnimationFrame(loop);
+  if (playing && !paused && !bagging) rafId = requestAnimationFrame(loop);
 }
 // 0.4: start the loop (does nothing if one is already running)
 function startLoop() {
-  if (rafId) return;
+  if (rafId || bagging) return; // 0.10a
+
   last = performance.now();
   rafId = requestAnimationFrame(loop);
 }
@@ -3398,10 +3932,10 @@ addEventListener('keydown', e => {
   keys[e.key] = true;
   if (e.code === 'Space') {
     e.preventDefault();
-    if (playing && !paused && !leveling) doDash();
+    if (playing && !paused && !leveling && !bagging) doDash();
   }
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
-    if (playing && !leveling) togglePause();
+    if (playing && !leveling && !bagging) togglePause();
   }
 });
 addEventListener('keyup', e => {
@@ -3410,19 +3944,20 @@ addEventListener('keyup', e => {
 });
 
 $('dashBtn').addEventListener('click', () => {
-  if (playing && !paused && !leveling) doDash();
+  if (playing && !paused && !leveling && !bagging) doDash();
 });
 $('abilityBtn').addEventListener('click', () => {
-  if (playing && !paused && !leveling) doSpecial();
+  if (playing && !paused && !leveling && !bagging) doSpecial();
 });
 
 function togglePause() {
-  if (!playing || leveling) return;
+  if (!playing || leveling || bagging) return;
   paused = !paused;
   if (paused) {
     stopLoop();      // 0.4: the loop fully stops while paused
     resetJoystick(); // 0.4: let go of the joystick
     keys = {};       // 0.4: forget held keys so you don't keep walking after resuming
+    hideToast();
     $('overlay').style.display = 'flex';
     $('panel').innerHTML = `
       <h2>PAUSED</h2>
@@ -3447,7 +3982,7 @@ $('pauseBtn').onclick = togglePause;
 
 // 0.4: auto-pause when you switch apps, lock the phone, or click away from the window
 function autoPause() {
-  if (playing && !paused && !leveling) togglePause();
+  if (playing && !paused && !leveling && !bagging) togglePause();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); });
 addEventListener('blur', autoPause);
