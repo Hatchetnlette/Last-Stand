@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.10a</title>
+<title>Last Stand — Prototype 0.11a</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -67,8 +67,8 @@ button:disabled{opacity:.4;cursor:default}
 .mhead{display:flex;justify-content:space-between;align-items:center}
 .mhead h2{margin:0;font-size:22px}
 .ren{color:#ffd86a;font-weight:800;font-size:15px}
-.mtabs{display:flex;gap:6px;margin-top:8px}
-.mtabs button{margin:0;padding:6px 4px;font-size:14px;min-height:46px;line-height:1.15}
+.mtabs{display:flex;gap:3px;margin-top:6px;flex-wrap:wrap}
+.mtabs button{margin:0;padding:4px 2px;font-size:11px;min-height:38px;line-height:1.1;flex:1 1 14%;min-width:52px}
 .mtabs button.on{background:#5a4a1e;border-color:#ffd86a;color:#ffe9a8}
 .mtabs small{display:block;font-size:10px;color:#cdbf8f;font-weight:600}
 .mslot{font-size:11px;color:#cdbf8f;margin:6px 2px 0}
@@ -151,11 +151,11 @@ body.bossOn #buffs{top:122px}
 .classdrop .chev{color:#e8c56a;font-size:14px}
 .classlist{position:absolute;left:0;right:0;top:100%;z-index:25;margin-top:4px;
   background:#1a2a20;border:1px solid #7a8a5e;border-radius:12px;overflow:hidden;
-  box-shadow:0 12px 28px #000c}
+  box-shadow:0 12px 28px #000c;max-height:min(320px,50dvh);overflow-y:auto}
 .classlist[hidden]{display:none}
-.classopt{width:100%;margin:0;padding:14px 14px;border:none;border-bottom:1px solid #2a3a2c;
-  border-radius:0;background:#243328;color:#fff3d2;font-weight:700;font-size:15px;
-  text-align:left;min-height:48px}
+.classopt{width:100%;margin:0;padding:11px 12px;border:none;border-bottom:1px solid #2a3a2c;
+  border-radius:0;background:#243328;color:#fff3d2;font-weight:700;font-size:14px;
+  text-align:left;min-height:44px}
 .classopt:last-child{border-bottom:none}
 .classopt.on{background:#3d5a2e;border-left:3px solid #e8c56a}
 .classopt.lock{opacity:.55;color:#9aa08a}
@@ -240,7 +240,7 @@ body.bossOn #buffs{top:122px}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.10a</div><!-- 0.10a: in-run items + 5-slot bag; 0.9c: class dropdown menu; 0.9b: Fisher pierce/splash/net push + faster basic; 0.9a: opt-in Penance Swarm events -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.11a</div><!-- 0.11a: Thief, Priest, Woodcutter, Firemaker; 0.10a: in-run items + 5-slot bag; 0.9c: class dropdown menu -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, bring treasure home.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -254,6 +254,14 @@ body.bossOn #buffs{top:122px}
         <button type="button" class="classopt" role="option" data-s="ranged">🏹 Ranged</button>
         <button type="button" class="classopt" role="option" data-s="magic">✨ Magic</button>
         <button type="button" class="classopt" role="option" data-s="fisher" id="fisherBtn">🎣 Fisher<span class="unlock" id="fisherLock" style="display:none">🔒 Locked — any class level 5</span></button>
+        <button type="button" class="classopt" role="option" data-s="woodcutter" id="woodcutterBtn">🪓 Woodcutter<span class="unlock" id="woodcutterLock" style="display:none">🔒 Locked — survive 3:00</span></button>
+        <button type="button" class="classopt" role="option" data-s="thief" id="thiefBtn">🗡 Thief<span class="unlock" id="thiefLock" style="display:none">🔒 Locked — any class level 10</span></button>
+        <button type="button" class="classopt" role="option" data-s="priest" id="priestBtn">🙏 Priest<span class="unlock" id="priestLock" style="display:none">🔒 Locked — slay the dragon</span></button>
+        <button type="button" class="classopt" role="option" data-s="firemaker" id="firemakerBtn">🔥 Firemaker<span class="unlock" id="firemakerLock" style="display:none">🔒 Locked — survive 8:00 or 2 dragons</span></button>
+        <button type="button" class="classopt" role="option" data-s="necromancer" id="necromancerBtn">💀 Necromancer<span class="unlock" id="necromancerLock" style="display:none">🔒 Locked — Magic level 10</span></button>
+        <button type="button" class="classopt" role="option" data-s="slayer" id="slayerBtn">🗡 Slayer<span class="unlock" id="slayerLock" style="display:none">🔒 Locked — 8 chests or any class level 12</span></button>
+        <button type="button" class="classopt" role="option" data-s="hunter" id="hunterBtn">🦅 Hunter<span class="unlock" id="hunterLock" style="display:none">🔒 Locked — survive 5:00 (or 4:00 with 3 chests)</span></button>
+        <button type="button" class="classopt" role="option" data-s="runecrafter" id="runecrafterBtn">◈ Runecrafter<span class="unlock" id="runecrafterLock" style="display:none">🔒 Locked — Magic &amp; Ranged 8, or spend 500 coins</span></button>
       </div>
     </div>
     <div id="classInfo" class="classinfo">
@@ -458,6 +466,12 @@ function solidsNear(x, y) {
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
     const p = propAt(ix + dx, iy + dy);
     if (p && p.solid) _near.push(p);
+  }
+  // 0.11a: Woodcutter / Firemaker temporary logs also block like props
+  if (typeof woodLogs !== 'undefined') {
+    for (const p of woodLogs) {
+      if (p && p.life > 0 && Math.abs(p.x - x) < (p.r + 80) && Math.abs(p.y - y) < (p.r + 80)) _near.push(p);
+    }
   }
   return _near;
 }
@@ -669,6 +683,166 @@ const TREES = {
       ['cook3', 'Shark bait', '🦈', '+20 max HP. After eating a lobster, +15% damage for 5s.', p => p.maxHp += 20],
       ['cook4', 'Gourmand', '🍽', 'Eating a lobster shortens Cast Net cooldown by 3s.'],
       ['cookC', 'Feast', '🧺', 'Every 28s you automatically eat a shark: heal 22 HP and gain +15% damage for 5s.', null, '−10% weapon damage (food coma).']] }
+  ] },
+  woodcutter: { name: 'Woodcutter', icon: '🪓', skill: 'Woodcutting', branches: [
+    { id: 'cleave', name: 'Cleave', icon: '🪓', blurb: 'Wide axe arcs. Chip through the pack.', nodes: [
+      ['cleave1', 'Wide cut', '〰', 'Cleave radius +16px and cleave hits deal 45% damage.', p => { p.sweep += 16; p.sweepMul = Math.max(p.sweepMul || 0, 0.45); }],
+      ['cleave2', 'Lumberjack', '💪', '+12% axe damage.', p => p.damage = Math.round(p.damage * 1.12)],
+      ['cleave3', 'Chip away', '🪵', '20% chance on hit to knock an enemy 40px (not the dragon).'],
+      ['cleave4', 'Double chop', '🪓', '20% chance to immediately chop again for 60% damage.'],
+      ['cleaveC', 'Dragon Axe Spec', '🐉', 'Every 5th attack is a 180% cleave wave out to 90px.', null, '−8% attack speed.']] },
+    { id: 'woods', name: 'Timber', icon: '🌲', blurb: 'Drop trees that block the horde.', nodes: [
+      ['woods1', 'Long fall', '🌲', 'Timber! line 140 → 175px.'],
+      ['woods2', 'Solid oak', '🌳', 'Logs last 6s → 9s and are a little bigger.'],
+      ['woods3', 'Splinters', '🪵', 'Enemies that bump a log take 20% weapon damage.'],
+      ['woods4', 'Clear cut', '⏩', 'Timber! cooldown 8s → 6.5s.', p => p.specialMax = 6.5],
+      ['woodsC', 'Deep Roots', '🌱', 'Logs also slow enemies by 30% within 50px.', null, '−6% move speed.']] },
+    { id: 'forest', name: 'Forester', icon: '🌳', blurb: 'Tough as old oak.', nodes: [
+      ['forest1', 'Hardy', '💪', '+20 max HP.', p => p.maxHp += 20],
+      ['forest2', 'Bark skin', '🪵', '+6% armour.', p => p.armor = Math.min(armorCap(), p.armor + 0.06)],
+      ['forest3', "Bird's nest", '🪺', '10% chance on kill for a small coin burst.'],
+      ['forest4', 'Efficient', '⚡', '+8% attack speed.', p => p.rm2 /= 1.08],
+      ['forestC', 'Woodcutting Guild', '🏡', 'Each log you drop heals 8 HP. +10% damage.', null, '−10 max HP.']] }
+  ] },
+  thief: { name: 'Thief', icon: '🗡', skill: 'Thieving', branches: [
+    { id: 'pocket', name: 'Pickpocket', icon: '👜', blurb: 'Every hit lifts a few coins.', nodes: [
+      ['pocket1', 'Filch', '🪙', 'Pickpocket yields +1 coin per hit.'],
+      ['pocket2', 'Light-fingered', '🧤', '+8% chance for a pickpocket extra crit.'],
+      ['pocket3', 'Palmed loot', '💰', 'Pickpocket coins +50% (stacks with the Ring of wealth).'],
+      ['pocket4', 'Master thief', '🃏', '+10% crit chance.', p => p.crit += 0.10],
+      ['pocketC', 'Gloves of Silence', '🤫', 'Kills also pickpocket a burst of coins. Crits steal 3× coins.', null, '−10% weapon damage.']] },
+    { id: 'jack', name: 'Blackjack', icon: '♣', blurb: 'Sap and knock out marks.', nodes: [
+      ['jack1', 'Sap', '♣', 'Blackjack chance 12% → 22%.'],
+      ['jack2', 'Heavy sap', '🪵', 'Stun 0.65s → 1.1s.'],
+      ['jack3', 'Knock-out', '💫', 'Stunned enemies take +20% damage.'],
+      ['jack4', 'Concuss', '💥', 'A blackjack also stuns 1 nearby enemy for 50% duration.'],
+      ['jackC', 'Karamjan Knockout', '🌴', 'Every 5th hit is a guaranteed blackjack that stuns 1.4s and crits.', null, '−10% attack speed.']] },
+    { id: 'shad', name: 'Shadow', icon: '🌑', blurb: 'Vanish, then backstab.', nodes: [
+      ['shad1', 'Fade', '🌫', 'Shadow Step lasts 1.8s → 2.4s.'],
+      ['shad2', 'Backstab', '🗡', 'The post-stealth backstab deals 3.0× instead of 2.6×.'],
+      ['shad3', 'Smoke bomb', '💨', 'Shadow Step chills nearby enemies for 1s when you vanish.'],
+      ['shad4', 'Quick escape', '👟', 'Shadow Step cooldown 8s → 6.5s.', p => p.specialMax = 6.5],
+      ['shadC', 'Master of Shadows', '👤', 'Leaving stealth slashes all enemies within 90px for 150% and you keep 0.4s of i-frames.', null, '−12 max HP.']] }
+  ] },
+  priest: { name: 'Priest', icon: '🙏', skill: 'Prayer', branches: [
+    { id: 'prot', name: 'Protection', icon: '🛡', blurb: 'Prayer points power a damage-reducing aura.', nodes: [
+      ['prot1', 'Protect from Melee', '🛡', 'Protection prayer reduces damage by 28% instead of 22%.'],
+      ['prot2', 'Mystic Might', '✨', '+8% damage while you have prayer points.'],
+      ['prot3', 'Preserve', '🕯', 'Prayer drains 25% slower.'],
+      ['prot4', 'Redemption', '💖', 'When you fall below 15% HP, spend 20 prayer to heal 25 (20s cooldown).'],
+      ['protC', 'Piety', '😇', 'While praying: 35% damage reduction, +12% damage, +8% attack speed.', null, 'Prayer drains 40% faster.']] },
+    { id: 'smite', name: 'Smite', icon: '⚡', blurb: 'Holy hits that drain and mend.', nodes: [
+      ['smite1', 'Siphon faith', '🩸', 'Hits heal you for 3% of the damage (up to 4 HP/s).'],
+      ['smite2', 'Retribution', '⚡', '+10% smite damage.', p => p.damage = Math.round(p.damage * 1.10)],
+      ['smite3', 'Replenish', '🙏', 'Hits restore 1 prayer point.'],
+      ['smite4', 'Holy wrath', '☀️', '+15% damage to elites, giants and the dragon.'],
+      ['smiteC', 'Smite Flurry', '✨', 'Every 4th attack fires a second holy bolt at 80%.', null, '−10% max HP.']] },
+    { id: 'holy', name: 'Sacred', icon: '⛪', blurb: 'A stronger Holy Bolt special.', nodes: [
+      ['holy1', 'Divine', '✨', 'Holy Bolt cooldown 8s → 6.5s.', p => p.specialMax = 6.5],
+      ['holy2', 'Blessing', '💖', 'Holy Bolt heals 20 → 32.'],
+      ['holy3', 'Sanctuary', '🕊', 'Holy Bolt also grants 2s of 40% damage reduction.'],
+      ['holy4', 'Bolt storm', '🌟', 'Holy Bolt hits 5 enemies instead of 3.'],
+      ['holyC', 'Gilded Altar', '⛪', 'Holy Bolt leaves a 4s consecrated zone (heal 6/s, 15% damage reduction).', null, 'Special cooldown 10s.']] }
+  ] },
+  firemaker: { name: 'Firemaker', icon: '🔥', skill: 'Firemaking', branches: [
+    { id: 'kindle', name: 'Kindling', icon: '🔥', blurb: 'Hotter, longer ground fires.', nodes: [
+      ['kindle1', 'Lasting flame', '🕯', 'Ground fires last +1.2s.'],
+      ['kindle2', 'Hotter', '♨', 'Fire damage 20% → 30% of weapon damage per second.'],
+      ['kindle3', 'Spread', '🔶', 'Fire radius 28 → 38px.'],
+      ['kindle4', 'Embers', '✨', 'A burning enemy that dies has a 40% chance to leave a small fire.'],
+      ['kindleC', 'Infernal', '🌋', 'Your fires also slow enemies by 20%.', null, 'You take 8% more damage.']] },
+    { id: 'bon', name: 'Bonfire', icon: '🏕', blurb: 'A bigger Ring of Fire special.', nodes: [
+      ['bon1', 'Wide ring', '⭕', 'Ring of Fire radius 120 → 150px.'],
+      ['bon2', 'Roaring', '🔥', 'Ring of Fire damage +30%.'],
+      ['bon3', 'Warmth', '🧡', 'Standing in your own fire heals 3 HP per second.'],
+      ['bon4', 'Quick light', '⚡', 'Ring of Fire cooldown 8s → 6.5s.', p => p.specialMax = 6.5],
+      ['bonC', 'Fire Spirit', '👻', 'Ring of Fire lasts 4s → 7s and pulses a knockback every 2s.', null, 'Special cooldown 10s.']] },
+    { id: 'fuel', name: 'Fuel', icon: '🪵', blurb: 'Logs feed bigger fires (pairs with Woodcutter logs).', nodes: [
+      ['fuel1', 'Kindling pack', '🎒', 'Drop a log at your feet every 8s.'],
+      ['fuel2', 'Expert light', '🔥', 'Igniting a log makes a 50px / 5s fire.'],
+      ['fuel3', 'Fuel', '🪵', 'All fires last 20% longer.'],
+      ['fuel4', 'Campfire', '🏕', 'Igniting a log also grants 1.5s of 10% damage reduction.'],
+      ['fuelC', "Forester's Camp", '⛺', 'Max fires 8 → 12. Logs spawn every 5s.', null, '−12% weapon damage.']] }
+  ] },
+  necromancer: { name: 'Necromancer', icon: '💀', skill: 'Necromancy', branches: [
+    { id: 'thrall', name: 'Thralls', icon: '👻', blurb: 'Arceuus thralls that peel and fight.', nodes: [
+      ['thrall1', 'Apprentice', '👻', 'Thrall Summon raises 2 thralls instead of 1.'],
+      ['thrall2', 'Lasting bond', '⏳', 'Thralls last 6s → 9s.'],
+      ['thrall3', 'Stronger dead', '💪', 'Thralls deal 30% more damage.'],
+      ['thrall4', 'Soul link', '🔗', 'When a thrall hits, you heal 2 HP.'],
+      ['thrallC', 'Army of the Dead', '💀', 'Thrall cap 3 → 4 (hard cap still 4). Expired thralls burst for 80% weapon damage.', null, '−15 max HP.']] },
+    { id: 'deathn', name: 'Death', icon: '☠', blurb: 'Darker personal hits.', nodes: [
+      ['deathn1', 'Death touch', '🖤', '+12% staff damage.', p => p.damage = Math.round(p.damage * 1.12)],
+      ['deathn2', 'Wither', '🌫', 'Hits apply a 2s wither (10% weapon damage per second).'],
+      ['deathn3', 'Execute', '☠', '+20% damage to enemies below 30% HP.'],
+      ['deathn4', 'Grave chill', '❄', 'Hits chill for 0.6s.'],
+      ['deathnC', 'Death Charge', '⚡', 'A thrall death shortens Thrall Summon cooldown by 1.5s (up to 4s).', null, '−10% staff damage.']] },
+    { id: 'soul', name: 'Soul', icon: '🕯', blurb: 'Souls keep you standing.', nodes: [
+      ['soul1', 'Vessel', '🛡', '+16 max HP.', p => p.maxHp += 16],
+      ['soul2', 'Siphon grave', '🩸', '+3 HP per kill.', p => p.kh += 3],
+      ['soul3', 'Quick rite', '⏩', 'Thrall Summon cooldown 8s → 6.5s.', p => p.specialMax = 6.5],
+      ['soul4', 'Ghost walk', '🌫', 'While a thrall lives, you take 8% less damage.'],
+      ['soulC', 'Dark Beacon', '🕯', 'Thralls last +2s and taunt more strongly.', null, '−8% move speed while any thrall is alive.']] }
+  ] },
+  slayer: { name: 'Slayer', icon: '🧿', skill: 'Slayer', branches: [
+    { id: 'task', name: 'Tasks', icon: '📜', blurb: 'Your assignment is the run.', nodes: [
+      ['task1', 'Slayer knowledge', '📘', 'Task prey take +35% damage instead of +22%.'],
+      ['task2', 'Efficient', '✅', 'Task counts needed are 20% lower (rounded up).'],
+      ['task3', 'Task heal', '💖', 'Killing task prey heals 4 HP.'],
+      ['task4', 'On assignment', '🎯', '+8% attack speed while a task is active.', p => p.rm2 /= 1.08],
+      ['taskC', 'Slayer Contract', '📜', 'Completing a task drops a small chest and rerolls immediately. A new task also appears every 60s if you stall.', null, '−15% damage to off-task enemies.']] },
+    { id: 'hunt', name: 'Hunt', icon: '🗡', blurb: 'A sharper Slayer Strike.', nodes: [
+      ['hunt1', 'Broad tips', '🔱', '+10% weapon damage.', p => p.damage = Math.round(p.damage * 1.10)],
+      ['hunt2', 'Mark prey', '📍', 'Slayer Strike marks last 4s → 7s and take +30%.'],
+      ['hunt3', 'Quick strike', '⚡', 'Slayer Strike cooldown 8s → 6.5s.', p => p.specialMax = 6.5],
+      ['hunt4', 'Cleave the task', '〰', 'Slayer Strike hits 2 extra task foes for 60%.'],
+      ['huntC', 'Superior catch', '💀', 'Slayer Strike always crits versus the current task.', null, '−8% armour.']] },
+    { id: 'helm', name: 'Helm', icon: '🪖', blurb: 'Wear the assignment.', nodes: [
+      ['helm1', 'Black mask', '🖤', '+6% armour.', p => p.armor = Math.min(armorCap(), p.armor + 0.06)],
+      ['helm2', 'Hardened', '💪', '+18 max HP.', p => p.maxHp += 18],
+      ['helm3', 'Boss hunter', '🐉', '+12% damage to elites and the dragon.'],
+      ['helm4', 'Focus', '👁', 'Off-task enemies no longer deal bonus damage to you.'],
+      ['helmC', 'Slayer Helmet (i)', '🧿', '+12% task damage and +6% armour.', null, '−10 max HP.']] }
+  ] },
+  hunter: { name: 'Hunter', icon: '🦅', skill: 'Hunter', branches: [
+    { id: 'trapb', name: 'Traps', icon: '📦', blurb: 'Box traps and snares do the work.', nodes: [
+      ['trapb1', 'Quick set', '🖐', 'Traps arm in 0.35s instead of 0.6s.'],
+      ['trapb2', 'Big box', '📦', 'Box trap radius 42 → 56px, snap damage 200%.'],
+      ['trapb3', 'Barbed', '📌', 'Snaps also root 1.2s instead of 0.7s.'],
+      ['trapb4', 'Spare snare', '🪢', 'You drop a small snare every 6s instead of 8s.'],
+      ['trapbC', 'Pitfall', '🕳', 'Box Trap also yanks a line of enemies 70px toward the trap. Trap cap 2 → 3 (hard cap 3).', null, 'Special cooldown 10s.']] },
+    { id: 'track', name: 'Tracking', icon: '🐾', blurb: 'Make the woods work for you.', nodes: [
+      ['track1', 'Camouflage', '🌿', 'Traps last 7s → 11s.'],
+      ['track2', 'Log hide', '🪵', 'A trap set against a log lasts twice as long (not just +50%).'],
+      ['track3', 'Entangle', '🕸️', 'Snares also slow 40% for 2s.'],
+      ['track4', 'Opportunist', '🎯', '+15% damage versus rooted or slowed enemies.'],
+      ['trackC', "Hunter's Instinct", '🦅', 'A snap grants +20% damage for 3s.', null, '−10% weapon damage.']] },
+    { id: 'scout', name: 'Scout', icon: '👟', blurb: 'Fast feet, light kit.', nodes: [
+      ['scout1', 'Lightfoot', '🪶', '+6% move speed (still under the +40% cap).', p => addMoveSpeed(p, 0.06)],
+      ['scout2', 'Roll out', '🤸', 'Dash cooldown −0.3s.', p => p.dashMax = Math.max(1.1, p.dashMax - 0.3)],
+      ['scout3', 'Eagle eye', '👁', '+12 range and +8% damage.', p => { p.itemRange = (p.itemRange || 0) + 12; p.damage = Math.round(p.damage * 1.08); }],
+      ['scout4', 'Quick hands', '⚡', '+10% attack speed.', p => p.rm2 /= 1.10],
+      ['scoutC', 'Travel light', '🎒', 'After a dash, your next trap arms instantly.', null, '−8% armour.']] }
+  ] },
+  runecrafter: { name: 'Runecrafter', icon: '◈', skill: 'Runecraft', branches: [
+    { id: 'ess', name: 'Essence', icon: '💎', blurb: 'Fill the pouch, then spend it.', nodes: [
+      ['ess1', 'Catalytic', '✨', 'Hits grant 2 essence instead of 1.'],
+      ['ess2', 'Bigger pouch', '👝', 'Essence cap 40 → 60.'],
+      ['ess3', 'Efficient craft', '🔶', 'Crafting costs 6 essence instead of 8.'],
+      ['ess4', 'Grave dust', '💀', 'Kills grant 3 essence.'],
+      ['essC', 'Abyssal Pouch', '👝', 'Every 18s, gain 8 essence. Crafting also yields +1 law rune.', null, '−10% attack speed while you have no runes.']] },
+    { id: 'elem', name: 'Elements', icon: '🜂', blurb: 'Air, fire, law and death runes.', nodes: [
+      ['elem1', 'Hotter fire', '🔥', 'Fire-rune splash is 40% in 50px instead of 30% in 40px.'],
+      ['elem2', 'Tailwind', '💨', 'Air runes grant +16% attack speed instead of +10%.'],
+      ['elem3', 'Reaper', '☠', 'Death-rune execute triggers below 25% HP instead of 18%.'],
+      ['elem4', 'Long step', '👟', 'Law-rune blink travels farther (still a dash-like hop, not a speed bonus).'],
+      ['elemC', 'Infinite combo', '♾', 'Runes drain 25% slower.', null, '−8% weapon damage.']] },
+    { id: 'altar', name: 'Altar', icon: '⛪', blurb: 'A bigger Ourania dump.', nodes: [
+      ['altar1', 'Ourania', '◈', 'Ourania Pulse cooldown 8s → 6.5s.', p => p.specialMax = 6.5],
+      ['altar2', 'Overcharge', '💥', 'The pulse deals +25% damage.'],
+      ['altar3', 'Leftover', '🔁', 'The pulse keeps 1 of each rune you spent.'],
+      ['altar4', 'Blessed altar', '✨', 'The pulse heals 18 HP.'],
+      ['altarC', 'Living Altar', '🏛', 'Ourania Pulse leaves a 4s rune altar that grants 2 essence per second.', null, 'Special cooldown 10s.']] }
   ] }
 
 };
@@ -788,6 +962,9 @@ function migrateSave(s) {
   }
   if (bump) { s.renown += refund; s.treeRefund = refund; } // a toast tells the player once the menu is up
   s.treeV = TREE_V;
+  s.chestsTotal = num(s.chestsTotal);
+  s.shopSpent = num(s.shopSpent);
+  s.hunterQuest = !!s.hunterQuest;
   return s;
 }
 function persist() {
@@ -816,7 +993,10 @@ function addMoveSpeed(p, bonus) {
 function moveSpeed() {
   const base = player.baseSpeed || 185;
   const temporary = (buffs.boots > 0 ? 0.40 : 0) + (player.cyclone > 0 ? 0.20 : 0) + (penanceBuff > 0 ? 0.08 : 0);
-  return Math.min(base * 1.40, player.speed + base * temporary);
+  let spd = Math.min(base * 1.40, player.speed + base * temporary);
+  // soulC / beacon self-slow is temporary and never goes through addMoveSpeed (speed cap stays intact)
+  if (player.m && player.m.soulC && thralls.some(th => th.hp > 0)) spd *= 0.92;
+  return spd;
 }
 function newPlayer() {
   return {
@@ -838,11 +1018,24 @@ function newPlayer() {
     healMul: 1, armorCap: 0.65, dashCh: 1, dashChMax: 1, dashRegen: 0,
     cyclone: 0, hitN: 0, spellN: 0, feastT: 0, meatT: 0, meatMul: 1,
     fireWave: false, leechCap: 4, leechRate: 0.02, bloodShield: 0,
-    netSpot: null, rootIgnore: 0
+    netSpot: null, rootIgnore: 0,
+    // 0.11a class state
+    stealth: 0, backstab: 0, shadowX: 0, shadowY: 0,
+    pray: 0, prayMax: 0, prayCd: 0, altar: null, sanctum: 0,
+    kindleT: 0,
+    slayerTask: null, slayerMark: null, slayerNewAt: 0,
+    essence: 0, essenceMax: 40, runes: { air:0, fire:0, law:0, death:0 }, runeAltar: null, lawBlinkCd: 0,
+    snareT: 0, trapArmed: 0, huntBuff: 0
   };
 }
 let decoys = [];   // 0.8b Shadow Step
 let firePools = []; // 0.8b Inferno
+let woodLogs = [];  // 0.11a Woodcutter / Firemaker logs
+let fires = [];     // 0.11a Firemaker ground fires
+let thralls = [];  // 0.11a Necromancer (hard-capped)
+let traps = [];    // 0.11a Hunter (hard-capped)
+const THRALL_HARD_CAP = 4;
+const TRAP_HARD_CAP = 3;
 function armorCap() { return player.armorCap || 0.65; }
 function healAmt(n) { return n * (player.healMul || 1); } // 0.8b Barbarian Fury halves food heals
 function eatLobster(p) { // 0.8b Cook: shared lobster-card apply
@@ -865,11 +1058,81 @@ const STY = {
   magic:  { n:'Magic',  sk:'Magic',  w:['Wind Strike','Water Bolt','Earth Bolt','Fire Blast','Fire Surge','Ice Barrage'],
             range:225, dmg:1.08, rate:0.95, col:'#7fb8ff', specialName:'Arcane Nova' },
   fisher: { n:'Fisher', sk:'Fishing', w:['Small fishing net','Big fishing net','Fishing rod','Fly fishing rod','Harpoon','Dragon harpoon'],
-            range:165, dmg:1.12, rate:0.72, col:'#5ec8c0', specialName:'Cast Net' } // 0.8b; 0.9b: 0.80→0.72
+            range:165, dmg:1.12, rate:0.72, col:'#5ec8c0', specialName:'Cast Net' }, // 0.8b; 0.9b: 0.80→0.72
+  woodcutter: { n:'Woodcutter', sk:'Woodcutting', w:['Bronze axe','Iron axe','Steel axe','Mithril axe','Adamant axe','Dragon axe'],
+            range:120, dmg:1.24, rate:0.60, col:'#c4a06a', specialName:'Timber!' },
+  thief: { n:'Thief', sk:'Thieving', w:['Bronze dagger','Iron dagger','Steel dagger','Mithril dagger','Rune dagger','Dragon dagger'],
+            range:118, dmg:1.20, rate:0.52, col:'#d4a574', specialName:'Shadow Step' },
+  priest: { n:'Priest', sk:'Prayer', w:['Wooden mace','Iron mace','Steel mace','Mithril mace','Adamant mace','Ancient mace'],
+            range:165, dmg:1.08, rate:0.64, col:'#e8d88a', specialName:'Holy Bolt' },
+  firemaker: { n:'Firemaker', sk:'Firemaking', w:['Torch','Oil lantern','Bullseye lantern','Bruma torch','Pyromancer lantern','Infernal tinderbox'],
+            range:150, dmg:0.90, rate:0.78, col:'#ff8a3c', specialName:'Ring of Fire' },
+  necromancer: { n:'Necromancer', sk:'Necromancy', w:['Ghostly staff','Bone staff','Blood staff','Death staff','Ancient necrostaff','Sanguinesti staff'],
+            range:190, dmg:0.88, rate:0.82, col:'#b89ae8', specialName:'Thrall Summon' },
+  slayer: { n:'Slayer', sk:'Slayer', w:['Bronze sword','Iron sword','Steel sword','Mithril sword','Leaf-bladed sword','Slayer dart'],
+            range:170, dmg:1.05, rate:0.68, col:'#c8b070', specialName:'Slayer Strike' },
+  hunter: { n:'Hunter', sk:'Hunter', w:['Wooden spear','Iron javelin','Steel javelin','Mithril javelin','Rune dart','Hunter lance'],
+            range:160, dmg:0.82, rate:0.70, col:'#8fbc6a', specialName:'Box Trap' },
+  runecrafter: { n:'Runecrafter', sk:'Runecraft', w:['Essence staff','Air staff','Fire staff','Law staff','Death talisman','Ourania staff'],
+            range:180, dmg:0.98, rate:0.70, col:'#7ec8e8', specialName:'Ourania Pulse' }
 };
-const ORDER = ['melee','ranged','magic','fisher'];
+const ORDER = ['melee','ranged','magic','fisher','woodcutter','thief','priest','firemaker','necromancer','slayer','hunter','runecrafter'];
+function maxSkillLevel() { // 0.11a: highest saved class skill (old and new classes)
+  let m = 1;
+  for (const k in STY) m = Math.max(m, sLvl(k) || 0);
+  return m;
+}
 function fisherUnlocked() { // 0.8b: any class at skill level 5 unlocks Fisher (old saves included)
-  return Math.max(sLvl('melee'), sLvl('ranged'), sLvl('magic'), sLvl('fisher') || 0) >= 5;
+  return maxSkillLevel() >= 5;
+}
+function thiefUnlocked() { return maxSkillLevel() >= 10; }
+function woodcutterUnlocked() { return (save.best || 0) >= 180; }
+function priestUnlocked() { return (save.bossTotal || 0) >= 1; }
+function firemakerUnlocked() { return (save.best || 0) >= 480 || (save.bossTotal || 0) >= 2; }
+function necromancerUnlocked() { return sLvl('magic') >= 10; } // Magic path; no per-class survive clock in the save
+function slayerUnlocked() { return (save.chestsTotal || 0) >= 8 || maxSkillLevel() >= 12; }
+function hunterUnlocked() { return (save.best || 0) >= 300 || !!(save.hunterQuest); }
+function runecrafterUnlocked() { return (sLvl('magic') >= 8 && sLvl('ranged') >= 8) || (save.shopSpent || 0) >= 500; }
+// 0.11a testing: the 8 new classes stay unlocked until Hatch approves gates. Fisher still uses its live gate.
+const UNLOCK_GATES_ON = false;
+function classUnlocked(k) {
+  if (k === 'fisher') return fisherUnlocked();
+  if (!UNLOCK_GATES_ON) return true;
+  if (k === 'woodcutter') return woodcutterUnlocked();
+  if (k === 'thief') return thiefUnlocked();
+  if (k === 'priest') return priestUnlocked();
+  if (k === 'firemaker') return firemakerUnlocked();
+  if (k === 'necromancer') return necromancerUnlocked();
+  if (k === 'slayer') return slayerUnlocked();
+  if (k === 'hunter') return hunterUnlocked();
+  if (k === 'runecrafter') return runecrafterUnlocked();
+  return true;
+}
+function unlockHint(k) {
+  return ({
+    fisher: '🔒 Locked — any class level 5',
+    woodcutter: '🔒 Locked — survive 3:00',
+    thief: '🔒 Locked — any class level 10',
+    priest: '🔒 Locked — slay the dragon',
+    firemaker: '🔒 Locked — survive 8:00 or 2 dragons',
+    necromancer: '🔒 Locked — Magic level 10',
+    slayer: '🔒 Locked — 8 chests or any class level 12',
+    hunter: '🔒 Locked — survive 5:00 (or 4:00 with 3 chests)',
+    runecrafter: '🔒 Locked — Magic & Ranged 8, or spend 500 coins'
+  })[k] || '';
+}
+function unlockToast(k) {
+  return ({
+    fisher: 'Reach level 5 with any class to unlock Fisher',
+    woodcutter: 'Survive 3:00 in a run to unlock Woodcutter',
+    thief: 'Reach level 10 with any class to unlock Thief',
+    priest: 'Slay the King Black Dragon once to unlock Priest',
+    firemaker: 'Survive 8:00 in a run, or slay 2 dragons, to unlock Firemaker',
+    necromancer: 'Reach Magic level 10 to unlock Necromancer',
+    slayer: 'Open 8 timed chests, or reach level 12 with any class, to unlock Slayer',
+    hunter: 'Survive 5:00, or finish a run of 4:00 with 3 chests, to unlock Hunter',
+    runecrafter: 'Reach Magic and Ranged level 8, or spend 500 coins in the shop, to unlock Runecrafter'
+  })[k] || ('Unlock ' + k);
 }
 
 function lvl(xp) {
@@ -884,7 +1147,9 @@ function applyStyle(k) {
   const d = STY[k];
   const l = sLvl(k);
   // 0.4.1: cap range to what's visible on screen so nothing gets shot offscreen
-  player.range = Math.max(140, Math.min(d.range * player.rm, 0.48 * Math.min(W, H)));
+  // 0.11a: Thief dagger and Woodcutter axe stay short (no 140px floor)
+  const floor = (k === 'thief' || k === 'woodcutter') ? 80 : 140;
+  player.range = Math.max(floor, Math.min(d.range * player.rm, 0.48 * Math.min(W, H)));
   if (player.m && player.m.harpC) player.range = Math.max(80, player.range - 15); // 0.8b Karambwan Spike drawback
   const wIdx = Math.min(5, Math.floor((l - 1) / 5));
   const uniq = player.itemUnique;
@@ -927,6 +1192,57 @@ function start(k) {
     player.armor = 0.06;
     player.speed = 195;
     player.magnet = 100;
+  } else if (k === 'woodcutter') { // 0.11a: sturdy axe user, short cleave
+    player.maxHp = player.hp = 120;
+    player.armor = 0.10;
+    player.speed = 185;
+    player.magnet = 100;
+    player.sweep = 24;
+    player.sweepMul = 0.42;
+  } else if (k === 'thief') { // 0.11a: fast, fragile, short dagger
+    player.maxHp = player.hp = 90;
+    player.armor = 0.03;
+    player.speed = 210;
+    player.crit = 0.10;
+    player.magnet = 90;
+  } else if (k === 'priest') { // 0.11a: mid-range holy smite, prayer aura
+    player.maxHp = player.hp = 108;
+    player.armor = 0.08;
+    player.speed = 185;
+    player.magnet = 105;
+    player.prayMax = 50;
+    player.pray = 50;
+  } else if (k === 'firemaker') { // 0.11a: mid-range lighter; innate smoke DR after bots still ate ~2x damage
+    player.maxHp = player.hp = 110;
+    player.armor = 0.14;
+    player.speed = 195;
+    player.magnet = 100;
+    player.kindleT = 8;
+  } else if (k === 'necromancer') { // glass summoner
+    player.maxHp = player.hp = 84;
+    player.armor = 0.02;
+    player.speed = 185;
+    player.magnet = 110;
+  } else if (k === 'slayer') {
+    player.maxHp = player.hp = 105;
+    player.armor = 0.07;
+    player.speed = 195;
+    player.magnet = 100;
+  } else if (k === 'hunter') { // fast scout, close to Thief's base, cap is still +40% of 208
+    player.maxHp = player.hp = 92;
+    player.armor = 0.03;
+    player.speed = 208;
+    player.crit = 0.08;
+    player.magnet = 100;
+    player.snareT = 8;
+  } else if (k === 'runecrafter') {
+    player.maxHp = player.hp = 96;
+    player.armor = 0.05;
+    player.speed = 190;
+    player.magnet = 110;
+    player.essence = 0;
+    player.essenceMax = 40;
+    player.runes = { air:0, fire:0, law:0, death:0 };
   } else {
     player.maxHp = player.hp = 82;
     player.magnet = 125;
@@ -970,7 +1286,7 @@ function start(k) {
   // 0.6: no boss yet; first King Black Dragon at 5:00
   boss = null; fireballs = []; bossesSlain = 0; bossCount = 0;
   bolts = []; // 0.7c
-  decoys = []; firePools = []; // 0.8b
+  decoys = []; firePools = []; woodLogs = []; fires = []; thralls = []; traps = []; // 0.8b / 0.11a
   eventInvite = null; eventFight = null; renownEvent = 0; penanceBuff = 0; penanceDmg = 1;
   nextEventAt = 75 + Math.random() * 15; // 0.9a: first horn ~75–90s
   bossNext = BOSS_EVERY; bossWarned = false; bossWarnAt = 0;
@@ -982,6 +1298,7 @@ function start(k) {
   $('pauseBtn').style.display = 'block';
   if (typeof refreshItems === 'function') refreshItems();
   else if (typeof renderBag === 'function') renderBag();
+  if (k === 'slayer' && typeof rollSlayerTask === 'function') rollSlayerTask();
   $('dashBtn').style.display = 'flex';
   $('abilityBtn').style.display = 'flex';
   // 0.4: stop any old loop, then start exactly one new loop
@@ -1034,7 +1351,7 @@ function store(kind) {
       const r = save[kind][it[0]];
       const c = price(it, r);
       if (r >= it[4] || (shop ? save.gold : pts()) < c) return;
-      if (shop) save.gold -= c;
+      if (shop) { save.gold -= c; save.shopSpent = (save.shopSpent || 0) + c; }
       save[kind][it[0]]++;
       persist();
       store(kind);
@@ -1070,6 +1387,29 @@ function applyMastery(k) {
     if (p.m.bloodC) { p.maxHp = Math.max(30, Math.round(p.maxHp * 0.80)); p.leechCap = 10; p.leechRate = 0.06; } // Sanguinesti
     if (p.m.harpC) p.range = Math.max(80, p.range - 15);             // Karambwan Spike
     if (p.m.cookC) { p.damage = Math.round(p.damage * 0.90); p.feastT = 28; } // Feast food coma + timer
+    // 0.11a capstones
+    if (p.m.cleaveC) p.rm2 *= 1.08;
+    if (p.m.woodsC) addMoveSpeed(p, -0.06);
+    if (p.m.forestC) { p.maxHp = Math.max(30, p.maxHp - 10); p.damage = Math.round(p.damage * 1.10); }
+    if (p.m.pocketC) p.damage = Math.round(p.damage * 0.90);
+    if (p.m.jackC) p.rm2 *= 1.10;
+    if (p.m.shadC) p.maxHp = Math.max(30, p.maxHp - 12);
+    if (p.m.protC) p.rm2 /= 1.08;
+    if (p.m.smiteC) p.maxHp = Math.max(30, Math.round(p.maxHp * 0.90));
+    if (p.m.holyC) p.specialMax = 10;
+    if (p.m.kindleC) p.dmgTaken *= 1.08;
+    if (p.m.bonC) p.specialMax = 10;
+    if (p.m.fuelC) p.damage = Math.round(p.damage * 0.88);
+    if (p.m.thrallC) p.maxHp = Math.max(30, p.maxHp - 15);
+    if (p.m.deathnC) p.damage = Math.round(p.damage * 0.90);
+    if (p.m.huntC) p.armor = Math.max(0, p.armor - 0.08);
+    if (p.m.helmC) { p.maxHp = Math.max(30, p.maxHp - 10); p.armor = Math.min(armorCap(), p.armor + 0.06); }
+    if (p.m.trapbC) p.specialMax = 10;
+    if (p.m.trackC) p.damage = Math.round(p.damage * 0.90);
+    if (p.m.scoutC) p.armor = Math.max(0, p.armor - 0.08);
+    if (p.m.essC && true) { /* timer started in update */ }
+    if (p.m.elemC) p.damage = Math.round(p.damage * 0.92);
+    if (p.m.altarC) p.specialMax = 10;
   }
   if (p.m.guard3) p.shieldCd = 0;
   if (!p.dashChMax) { p.dashChMax = 1; p.dashCh = 1; }
@@ -1229,24 +1569,31 @@ const CLASS_INFO = {
   melee:  { icon: '⚔', name: 'Melee',  blurb: 'Tough bruiser · extra health & armour · short range<br>Special: Whirlwind (spin AoE) · Upgrades: Whirlwind, Soul harvest, Granite skin' },
   ranged: { icon: '🏹', name: 'Ranged', blurb: 'Fast kiter · long range · crits<br>Special: Barrage (rapid multi-shot) · Upgrades: Twin shot, Ruby bolts, Eagle eye' },
   magic:  { icon: '✨', name: 'Magic',  blurb: 'Glass cannon · splash damage · low health<br>Special: Arcane Nova (big freeze blast) · Upgrades: Blast radius, Ice barrage, Arcane focus' },
-  fisher: { icon: '🎣', name: 'Fisher', blurb: 'Mid-range angler · harpoon + nets · lobster feasts<br>Special: Cast Net (slow the pack) · Upgrades: Hooked, Net practice, Fishy treats' }
+  fisher: { icon: '🎣', name: 'Fisher', blurb: 'Mid-range angler · harpoon + nets · lobster feasts<br>Special: Cast Net (slow the pack) · Upgrades: Hooked, Net practice, Fishy treats' },
+  woodcutter: { icon: '🪓', name: 'Woodcutter', blurb: 'Axe bruiser · cleave arcs · logs that block the horde<br>Special: Timber! (falling-tree slam) · Upgrades: Wide cut, Long fall, Hardy' },
+  thief: { icon: '🗡', name: 'Thief', blurb: 'Fast and fragile · pickpocket coins on hit · blackjack stuns<br>Special: Shadow Step (vanish, then a backstab crit) · Upgrades: Filch, Sap, Fade' },
+  priest: { icon: '🙏', name: 'Priest', blurb: 'Holy mid-range · protection prayer aura · smite that drains and heals<br>Special: Holy Bolt · prayer pots refill prayer points · Upgrades: Protect, Siphon, Blessing' },
+  firemaker: { icon: '🔥', name: 'Firemaker', blurb: 'Lights lingering fire zones · logs make bigger fires<br>Special: Ring of Fire (bonfire) · Upgrades: Lasting flame, Wide ring, Kindling pack' },
+  necromancer: { icon: '💀', name: 'Necromancer', blurb: 'Glass summoner · Arceuus thralls peel and fight<br>Special: Thrall Summon (hard-capped) · Upgrades: Apprentice, Death touch, Vessel' },
+  slayer: { icon: '🧿', name: 'Slayer', blurb: 'The task is the run · marked prey die faster, off-task hits harder<br>Special: Slayer Strike · Upgrades: Slayer knowledge, Broad tips, Black mask' },
+  hunter: { icon: '🦅', name: 'Hunter', blurb: 'Fast scout · box traps and snares, bait the pack<br>Special: Box Trap · Upgrades: Quick set, Camouflage, Lightfoot' },
+  runecrafter: { icon: '◈', name: 'Runecrafter', blurb: 'Craft air, fire, law and death runes · dump them at the altar<br>Special: Ourania Pulse · law blink is a hop, not a speed boost · Upgrades: Catalytic, Tailwind, Ourania' }
 };
 function closeClassList() {
   const list = $('classList'), drop = $('classDrop');
   if (list) list.hidden = true;
   if (drop) drop.setAttribute('aria-expanded', 'false');
 }
-function refreshClassPicker() { // 0.9c: sync dropdown label, blurb, Start button, Fisher lock, mastery line
+function refreshClassPicker() { // 0.9c / 0.11a: sync dropdown label, blurb, Start, locks, mastery line
   const k = lastClass || 'melee';
   const info = CLASS_INFO[k] || CLASS_INFO.melee;
-  const fu = fisherUnlocked();
-  const fb = $('fisherBtn');
-  if (fb) {
-    fb.classList.toggle('lock', !fu);
-    const lk = $('fisherLock'); if (lk) lk.style.display = fu ? 'none' : 'inline';
-  }
   document.querySelectorAll('#classList .classopt').forEach(b => {
-    b.classList.toggle('on', b.dataset.s === k);
+    const id = b.dataset.s;
+    const ok = classUnlocked(id);
+    b.classList.toggle('lock', !ok);
+    b.classList.toggle('on', id === k);
+    const lk = b.querySelector('.unlock');
+    if (lk) lk.style.display = ok ? 'none' : 'inline';
   });
   if ($('classDropLabel')) $('classDropLabel').textContent = 'Class: ' + info.icon + ' ' + info.name;
   if ($('classInfoName')) $('classInfoName').textContent = info.icon + ' ' + info.name;
@@ -1281,8 +1628,8 @@ function bind() {
     list.querySelectorAll('.classopt').forEach(b => b.onclick = (e) => {
       e.stopPropagation();
       const s = b.dataset.s;
-      if (s === 'fisher' && !fisherUnlocked()) {
-        toast('Reach level 5 with any class to unlock Fisher');
+      if (!classUnlocked(s)) {
+        toast(unlockToast(s));
         closeClassList(); // keep current class; close so Start stays tappable
         return;
       }
@@ -1293,8 +1640,8 @@ function bind() {
   }
   if ($('startBtn')) $('startBtn').onclick = () => {
     const s = lastClass || 'melee';
-    if (s === 'fisher' && !fisherUnlocked()) {
-      toast('Reach level 5 with any class to unlock Fisher');
+    if (!classUnlocked(s)) {
+      toast(unlockToast(s));
       return;
     }
     start(s);
@@ -1607,6 +1954,7 @@ function hurt(e, d, isCrit, dot) { // 0.8a: dot = burn tick / Retribution (no on
     kills++;
     streak++;
     streakTimer = 2.8;
+    if (typeof onEnemyKilled === 'function') onEnemyKilled(e);
     if (player.kh) player.hp = Math.min(player.maxHp, player.hp + player.kh);
     if (e.burn > 0 && M.pyro4) { // 0.8a Wildfire
       let best = null, bd = 70;
@@ -1619,6 +1967,14 @@ function hurt(e, d, isCrit, dot) { // 0.8a: dot = burn tick / Retribution (no on
       for (const o of enemies) if (o !== e && o.hp > 0 && dist(o, e) < 60) hurt(o, sd, false, true);
       for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; particles.push({ x: e.x, y: e.y, vx: Math.cos(a) * 100, vy: Math.sin(a) * 100, life: 0.35, color: '#b8e8ff', size: 4 }); }
     }
+    // 0.11a: Gloves of Silence burst; Firemaker embers
+    if (player.style === 'thief' && M.pocketC) {
+      const c = Math.max(2, Math.round(8 * coinMul()));
+      runGold += c;
+      floats.push({ x: e.x, y: e.y - 20, text: '👜 +' + c + ' ◆', life: 0.7, vy: -34, color: '#ffd24a' });
+    }
+    if (player.style === 'firemaker' && M.kindle4 && (e.burn > 0) && Math.random() < 0.40)
+      spawnFire(e.x, e.y, fireRadius(22), fireLifetime(1.6), fireDpsMul(0.18));
 
     if (e.boss) {
       bossDefeated(e); // 0.6: boss has its own big reward
@@ -1682,14 +2038,72 @@ function attack() {
     if (spike && ti === 0) d = Math.round(d * 2.2);
     if (bolt && ti === 0 && e.boss) d = Math.round(d * 1.25);
 
+    // 0.11a class hit modifiers
+    if (player.style === 'priest' && (player.pray || 0) > 0) {
+      if (M.prot2) d = Math.round(d * 1.08);
+      if (M.protC) d = Math.round(d * 1.12);
+    }
+    if (player.style === 'priest' && M.smite4 && (e.elite || e.boss || e.kind === 2)) d = Math.round(d * 1.15);
+    if (player.style === 'thief' && M.jack3 && (e.freezeT || 0) > 0) d = Math.round(d * 1.20);
+    if (player.style === 'necromancer') {
+      if (M.deathn3 && e.maxHp && e.hp / e.maxHp < 0.30) d = Math.round(d * 1.20);
+    }
+    if (player.style === 'slayer') {
+      if (isTaskEnemy(e)) {
+        let tm = 1.22;
+        if (M.task1) tm = 1.35;
+        if (M.helmC) tm += 0.12;
+        tm += (player.itemTask || 0) + (player.taskCard || 0);
+        d = Math.round(d * tm);
+      } else if (M.taskC) d = Math.round(d * 0.85);
+      if (M.helm3 && (e.elite || e.boss)) d = Math.round(d * 1.12);
+      if ((e.slayerMark || 0) > 0) d = Math.round(d * (e._markMul || 1.18));
+    }
+    if (player.style === 'hunter') {
+      if (M.track4 && ((e.root || 0) > 0 || (e.slow || 0) > 0)) d = Math.round(d * 1.15);
+      if ((player.huntBuff || 0) > 0) d = Math.round(d * 1.20);
+    }
+
     let isCrit = Math.random() < (player.crit || 0);
     if (bolt && ti === 0) isCrit = true;
-    if (isCrit) d = Math.round(d * (player.critMul || 2.4));
+    // 0.11a Thief: pickpocket extra crit, guaranteed blackjack crit, post-stealth backstab
+    if (player.style === 'thief' && ti === 0) {
+      const extra = 0.12 + (M.pocket2 ? 0.08 : 0);
+      if (!isCrit && Math.random() < extra) isCrit = true;
+      if (M.jackC && player.hitN % 5 === 0) isCrit = true;
+      if (player.stealth > 0 || player.backstab > 0) {
+        isCrit = true;
+        player._backstabHit = true;
+      }
+    }
+    if (isCrit) {
+      if (player._backstabHit) { d = Math.round(d * (M.shad2 ? 3.0 : 2.6)); player._backstabHit = false; }
+      else d = Math.round(d * (player.critMul || 2.4));
+    }
 
     const thick = (bolt && ti === 0) ? 5 : (isCrit ? 4 : (player.style === 'fisher' ? 3.2 : 2.5));
     shots.push({ x: player.x, y: player.y, tx: e.x, ty: e.y, life: (bolt && ti === 0) ? 0.22 : 0.14, col: S.col, thick });
 
     hurt(e, d, isCrit);
+    if (player.style === 'necromancer' && e.hp > 0) {
+      if (M.deathn2) { e.wither = Math.max(e.wither || 0, 2); e.witherDps = wDmg() * 0.10; e.witherTick = 0.5; }
+      if (M.deathn4) e.chill = Math.max(e.chill || 0, 0.6);
+    }
+    if (player.style === 'runecrafter') {
+      grantEssence(1 + (M.ess1 ? 1 : 0) + (player.itemEss || 0) + (player.essCard || 0));
+      if ((player.runes.fire || 0) > 0 && e.hp > 0) {
+        const rr = M.elem1 ? 50 : 40, fm = M.elem1 ? 0.40 : 0.30;
+        const sd = Math.max(1, Math.round(d * fm));
+        for (const o of enemies) {
+          if (o === e || o.hp <= 0) continue;
+          if (Math.hypot(o.x - e.x, o.y - e.y) < rr) hurt(o, sd, false, true);
+        }
+      }
+      if ((player.runes.death || 0) > 0 && e.hp > 0 && !e.boss && e.maxHp) {
+        const thresh = M.elem3 ? 0.25 : 0.18;
+        if (e.hp / e.maxHp < thresh) { e.hp = 0; hurt(e, 1, true); }
+      }
+    }
     if (M.pyro2 && e.hp > 0) ignite(e);
     if (M.rapidC && e.hp > 0) { e.venom = Math.min(3, (e.venom || 0) + 1); e.venomT = 4; e.venomDps = wDmg() * 0.20; e.venomTick = 0.5; }
     if (M.iceC && ti === 0) {
@@ -1708,6 +2122,51 @@ function attack() {
     if (M.net2 && e.hp > 0) e.chill = Math.max(e.chill || 0, 0.5);
     if (player.itemChill && e.hp > 0) e.chill = Math.max(e.chill || 0, player.itemChill);
     if (M.zerkC && player.hp / player.maxHp < 0.3) player.hp = Math.min(player.maxHp, player.hp + 2);
+
+    // 0.11a on-hit class effects (primary target only unless noted)
+    if (ti === 0 && player.style === 'thief') {
+      if (player.stealth > 0) endStealth(true);
+      else if (player.backstab > 0) player.backstab = 0;
+      pickpocketCoins(isCrit);
+      thiefBlackjack(e, isCrit);
+      // short dagger flick so a packed blob can be chipped, not a full Whirlwind
+      for (const o of enemies) {
+        if (o === e || o.hp <= 0) continue;
+        if (dist(o, player) < player.r + 32) hurt(o, Math.round(d * 0.40), false);
+      }
+    }
+    if (ti === 0 && player.style === 'priest') {
+      if (M.smite1) {
+        const heal = Math.min(4, Math.max(1, Math.round(d * 0.03)));
+        player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + heal);
+      }
+      if (M.smite3 || player.prayHit) refillPray(1, true);
+      if (M.smiteC && player.hitN % 4 === 0) {
+        const extra = Math.round(d * 0.80);
+        shots.push({ x: player.x, y: player.y, tx: e.x, ty: e.y, life: 0.14, col: '#f0e6a0', thick: 3 });
+        if (e.hp > 0) hurt(e, extra, false);
+      }
+    }
+    if (ti === 0 && player.style === 'woodcutter') {
+      if (M.cleave3 && !e.boss && e.hp > 0 && Math.random() < 0.20) {
+        const dd = dist(e, player) || 1;
+        e.x += (e.x - player.x) / dd * 40; e.y += (e.y - player.y) / dd * 40;
+      }
+      if (M.cleave4 && Math.random() < 0.20 && e.hp > 0) hurt(e, Math.round(d * 0.60), false);
+      if (M.cleaveC && player.hitN % 5 === 0) {
+        for (const o of enemies) if (o.hp > 0 && dist(o, player) < 90) hurt(o, Math.round(wDmg() * 1.80), o === e ? isCrit : false);
+      }
+      if (M.forest3 && e.hp <= 0 && Math.random() < 0.10) {
+        const c = Math.max(1, Math.round(6 * coinMul()));
+        runGold += c;
+        floats.push({ x: e.x, y: e.y - 18, text: '🪺 +' + c, life: 0.7, vy: -34, color: '#ffd24a' });
+      }
+    }
+    if (ti === 0 && player.style === 'firemaker') {
+      if (e.hp > 0) { e.burn = Math.max(e.burn || 0, 2); e.burnDps = Math.max(e.burnDps || 0, wDmg() * 0.10); if (!(e.burnTick > 0)) e.burnTick = 0.5; }
+      const chance = 0.15 + (player.fireChance || 0);
+      if (Math.random() < chance) spawnFire(e.x, e.y, fireRadius(28), fireLifetime(2.0), fireDpsMul(0.20));
+    }
 
     // 0.9b Fisher: harpoon pierces 2 more in a line (65%) + small splash (35% in 38px) so basics clear a packed slow-blob
     if (player.style === 'fisher' && ti === 0) {
@@ -1802,6 +2261,7 @@ function doDash() {
   if (player.m.skirm4) player.ambush = 3;
   player.dashIframes = 0.28;
   player.invuln = 0.28;
+  if (player.m && player.m.scoutC) player.trapArmed = 1;
   sfx('dash');
   for (let i = 0; i < 6; i++) {
     particles.push({ x: player.x, y: player.y, vx: rand(-40, 40), vy: rand(-40, 40), life: 0.25, color: '#c8e0b0', size: 3 });
@@ -1851,6 +2311,22 @@ function doSpecial() {
     });
   } else if (player.style === 'fisher') { // 0.8b Cast Net / Rare Fishing Spot
     castNet();
+  } else if (player.style === 'thief') {
+    startStealth();
+  } else if (player.style === 'priest') {
+    holyBolt();
+  } else if (player.style === 'woodcutter') {
+    timberSlam();
+  } else if (player.style === 'firemaker') {
+    ringOfFire();
+  } else if (player.style === 'necromancer') {
+    doThrallSummon();
+  } else if (player.style === 'slayer') {
+    doSlayerStrike();
+  } else if (player.style === 'hunter') {
+    doBoxTrap();
+  } else if (player.style === 'runecrafter') {
+    doOuraniaPulse();
   } else {
     // Arcane Nova / 0.8b Fire Wave
     let mul = 1.35;
@@ -1918,6 +2394,581 @@ function netPulse(cx, cy, R, mul) {
   }
 }
 
+/* ========== 0.11a: THIEF / PRIEST / WOODCUTTER / FIREMAKER ========== */
+function refillPray(n, quiet) {
+  if (player.style !== 'priest' || !player.prayMax) return;
+  const b = player.pray || 0;
+  player.pray = Math.min(player.prayMax, b + n);
+  if (!quiet && player.pray > b)
+    floats.push({ x: player.x, y: player.y - 26, text: '🙏 +' + Math.round(player.pray - b), life: 0.7, vy: -36, color: '#e8d88a' });
+}
+function pickpocketCoins(isCrit) {
+  const M = player.m || {};
+  let raw = 1 + (M.pocket1 ? 1 : 0) + (player.filchCard || 0);
+  if (M.pocket3) raw *= 1.5;
+  if (M.pocketC && isCrit) raw *= 3;
+  raw *= coinMul(); // Ring of wealth / coin pouch / glory all apply
+  player._pocketFrac = (player._pocketFrac || 0) + raw;
+  const n = Math.floor(player._pocketFrac);
+  player._pocketFrac -= n;
+  if (n <= 0) return;
+  runGold += n;
+  if (Math.random() < 0.45 || n >= 2)
+    floats.push({ x: player.x, y: player.y - 22, text: '👜 +' + n + ' ◆', life: 0.55, vy: -32, color: '#ffd24a' });
+}
+function thiefBlackjack(e, isCrit) {
+  const M = player.m || {};
+  if (!e || e.hp <= 0) return;
+  const forced = M.jackC && player.hitN % 5 === 0;
+  const chance = 0.12 + (M.jack1 ? 0.10 : 0) + (player.jackChance || 0);
+  if (!forced && Math.random() >= chance) return;
+  if (e.boss) { e.slow = Math.max(e.slow || 0, 0.5); return; }
+  const dur = (M.jackC && forced ? 1.4 : (M.jack2 ? 1.1 : 0.65)) + (player.jackTime || 0);
+  e.freezeT = Math.max(e.freezeT || 0, dur);
+  e.windup = 0;
+  floats.push({ x: e.x, y: e.y - 16, text: '💫', life: 0.45, vy: -28, color: '#d4a574' });
+  if (M.jack4) {
+    let best = null, bd = 50;
+    for (const o of enemies) {
+      if (o === e || o.hp <= 0 || o.boss) continue;
+      const dd = dist(o, e);
+      if (dd < bd) { bd = dd; best = o; }
+    }
+    if (best) { best.freezeT = Math.max(best.freezeT || 0, dur * 0.5); best.windup = 0; }
+  }
+}
+function startStealth() {
+  const M = player.m || {};
+  player.stealth = M.shad1 ? 2.4 : 1.8;
+  player.shadowX = player.x;
+  player.shadowY = player.y;
+  player.invuln = Math.max(player.invuln, player.stealth);
+  player.backstab = 0;
+  floats.push({ x: player.x, y: player.y - 28, text: '👤 Vanish', life: 0.8, vy: -34, color: '#c8b8e0' });
+  for (let i = 0; i < 14; i++) {
+    const a = i / 14 * 6.283;
+    particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * 70, vy: Math.sin(a) * 70, life: 0.4, color: '#6a5a8a', size: 4 });
+  }
+  if (M.shad3) {
+    for (const e of enemies) if (e.hp > 0 && dist(e, player) < 90) e.chill = Math.max(e.chill || 0, 1.0);
+  }
+  // lost aggro: cancel wind-ups aimed at you
+  for (const e of enemies) if (!e.boss) e.windup = 0;
+}
+function endStealth(fromHit) {
+  if (player.stealth <= 0 && !fromHit) return;
+  player.stealth = 0;
+  player.backstab = fromHit ? 0 : 2.5;
+  const M = player.m || {};
+  if (M.shadC) {
+    player.invuln = Math.max(player.invuln, 0.4);
+    for (const e of enemies) if (e.hp > 0 && dist(e, player) < 90) hurt(e, Math.round(wDmg() * 1.50), false);
+    for (let i = 0; i < 14; i++) {
+      const a = i / 14 * 6.283;
+      particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * 120, vy: Math.sin(a) * 120, life: 0.35, color: '#c8b8e0', size: 4 });
+    }
+  }
+}
+function holyBolt() {
+  const M = player.m || {};
+  const n = M.holy4 ? 5 : 3;
+  const heal = M.holy2 ? 32 : 20;
+  player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + healAmt(heal));
+  floats.push({ x: player.x, y: player.y - 28, text: '✨ +' + Math.round(healAmt(heal)), life: 0.8, vy: -36, color: '#e8d88a' });
+  const t = enemies.filter(e => e.hp > 0).sort((a, b) => dist(a, player) - dist(b, player)).slice(0, n);
+  t.forEach((e, i) => {
+    setTimeout(() => {
+      if (!playing || paused || leveling || bagging) return;
+      if (e.hp <= 0) return;
+      shots.push({ x: player.x, y: player.y, tx: e.x, ty: e.y, life: 0.16, col: '#f5e6a0', thick: 3.5 });
+      hurt(e, Math.round(wDmg() * 1.35), false);
+    }, i * 50);
+  });
+  if (M.holy3) player.sanctum = 2;
+  if (M.holyC) player.altar = { x: player.x, y: player.y, r: 70, life: 4, tick: 0.5 };
+}
+function spawnLog(x, y, r, life) {
+  // keep off the player so you are not boxed in
+  let px = x, py = y;
+  const dd = Math.hypot(px - player.x, py - player.y);
+  if (dd < (r || 22) + player.r + 6) {
+    const a = Math.atan2(py - player.y, px - player.x) || player.facing || 1;
+    px = player.x + Math.cos(a) * ((r || 22) + player.r + 12);
+    py = player.y + Math.sin(a) * ((r || 22) + player.r + 12);
+  }
+  if (hitsSolid(px, py, r || 22)) {
+    for (let i = 0; i < 8 && hitsSolid(px, py, r || 22); i++) {
+      const a = i / 8 * 6.283;
+      px = x + Math.cos(a) * 24; py = y + Math.sin(a) * 24;
+    }
+  }
+  woodLogs.push({ x: px, y: py, r: r || 22, life: life || 6, splinterCd: 0 });
+  if (woodLogs.length > 6) woodLogs.shift();
+  if (player.m && player.m.forestC) {
+    player.hp = Math.min(player.maxHp, player.hp + healAmt(8));
+    floats.push({ x: player.x, y: player.y - 24, text: '🏡 +8', life: 0.6, vy: -32, color: '#8bc46a' });
+  }
+}
+function timberSlam() {
+  const M = player.m || {};
+  const reach = M.woods1 ? 175 : 140;
+  let ang = player.facing >= 0 ? 0 : Math.PI;
+  const near = enemies.filter(e => e.hp > 0).sort((a, b) => dist(a, player) - dist(b, player))[0];
+  if (near) ang = Math.atan2(near.y - player.y, near.x - player.x);
+  const ux = Math.cos(ang), uy = Math.sin(ang);
+  const dmg = Math.round(wDmg() * 2.00);
+  for (const e of enemies) {
+    if (e.hp <= 0) continue;
+    const along = (e.x - player.x) * ux + (e.y - player.y) * uy;
+    const lat = Math.abs((e.x - player.x) * uy - (e.y - player.y) * ux);
+    if (along > 8 && along < reach && lat < 32 + e.r) {
+      hurt(e, dmg, false);
+      if (!e.boss) { e.x += ux * 52; e.y += uy * 52; }
+    }
+  }
+  const life = M.woods2 ? 9 : 6;
+  const rad = M.woods2 ? 26 : 22;
+  const nLogs = 1 + (player.extraLog || 0);
+  for (let i = 0; i < nLogs; i++) {
+    const t = reach * (0.45 + i * 0.25);
+    spawnLog(player.x + ux * t, player.y + uy * t, rad, life);
+  }
+  for (let i = 0; i < 16; i++) {
+    particles.push({ x: player.x + ux * 30, y: player.y + uy * 30, vx: ux * 80 + rand(-40, 40), vy: uy * 80 + rand(-40, 40), life: 0.4, color: '#8a6a3a', size: 5 });
+  }
+  floats.push({ x: player.x + ux * 40, y: player.y + uy * 40 - 16, text: '🌲 Timber!', life: 0.8, vy: -30, color: '#c4a06a' });
+}
+function fireRadius(base) {
+  return (player.m && player.m.kindle3 ? 38 : base);
+}
+function fireLifetime(base) {
+  let t = base + (player.m && player.m.kindle1 ? 1.2 : 0) + (player.fireDur || 0);
+  if (player.m && player.m.fuel3) t *= 1.20;
+  if (player.itemFireDur) t *= player.itemFireDur;
+  return t;
+}
+function fireDpsMul(base) {
+  let m = player.m && player.m.kindle2 ? 0.30 : base;
+  m *= (player.fireDpsMul || 1);
+  return m;
+}
+function spawnFire(x, y, r, life, dpsMul) {
+  // ignite a nearby log: bigger, longer fire, consume the log
+  for (let i = woodLogs.length - 1; i >= 0; i--) {
+    const L = woodLogs[i];
+    if (L.life > 0 && Math.hypot(L.x - x, L.y - y) < L.r + r + 8) {
+      woodLogs.splice(i, 1);
+      r = player.m && player.m.fuel2 ? 50 : Math.max(r, r + 20);
+      life = player.m && player.m.fuel2 ? 5 : life * 1.5;
+      if (player.m && player.m.fuel4) player.campfireDR = 1.5;
+      break;
+    }
+  }
+  const cap = player.m && player.m.fuelC ? 12 : 8;
+  fires.push({ x, y, r, life, dps: (dpsMul || 0.20) * wDmg(), tick: 0.35, ring: false, pulse: 0 });
+  while (fires.length > cap) fires.shift();
+}
+function ringOfFire() {
+  const M = player.m || {};
+  const r = M.bon1 ? 150 : 120;
+  const life = M.bonC ? 7 : 4;
+  const mul = fireDpsMul(0.40) * (M.bon2 ? 1.30 : 1);
+  fires.push({ x: player.x, y: player.y, r, life: fireLifetime(life), dps: mul * wDmg(), tick: 0.35, ring: true, pulse: M.bonC ? 2 : 0, follow: false });
+  const cap = M.fuelC ? 12 : 8;
+  while (fires.length > cap) fires.shift();
+  floats.push({ x: player.x, y: player.y - 28, text: '🔥 Bonfire', life: 0.8, vy: -34, color: '#ff8a3c' });
+}
+function updateLogsAndFires(dt) {
+  for (let i = woodLogs.length - 1; i >= 0; i--) {
+    const L = woodLogs[i];
+    L.life -= dt;
+    L.splinterCd = Math.max(0, (L.splinterCd || 0) - dt);
+    if (L.life <= 0) { woodLogs.splice(i, 1); continue; }
+    if (player.m && (player.m.woods3 || player.m.woodsC)) {
+      for (const e of enemies) {
+        if (e.hp <= 0) continue;
+        const dd = Math.hypot(e.x - L.x, e.y - L.y);
+        if (player.m.woodsC && dd < 50) e.slow = Math.max(e.slow || 0, 0.3);
+        if (player.m.woods3 && dd < L.r + e.r + 2 && L.splinterCd <= 0) {
+          L.splinterCd = 0.45;
+          hurt(e, Math.max(1, Math.round(wDmg() * 0.20)), false, true);
+        }
+      }
+    }
+  }
+  let warmth = false;
+  for (let i = fires.length - 1; i >= 0; i--) {
+    const f = fires[i];
+    f.life -= dt;
+    f.tick -= dt;
+    if (f.pulse > 0) {
+      f.pulse -= dt;
+      if (f.pulse <= 0) {
+        f.pulse = 2;
+        for (const e of enemies) if (e.hp > 0 && Math.hypot(e.x - f.x, e.y - f.y) < f.r + e.r) {
+          if (!e.boss) {
+            const dd = Math.hypot(e.x - f.x, e.y - f.y) || 1;
+            e.x += (e.x - f.x) / dd * 36; e.y += (e.y - f.y) / dd * 36;
+          }
+        }
+      }
+    }
+    if (f.tick <= 0) {
+      f.tick = 0.4;
+      for (const e of enemies) {
+        if (e.hp <= 0) continue;
+        if (Math.hypot(e.x - f.x, e.y - f.y) < f.r + e.r) {
+          hurt(e, Math.max(1, Math.round(f.dps * 0.4)), false, true);
+          if (player.m && player.m.kindleC) e.slow = Math.max(e.slow || 0, 0.4);
+        }
+      }
+    }
+    if (player.m && player.m.bon3 && Math.hypot(player.x - f.x, player.y - f.y) < f.r) warmth = true;
+    if (f.life <= 0) fires.splice(i, 1);
+  }
+  if (warmth) {
+    player._warmth = (player._warmth || 0) + dt;
+    if (player._warmth >= 1) { player._warmth -= 1; player.hp = Math.min(player.maxHp, player.hp + 3); }
+  } else player._warmth = 0;
+}
+
+/* ========== 0.11a: Necromancer / Slayer / Hunter / Runecrafter ========== */
+function slayerTakenMul(e) {
+  if (player.style !== 'slayer' || !player.slayerTask || !e) return 1;
+  if (player.m && player.m.helm4) return 1;
+  if (isTaskEnemy(e)) return 1;
+  return 1.15;
+}
+const SLAYER_TASKS = [
+  { kind: 0, name: 'Goblins', n: 18 },
+  { kind: 1, name: 'Skeletons', n: 14 },
+  { kind: 2, name: 'Hill giants', n: 8 },
+  { kind: 3, name: 'Elites', n: 4 },
+  { kind: 4, name: 'Cultists', n: 12 }
+];
+function rollSlayerTask() {
+  const pool = SLAYER_TASKS;
+  let pick = pool[Math.floor(Math.random() * pool.length)];
+  if (player.slayerTask && pick.kind === player.slayerTask.kind)
+    pick = pool[(pool.indexOf(pick) + 1) % pool.length];
+  let need = pick.n;
+  if (player.m && player.m.task2) need = Math.ceil(need * 0.8);
+  player.slayerTask = { kind: pick.kind, name: pick.name, need, have: 0 };
+  player.slayerNewAt = elapsed + 60;
+  floats.push({ x: player.x, y: player.y - 28, text: '📜 ' + pick.name + ' ×' + need, life: 1.2, vy: -30, color: '#c8b070' });
+}
+function isTaskEnemy(e) {
+  if (!e || !player.slayerTask) return false;
+  if (e.kind === player.slayerTask.kind) return true;
+  if (player.slayerTask.kind === 3 && e.elite) return true;
+  return false;
+}
+function onSlayerKill(e) {
+  if (player.style !== 'slayer' || !player.slayerTask || !isTaskEnemy(e)) return;
+  player.slayerTask.have++;
+  if (player.m && player.m.task3) player.hp = Math.min(player.maxHp, player.hp + 4);
+  if (player.slayerTask.have >= player.slayerTask.need) {
+    floats.push({ x: player.x, y: player.y - 30, text: '✅ Task complete', life: 1.1, vy: -32, color: '#c8e080' });
+    if (player.m && player.m.taskC) {
+      openChest({ x: player.x, y: player.y - 20, rolls: 1 }, null, false);
+    }
+    rollSlayerTask();
+  }
+}
+
+const THRALL_KINDS = [
+  { name: 'Ghost', col: '#c8b8ff', r: 10, hp: 28, dmg: 0.55, speed: 72 },
+  { name: 'Skeleton', col: '#d4cbb0', r: 11, hp: 36, dmg: 0.70, speed: 54 },
+  { name: 'Zombie', col: '#6a8a58', r: 13, hp: 48, dmg: 0.60, speed: 42 }
+];
+function thrallCap() {
+  return Math.min(THRALL_HARD_CAP, (player.m && player.m.thrallC) ? 4 : 3);
+}
+function expireThrall(th, natural) {
+  if (natural && player.m && player.m.thrallC) {
+    const sd = Math.round(wDmg() * 0.80);
+    for (const e of enemies) if (e.hp > 0 && Math.hypot(e.x - th.x, e.y - th.y) < 70) hurt(e, sd, false);
+  }
+  if (player.m && player.m.deathnC) {
+    player._dcRefund = (player._dcRefund || 0) + 1.5;
+    const cut = Math.min(1.5, Math.max(0, 4 - (player._dcRefund - 1.5)));
+    if (cut > 0) player.specialCd = Math.max(0, player.specialCd - cut);
+  }
+  for (let j = 0; j < 10; j++) {
+    const a = j / 10 * 6.283;
+    particles.push({ x: th.x, y: th.y, vx: Math.cos(a) * 70, vy: Math.sin(a) * 70, life: 0.3, color: th.col, size: 3 });
+  }
+}
+function trimThralls() {
+  while (thralls.length > thrallCap()) {
+    const old = thralls.shift();
+    expireThrall(old, false);
+  }
+}
+function summonThrall() {
+  const k = THRALL_KINDS[Math.floor(Math.random() * THRALL_KINDS.length)];
+  let life = 6;
+  if (player.m && player.m.thrall2) life = 9;
+  if (player.m && player.m.soulC) life += 2;
+  life += (player.itemThrallLife || 0) + (player.thrallLifeCard || 0);
+  const ang = Math.random() * Math.PI * 2;
+  const th = {
+    x: player.x + Math.cos(ang) * 22, y: player.y + Math.sin(ang) * 22,
+    r: k.r, hp: k.hp, maxHp: k.hp, speed: k.speed, dmg: k.dmg, col: k.col, name: k.name,
+    life, atk: 0, kind: k.name
+  };
+  thralls.push(th);
+  trimThralls();
+  return th;
+}
+function doThrallSummon() {
+  player._dcRefund = 0;
+  const n = (player.m && player.m.thrall1) ? 2 : 1;
+  for (let i = 0; i < n; i++) summonThrall();
+  floats.push({ x: player.x, y: player.y - 26, text: '💀 Thralls', life: 0.8, vy: -32, color: '#b89ae8' });
+}
+function updateThralls(dt) {
+  for (let i = thralls.length - 1; i >= 0; i--) {
+    const th = thralls[i];
+    th.life -= dt;
+    if (th.hp <= 0 || th.life <= 0) {
+      expireThrall(th, th.life <= 0 && th.hp > 0);
+      thralls.splice(i, 1);
+      continue;
+    }
+    let best = null, bd = 1e9;
+    for (const e of enemies) {
+      if (e.hp <= 0) continue;
+      const dd = Math.hypot(e.x - th.x, e.y - th.y);
+      if (dd < bd) { bd = dd; best = e; }
+    }
+    if (best) {
+      const dx = best.x - th.x, dy = best.y - th.y, d = Math.hypot(dx, dy) || 1;
+      if (d > th.r + best.r + 2) {
+        th.x += dx / d * th.speed * dt;
+        th.y += dy / d * th.speed * dt;
+      }
+      th.atk -= dt;
+      if (d < th.r + best.r + 8 && th.atk <= 0) {
+        th.atk = 0.7;
+        let mul = th.dmg;
+        if (player.m && player.m.thrall3) mul *= 1.30;
+        mul *= (player.thrallDmgCard || 1);
+        hurt(best, Math.max(1, Math.round(wDmg() * mul)), false);
+        if (player.m && player.m.thrall4) player.hp = Math.min(player.maxHp, player.hp + 2);
+      }
+    }
+  }
+}
+
+function trapCap() {
+  return Math.min(TRAP_HARD_CAP, (player.m && player.m.trapbC) ? 3 : 2);
+}
+function nearLog(x, y) {
+  for (const L of woodLogs) if (Math.hypot(L.x - x, L.y - y) < (L.r || 16) + 28) return true;
+  return false;
+}
+function placeTrap(kind, x, y) {
+  while (traps.length >= trapCap()) traps.shift();
+  let arm = (kind === 'snare') ? 0.25 : ((player.m && player.m.trapb1) ? 0.35 : 0.6);
+  if (player.trapArmCard) arm = Math.max(0.1, arm - player.trapArmCard);
+  if (kind === 'box' && player.trapArmed) { arm = 0; player.trapArmed = 0; }
+  let life = (player.m && player.m.track1) ? 11 : 7;
+  life += (player.itemTrapLife || 0) + (player.trapLifeCard || 0);
+  if (nearLog(x, y)) life *= (player.m && player.m.track2) ? 2 : 1.5;
+  const r = (kind === 'box') ? ((player.m && player.m.trapb2) ? 56 : 42) : 28;
+  traps.push({ x, y, r, life, arm, kind, snapped: false });
+}
+function doBoxTrap() {
+  placeTrap('box', player.x, player.y);
+  floats.push({ x: player.x, y: player.y - 24, text: '📦 Trap', life: 0.7, vy: -30, color: '#8fbc6a' });
+}
+function snapTrap(t, e) {
+  if (t.snapped) return;
+  t.snapped = true;
+  t.life = Math.min(t.life, 0.35);
+  const mul = (t.kind === 'box') ? ((player.m && player.m.trapb2) ? 2.0 : 1.7) : 1.1;
+  const rootT = (player.m && player.m.trapb3) ? 1.2 : 0.7;
+  const hitList = [];
+  for (const o of enemies) {
+    if (o.hp <= 0) continue;
+    if (Math.hypot(o.x - t.x, o.y - t.y) < t.r + o.r) hitList.push(o);
+  }
+  if (e && !hitList.includes(e)) hitList.push(e);
+  for (const o of hitList) {
+    hurt(o, Math.max(1, Math.round(wDmg() * mul)), false);
+    if (!o.boss) o.root = Math.max(o.root || 0, rootT);
+    if (player.m && player.m.track3) o.slow = Math.max(o.slow || 0, 2);
+    if (player.m && player.m.trapbC && !o.boss) {
+      const dd = Math.hypot(o.x - t.x, o.y - t.y) || 1;
+      o.x -= (o.x - t.x) / dd * 70; o.y -= (o.y - t.y) / dd * 70;
+    }
+  }
+  if (player.m && player.m.trackC) player.huntBuff = 3;
+  for (let j = 0; j < 12; j++) {
+    const a = j / 12 * 6.283;
+    particles.push({ x: t.x, y: t.y, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, life: 0.3, color: '#8fbc6a', size: 3 });
+  }
+}
+function updateTraps(dt) {
+  for (let i = traps.length - 1; i >= 0; i--) {
+    const t = traps[i];
+    t.life -= dt;
+    if (t.arm > 0) t.arm -= dt;
+    if (t.life <= 0) { traps.splice(i, 1); continue; }
+    if (t.arm <= 0 && !t.snapped) {
+      for (const e of enemies) {
+        if (e.hp <= 0) continue;
+        if (Math.hypot(e.x - t.x, e.y - t.y) < t.r + e.r) { snapTrap(t, e); break; }
+      }
+    }
+  }
+}
+
+function runeTotal() {
+  const r = player.runes || {};
+  return (r.air || 0) + (r.fire || 0) + (r.law || 0) + (r.death || 0);
+}
+function essCap() {
+  let cap = (player.m && player.m.ess2) ? 60 : 40;
+  cap += Math.max(0, (player.essenceMax || 40) - 40);
+  return cap;
+}
+function essCost() { return (player.m && player.m.ess3) ? 6 : 8; }
+function tryCraftRunes() {
+  const cost = essCost();
+  const types = ['air', 'fire', 'law', 'death'];
+  while ((player.essence || 0) >= cost) {
+    player.essence -= cost;
+    const r = types[Math.floor(Math.random() * types.length)];
+    player.runes[r] = (player.runes[r] || 0) + 1;
+    if (player.m && player.m.essC) player.runes.law = (player.runes.law || 0) + 1;
+  }
+}
+function grantEssence(n) {
+  player.essence = Math.min(essCap(), (player.essence || 0) + n);
+  tryCraftRunes();
+}
+function runeDrainRate() {
+  return (player.m && player.m.elemC) ? 0.75 : 1;
+}
+function runeBlink() {
+  // Dash-like hop: displaces the player, never touches player.speed / addMoveSpeed.
+  if (player.dashIframes > 0) return false;
+  let dx = (keys.ArrowRight || keys.d ? 1 : 0) - (keys.ArrowLeft || keys.a ? 1 : 0);
+  let dy = (keys.ArrowDown || keys.s ? 1 : 0) - (keys.ArrowUp || keys.w ? 1 : 0);
+  if (joystick.active) { dx = joystick.x; dy = joystick.y; }
+  if (Math.hypot(dx, dy) < 0.05) { dx = player.facing; dy = 0; }
+  const mag = Math.hypot(dx, dy) || 1;
+  const steps = (player.m && player.m.elem4) ? 7 : 5;
+  for (let i = 0; i < steps; i++) {
+    player.x += (dx / mag) * 19;
+    player.y += (dy / mag) * 19;
+    pushOutOfProps(player, player.r * PLAYER_FOOT);
+  }
+  player.dashIframes = Math.max(player.dashIframes, 0.18);
+  player.invuln = Math.max(player.invuln, 0.18);
+  for (let i = 0; i < 8; i++) {
+    particles.push({ x: player.x, y: player.y, vx: rand(-50, 50), vy: rand(-50, 50), life: 0.25, color: '#7ec8e8', size: 3 });
+  }
+  return true;
+}
+function doOuraniaPulse() {
+  const r = player.runes || { air:0, fire:0, law:0, death:0 };
+  const spent = { air: r.air || 0, fire: r.fire || 0, law: r.law || 0, death: r.death || 0 };
+  const n = spent.air + spent.fire + spent.law + spent.death;
+  let mul = 1.15 + 0.07 * n;
+  if (player.m && player.m.altar2) mul *= 1.25;
+  const R = 150 + 3 * n;
+  for (const e of enemies) {
+    if (e.hp > 0 && dist(e, player) < R) hurt(e, Math.round(player.damage * mul), false);
+  }
+  if (player.m && player.m.altar3) {
+    player.runes = {
+      air: spent.air ? 1 : 0,
+      fire: spent.fire ? 1 : 0,
+      law: spent.law ? 1 : 0,
+      death: spent.death ? 1 : 0
+    };
+  } else player.runes = { air:0, fire:0, law:0, death:0 };
+  if (player.m && player.m.altar4) player.hp = Math.min(player.maxHp, player.hp + 18);
+  if (player.m && player.m.altarC) player.runeAltar = { x: player.x, y: player.y, r: 70, life: 4, tick: 0 };
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    particles.push({ x: player.x, y: player.y, vx: Math.cos(a) * 130, vy: Math.sin(a) * 130, life: 0.45, color: '#7ec8e8', size: 5 });
+  }
+  floats.push({ x: player.x, y: player.y - 26, text: '◈ Ourania', life: 0.8, vy: -32, color: '#7ec8e8' });
+}
+function updateRunes(dt) {
+  if (player.style !== 'runecrafter') return;
+  const drain = runeDrainRate() * dt;
+  player._airT = (player._airT || 0) + drain;
+  player._fireT = (player._fireT || 0) + drain;
+  player._lawT = (player._lawT || 0) + drain;
+  if ((player.runes.air || 0) > 0 && player._airT >= 4) { player._airT = 0; player.runes.air--; }
+  if ((player.runes.fire || 0) > 0 && player._fireT >= 2.5) { player._fireT = 0; player.runes.fire--; }
+  player.lawBlinkCd = (player.lawBlinkCd || 0) - dt;
+  if ((player.runes.law || 0) > 0 && player.lawBlinkCd <= 0) {
+    if (runeBlink()) {
+      player.runes.law--;
+      player.lawBlinkCd = 4.5;
+    }
+  }
+  if (player.m && player.m.essC) {
+    player._hoodT = (player._hoodT || 18) - dt;
+    if (player._hoodT <= 0) { player._hoodT = 18; grantEssence(8); }
+  }
+  if (player.runeAltar) {
+    player.runeAltar.life -= dt; player.runeAltar.tick -= dt;
+    if (player.runeAltar.tick <= 0) {
+      player.runeAltar.tick = 1;
+      if (Math.hypot(player.x - player.runeAltar.x, player.y - player.runeAltar.y) <= player.runeAltar.r)
+        grantEssence(2);
+    }
+    if (player.runeAltar.life <= 0) player.runeAltar = null;
+  }
+}
+
+function doSlayerStrike() {
+  const M = player.m;
+  let best = null, bd = player.range + 30;
+  for (const e of enemies) {
+    if (e.hp <= 0) continue;
+    const dd = dist(e, player);
+    if (dd < bd) {
+      if (!best || (isTaskEnemy(e) && !isTaskEnemy(best)) || dd < dist(best, player)) { best = e; bd = dd; }
+    }
+  }
+  const markT = (M && M.hunt2) ? 7 : 4;
+  const markMul = (M && M.hunt2) ? 1.30 : 1.18;
+  const strike = (e, frac) => {
+    if (!e || e.hp <= 0) return;
+    let mul = 1.85 * frac;
+    if (isTaskEnemy(e)) mul *= 1.25;
+    let crit = !!(M && M.huntC && isTaskEnemy(e));
+    hurt(e, Math.round(player.damage * mul), crit);
+    e.slayerMark = markT;
+    e._markMul = markMul;
+    shots.push({ x: player.x, y: player.y, tx: e.x, ty: e.y, life: 0.18, col: '#c8b070', thick: 5 });
+  };
+  if (best) strike(best, 1);
+  if (M && M.hunt4) {
+    let n = 0;
+    for (const e of enemies) {
+      if (e === best || e.hp <= 0 || !isTaskEnemy(e)) continue;
+      if (dist(e, player) < player.range + 40) { strike(e, 0.60); if (++n >= 2) break; }
+    }
+  }
+  floats.push({ x: player.x, y: player.y - 26, text: '🗡 Strike', life: 0.7, vy: -30, color: '#c8b070' });
+}
+
+function onEnemyKilled(e) {
+  if (player.style === 'slayer') onSlayerKill(e);
+  if (player.style === 'runecrafter' && player.m && player.m.ess4) grantEssence(3);
+  if (e && e.wither) e.wither = 0;
+}
+
+
 /* ========== 0.5: LOOT CHESTS ========== */
 // 0.9c: minute chests persist until collected (no despawn/cap).
 const BUFF_TIME = 30;      // 0.5: power spikes last 30 seconds
@@ -1965,6 +3016,14 @@ const ITEMS = {
   heavy_harp:    { id:'heavy_harp',    n:'Heavy harpoon',      icon:'🔱', kind:'equip', slot:'weapon', tier:'unique',    cls:'fisher', dmg:0.15, pierce:3, net:15, d:'Overrides your weapon. +15% damage, pierces 3, Cast Net +15 px.' },
   crystal_bow:   { id:'crystal_bow',   n:'Crystal bow',        icon:'💎', kind:'equip', slot:'weapon', tier:'unique',    cls:'ranged', dmg:0.12, range:20, d:'Overrides your weapon. +12% damage, +20 range.' },
   granite_maul:  { id:'granite_maul',  n:'Granite maul',       icon:'🔨', kind:'equip', slot:'weapon', tier:'unique',    cls:'melee',  maul:1, d:'Overrides your weapon. Every 12s, a 70px knockback pulse.' },
+  abyssal_dagger:{ id:'abyssal_dagger',n:'Abyssal dagger',     icon:'🗡', kind:'equip', slot:'weapon', tier:'unique',    cls:'thief',  dmg:0.15, crit:0.08, d:'Overrides your weapon. +15% damage, +8% crit (80% if not Thief).' },
+  holy_book:     { id:'holy_book',     n:'Holy book',          icon:'📖', kind:'equip', slot:'weapon', tier:'unique',    cls:'priest', dmg:0.12, pray:10, d:'Overrides your weapon. +12% damage, +10 max prayer (80% if not Priest).' },
+  infernal_axe:  { id:'infernal_axe',  n:'Infernal axe',       icon:'🪓', kind:'equip', slot:'weapon', tier:'unique',    cls:'woodcutter', dmg:0.15, sweep:10, d:'Overrides your weapon. +15% damage, wider cleave (80% if not Woodcutter).' },
+  tome_of_fire:  { id:'tome_of_fire',  n:'Tome of fire',       icon:'📕', kind:'equip', slot:'weapon', tier:'unique',    cls:'firemaker', dmg:0.12, blast:8, d:'Overrides your weapon. +12% damage, fires last a little longer (80% if not Firemaker).' },
+  ancient_sceptre:{ id:'ancient_sceptre',n:'Ancient sceptre',  icon:'💀', kind:'equip', slot:'weapon', tier:'unique',    cls:'necromancer', dmg:0.12, thrallLife:2, d:'Overrides your weapon. +12% damage, thralls last +2s (80% if not Necromancer).' },
+  slayer_helm:   { id:'slayer_helm',   n:'Slayer helm',        icon:'🪖', kind:'equip', slot:'helm',   tier:'unique',    cls:'slayer', armor:0.05, task:0.08, d:'+5% armour, +8% damage to your current slayer task.' },
+  magic_net:     { id:'magic_net',     n:'Magic butterfly net',icon:'🕸️', kind:'equip', slot:'weapon', tier:'unique',    cls:'hunter', dmg:0.12, trapLife:3, d:'Overrides your weapon. +12% damage, traps last +3s (80% if not Hunter).' },
+  wicked_hood:   { id:'wicked_hood',   n:'Wicked hood',        icon:'🧢', kind:'equip', slot:'helm',   tier:'unique',    cls:'runecrafter', armor:0.03, ess:1, d:'+3% armour. Hits grant +1 extra essence.' },
   dharok_helm:   { id:'dharok_helm',   n:"Dharok's helm",      icon:'💀', kind:'set',   slot:'helm',   tier:'unique',    set:'dharok', d:'Dharok set. 1pc +4% dmg, 2pc +8%, 3pc more damage the lower your HP (up to +45%).' },
   dharok_body:   { id:'dharok_body',   n:"Dharok's platebody", icon:'💀', kind:'set',   slot:'body',   tier:'unique',    set:'dharok', d:'Dharok set. 1pc +4% dmg, 2pc +8%, 3pc more damage the lower your HP (up to +45%).' },
   dharok_axe:    { id:'dharok_axe',    n:"Dharok's greataxe",  icon:'🪓', kind:'set',   slot:'weapon', tier:'unique',    set:'dharok', cls:'melee', d:'Overrides your weapon. Counts as a Dharok piece.' },
@@ -1975,8 +3034,8 @@ const ITEMS = {
   manta:         { id:'manta',         n:'Manta ray',          icon:'🪸', kind:'food',  slot:'food',   tier:'unique',    heal:75, d:'Eat to restore 75 HP.' },
   att_pot:       { id:'att_pot',       n:'Attack potion',      icon:'🧪', kind:'potion',slot:'potion', tier:'common',    pot:'atk',  mul:0.15, dur:20, d:'+15% damage for 20s.' },
   super_att:     { id:'super_att',     n:'Super attack',       icon:'🧪', kind:'potion',slot:'potion', tier:'uncommon',  pot:'atk',  mul:0.25, dur:20, d:'+25% damage for 20s.' },
-  super_rest:    { id:'super_rest',    n:'Super restore',      icon:'🧪', kind:'potion',slot:'potion', tier:'rare',      pot:'restore', d:'Heal 30 and shorten special cooldown by 2s.' },
-  pray_pot:      { id:'pray_pot',      n:'Prayer potion',      icon:'🙏', kind:'potion',slot:'potion', tier:'rare',      pot:'pray', dur:8, d:'8s of +20% damage reduction.' },
+  super_rest:    { id:'super_rest',    n:'Super restore',      icon:'🧪', kind:'potion',slot:'potion', tier:'rare',      pot:'restore', d:'Heal 30 and shorten special cooldown by 2s. Priest also restores 20 prayer points.' },
+  pray_pot:      { id:'pray_pot',      n:'Prayer potion',      icon:'🙏', kind:'potion',slot:'potion', tier:'rare',      pot:'pray', dur:8, d:'8s of +20% damage reduction. Priest also restores 32 prayer points.' },
   brew:          { id:'brew',          n:'Saradomin brew',     icon:'🍺', kind:'potion',slot:'potion', tier:'rare',      pot:'brew', d:'+40 HP (can overheal 20). −8% damage for 15s.' },
   stamina:       { id:'stamina',       n:'Stamina potion',     icon:'💛', kind:'potion',slot:'potion', tier:'uncommon',  pot:'stam', dur:8, d:'8s of faster dash recharge (does not raise move-speed cap).' }
 };
@@ -1984,7 +3043,7 @@ const ITEM_POOL = {
   common:    ['iron_plate','iron_helm','steel_plate','steel_helm','trout','lobster','att_pot'],
   uncommon:  ['mith_plate','mith_helm','addy_plate','addy_helm','green_dhide','red_dhide','mystic_top','angler_jack','amulet_str','amulet_def','ring_wealth','swordfish','super_att','stamina'],
   rare:      ['rune_plate','rune_helm','dragon_med','black_dhide','amulet_pow','amulet_glory','ring_life','cape_sara','cape_zam','cape_guth','shark','super_rest','pray_pot','brew'],
-  unique:    ['fire_cape','abyssal_whip','dark_bow','ancient_staff','heavy_harp','crystal_bow','granite_maul','dharok_helm','dharok_body','dharok_axe','manta']
+  unique:    ['fire_cape','abyssal_whip','dark_bow','ancient_staff','heavy_harp','crystal_bow','granite_maul','abyssal_dagger','holy_book','infernal_axe','tome_of_fire','ancient_sceptre','slayer_helm','magic_net','wicked_hood','dharok_helm','dharok_body','dharok_axe','manta']
 };
 
 function itemDef(id) { return ITEMS[id] || ITEMS[id && id.id] || null; }
@@ -2069,6 +3128,9 @@ function refreshItems() {
     if (d.darkbow) st.darkbow = 1;
     if (d.maul) st.maul = 1;
     if (d.hp) st.hp += d.hp;
+    if (d.crit) st.crit = (st.crit || 0) + d.crit * scale;
+    if (d.pray) st.pray = (st.pray || 0) + d.pray;
+    if (d.sweep) st.sweep = (st.sweep || 0) + d.sweep;
     if (d.slot === 'weapon') st.unique = d;
   }
   if (st.dharok === 1) st.dmg += 0.04;
@@ -2092,6 +3154,30 @@ function refreshItems() {
   player.itemHp = st.hp;
   player.itemUnique = st.unique;
   player.itemDharok = st.dharok;
+  // 0.11a unique extras (dagger crit, holy book prayer, infernal axe cleave, tome fire duration)
+  if (st.crit && !player._itemCritApplied) { player.crit = (player.crit || 0) + st.crit; player._itemCritApplied = st.crit; }
+  else if (st.crit && player._itemCritApplied !== st.crit) {
+    player.crit = (player.crit || 0) - (player._itemCritApplied || 0) + st.crit;
+    player._itemCritApplied = st.crit;
+  }
+  if (st.pray && player.prayMax) {
+    const delta = st.pray - (player._itemPrayApplied || 0);
+    player.prayMax += delta;
+    player.pray = Math.min(player.prayMax, (player.pray || 0) + Math.max(0, delta));
+    player._itemPrayApplied = st.pray;
+  }
+  if (st.sweep) player.sweep = (player.sweep || 0) + (st.sweep - (player._itemSweepApplied || 0)), player._itemSweepApplied = st.sweep;
+  player.itemFireDur = st.unique && st.unique.id === 'tome_of_fire' ? 1.2 : 1;
+  player.itemThrallLife = (st.unique && st.unique.id === 'ancient_sceptre' ? (st.unique.thrallLife || 2) : 0) * (st.unique && st.unique.cls && st.unique.cls !== player.style ? 0.80 : 1);
+  player.itemTask = 0;
+  player.itemTrapLife = (st.unique && st.unique.id === 'magic_net' ? (st.unique.trapLife || 3) : 0) * (st.unique && st.unique.cls && st.unique.cls !== player.style ? 0.80 : 1);
+  player.itemEss = 0;
+  for (const slot of ['body','helm','jewelry','cape','weapon']) {
+    const it = wornOf(slot); if (!it) continue;
+    const d = itemDef(it.id); if (!d) continue;
+    if (d.task) player.itemTask += d.task;
+    if (d.ess) player.itemEss += d.ess;
+  }
   if (st.hp && player.maxHp && player._itemHpApplied !== st.hp) {
     const delta = st.hp - (player._itemHpApplied || 0);
     player.maxHp += delta;
@@ -2115,6 +3201,21 @@ function armorNow() {
 function dmgTakenNow() {
   let m = (player.dmgTaken || 1) * (1 + (player.itemTaken || 0));
   if (player.potPray > 0) m *= 0.80;
+  if (player.sanctum > 0) m *= 0.60; // 0.11a Priest Holy Bolt sanctuary
+  if (player.campfireDR > 0) m *= 0.90;
+  if (player.altar && Math.hypot(player.x - player.altar.x, player.y - player.altar.y) <= player.altar.r) m *= 0.85;
+  if (player.style === 'priest' && (player.pray || 0) > 0) {
+    let dr = 0.22;
+    if (player.m && player.m.prot1) dr = 0.28;
+    if (player.m && player.m.protC) dr = 0.35;
+    m *= (1 - dr);
+  }
+  if (player.style === 'firemaker') {
+    m *= 0.78; // innate smoke-hardened DR; standing in a fire adds a little more
+    if (fires.some(f => Math.hypot(player.x - f.x, player.y - f.y) < f.r)) m *= 0.90;
+  }
+  if (player.style === 'necromancer' && player.m && player.m.soul4 && thralls.some(th => th.hp > 0)) m *= 0.92;
+  if (player._slayerTaken) m *= player._slayerTaken;
   return m;
 }
 
@@ -2262,8 +3363,10 @@ function useBagItem(i) {
     player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + 30);
     player.specialCd = Math.max(0, (player.specialCd || 0) - 2);
     floats.push({ x: player.x, y: player.y - 26, text: '+30', life: 0.8, vy: -36, color: '#7ec978' });
+    refillPray(20);
   } else if (d.pot === 'pray') {
     player.potPray = d.dur;
+    refillPray(32);
   } else if (d.pot === 'brew') {
     player.hp += 40;
     const over = Math.max(0, player.hp - player.maxHp);
@@ -2326,6 +3429,7 @@ function openChest(c, force, extraRoll) {
   // 0.9c: richer timed chests retain the original per-roll table.
   if (!extraRoll) {
     chestsOpened++;
+    save.chestsTotal = (save.chestsTotal || 0) + 1;
     for (let i = 1; i < (c.rolls || 1); i++) openChest(c, force, true);
   }
   sfx('chest');
@@ -2448,6 +3552,24 @@ function renderBuffs() {
   if (player.potBrew > 0) h += '<div class="pill">🍺 ' + Math.ceil(player.potBrew) + 's</div>';
   if (player.potStam > 0) h += '<div class="pill">💛 ' + Math.ceil(player.potStam) + 's</div>';
   if ((player.itemDharok || 0) >= 3) h += '<div class="pill">💀 ' + Math.round(45 * (1 - player.hp / Math.max(1, player.maxHp))) + '%</div>';
+  // 0.11a class pills
+  if (player.stealth > 0) h += '<div class="pill">👤 ' + player.stealth.toFixed(1) + 's</div>';
+  else if (player.backstab > 0) h += '<div class="pill">🗡 Backstab</div>';
+  if (player.style === 'priest' && player.prayMax) h += '<div class="pill">🙏 ' + Math.ceil(player.pray) + '/' + player.prayMax + '</div>';
+  if (player.sanctum > 0) h += '<div class="pill">🕊 ' + player.sanctum.toFixed(1) + 's</div>';
+  if (player.altar) h += '<div class="pill">⛪ altar</div>';
+  if (fires.length) h += '<div class="pill">🔥 ×' + fires.length + '</div>';
+  if (thralls.length) h += '<div class="pill">💀 ×' + thralls.length + '</div>';
+  if (traps.length) h += '<div class="pill">📦 ×' + traps.length + '</div>';
+  if (player.style === 'slayer' && player.slayerTask)
+    h += '<div class="pill">📜 ' + player.slayerTask.name + ' ' + player.slayerTask.have + '/' + player.slayerTask.need + '</div>';
+  if ((player.huntBuff || 0) > 0) h += '<div class="pill">🦅 ' + player.huntBuff.toFixed(1) + 's</div>';
+  if (player.style === 'runecrafter') {
+    const r = player.runes || {};
+    h += '<div class="pill">💎 ' + Math.floor(player.essence || 0) + '/' + essCap() + '</div>';
+    h += '<div class="pill">◈ A' + (r.air||0) + ' F' + (r.fire||0) + ' L' + (r.law||0) + ' D' + (r.death||0) + '</div>';
+  }
+  if (player.runeAltar) h += '<div class="pill">⛪ rune altar</div>';
   if (h !== buffsHtml) { buffsHtml = h; $('buffs').innerHTML = h; }
 }
 
@@ -2584,10 +3706,12 @@ function bossHitPlayer(d) {
 
 /* ========== 0.7c: ENEMY ATTACKS ========== */
 // an enemy attack connects (bone, spell, swing or slam). Dash i-frames / Phoenix dodge it.
-function enemyHitPlayer(d) {
+function enemyHitPlayer(d, src) {
   if (player.invuln > 0) return false;
   if (shieldBlock()) return false;
+  player._slayerTaken = slayerTakenMul(src);
   let dmg = d * (1 - armorNow()) * dmgTakenNow();
+  player._slayerTaken = 0;
   if (player.bloodShield > 0) { const abs = Math.min(player.bloodShield, dmg); player.bloodShield -= abs; dmg -= abs; }
   player.hp -= dmg;
   player.invuln = Math.max(player.invuln, HIT_MERCY);
@@ -2601,6 +3725,11 @@ function onScreen(x, y, m) { return Math.abs(x - player.x) < W / 2 + m && Math.a
 function atkZone(e) { return e.ak === 'slam' ? e.reach : e.r + e.reach; }
 // runs every frame for each normal enemy. Returns how it moves: 1 walk in, 0 hold, -0.6 back off.
 function enemyAttack(e, ed, dt) {
+  if (player.stealth > 0 && !e.boss) { // 0.11a: lost sight during Shadow Step
+    if (e.windup > 0) e.windup = 0;
+    e.cd = Math.max(e.cd, 0.2);
+    return 1;
+  }
   if (e.slamT > 0) e.slamT -= dt;
   if (e.windup > 0) {
     e.windup -= dt * (player.m.ice3 && (e.slow > 0 || e.chill > 0) ? 0.65 : 1); // 0.8a Numbing frost
@@ -2625,15 +3754,24 @@ function enemyAttack(e, ed, dt) {
 function finishEnemyAttack(e) {
   e.windup = 0;
   e.cd = e.rate * rand(0.85, 1.15);
+  if (e._tgt && e._tgt.hp > 0 && e._tgt !== player && (e._tgt.col || e._tgt.name) && thralls.includes(e._tgt)) {
+    const td = Math.hypot(e._tgt.x - e.x, e._tgt.y - e.y);
+    const reach = (e.ak === 'slam' ? e.reach : atkZone(e)) + e._tgt.r;
+    if (td < reach + 8) {
+      e._tgt.hp -= e.dmg || e.damage || 8;
+      if (e.ak === 'melee') e.swing = 0.16;
+      return;
+    }
+  }
   const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1;
   if (e.ak === 'melee') {
     e.swing = 0.16;
-    if (d < atkZone(e) + player.r * 0.5) { if (!enemyHitPlayer(e.dmg) && player.invuln > HIT_MERCY) dodged(); }
+    if (d < atkZone(e) + player.r * 0.5) { if (!enemyHitPlayer(e.dmg, e) && player.invuln > HIT_MERCY) dodged(); }
     else if (d < atkZone(e) + 60) dodged(); // 0.8a Evasion: a swing within 60px missed
   } else if (e.ak === 'slam') {
     e.slamT = SLAM_WAVE;
     if (onScreen(e.x, e.y, 0)) shake = Math.max(shake, 0.25);
-    if (d < e.reach + player.r * 0.5) { if (!enemyHitPlayer(e.dmg) && player.invuln > HIT_MERCY) dodged(); }
+    if (d < e.reach + player.r * 0.5) { if (!enemyHitPlayer(e.dmg, e) && player.invuln > HIT_MERCY) dodged(); }
     else if (d < e.reach + 60) dodged();
   } else {
     const magic = e.ak === 'magic', sp = magic ? ORB_SPEED : BONE_SPEED;
@@ -2989,7 +4127,48 @@ const upgrades = [
   ['Hooked', 'Deal 18% more damage, but attack 8% slower.', p => { p.damage = Math.round(p.damage * 1.18); p.rm2 *= 1.08; }, 'fisher'],
   ['Net practice', 'Cast Net radius +25px.', p => { p.netBonus = (p.netBonus || 0) + 25; }, 'fisher'],
   ['Fishy treats', 'Heal 4 health per kill.', p => p.kh = (p.kh || 0) + 4, 'fisher'],
-  ['Angler\'s outfit', 'Move 12% faster and pull loot from further away.', p => { addMoveSpeed(p, 0.12); p.magnet += 20; }, 'fisher']
+  ['Angler\'s outfit', 'Move 12% faster and pull loot from further away.', p => { addMoveSpeed(p, 0.12); p.magnet += 20; }, 'fisher'],
+
+  // 0.11a new classes
+  ['Sneak', '+8% crit. Move 6% faster.', p => { p.crit = (p.crit || 0) + 0.08; addMoveSpeed(p, 0.06); }, 'thief'],
+  ['Palm', 'Pickpocket yields +1 coin per hit.', p => p.filchCard = (p.filchCard || 0) + 1, 'thief'],
+  ['Blackjack practice', 'Blackjack chance +10% and stuns last 0.2s longer.', p => { p.jackChance = (p.jackChance || 0) + 0.10; p.jackTime = (p.jackTime || 0) + 0.2; }, 'thief'],
+  ['Dagger mastery', '+16% dagger damage.', p => p.damage = Math.round(p.damage * 1.16), 'thief'],
+
+  ['Mending', 'Heal 5 health per kill and +10 max HP.', p => { p.kh = (p.kh || 0) + 5; p.maxHp += 10; p.hp += 10; }, 'priest'],
+  ['Smite harder', '+16% holy damage.', p => p.damage = Math.round(p.damage * 1.16), 'priest'],
+  ['Devotion', '+15 max prayer points and refill 15.', p => { p.prayMax = (p.prayMax || 50) + 15; p.pray = Math.min(p.prayMax, (p.pray || 0) + 15); }, 'priest'],
+  ['Hallowed', 'Attacks restore 1 prayer point.', p => p.prayHit = true, 'priest'],
+
+  ['Wide chop', 'Cleave reaches further and hits harder.', p => { p.sweep = (p.sweep || 0) + 20; p.sweepMul = Math.max(p.sweepMul || 0.35, 0.50); p.sweepCard = 1; }, 'woodcutter'],
+  ['Seasoned oak', '+18% axe damage.', p => p.damage = Math.round(p.damage * 1.18), 'woodcutter'],
+  ['Hard hat', '+25 max HP and +6% armour.', p => { p.maxHp += 25; p.hp += 25; p.armor = Math.min(armorCap(), p.armor + 0.06); }, 'woodcutter'],
+  ['Stack of logs', 'Timber! drops an extra log.', p => p.extraLog = (p.extraLog || 0) + 1, 'woodcutter'],
+
+  ['Hotter fires', 'Ground fires deal 25% more damage and last 1s longer.', p => { p.fireDpsMul = (p.fireDpsMul || 1) * 1.25; p.fireDur = (p.fireDur || 0) + 1; }, 'firemaker'],
+  ['Firestarter', '+14% lantern damage.', p => p.damage = Math.round(p.damage * 1.14), 'firemaker'],
+  ['Oil flask', 'Attacks have +10% chance to drop a fire.', p => p.fireChance = (p.fireChance || 0) + 0.10, 'firemaker'],
+  ['Campcraft', 'Drop a log at your feet every 6s.', p => { p.kindleT = Math.min(p.kindleT || 8, 6); p.kindleCard = true; }, 'firemaker'],
+
+  ['Dark apprentice', 'Thralls last +2s and deal 15% more.', p => { p.thrallLifeCard = (p.thrallLifeCard || 0) + 2; p.thrallDmgCard = (p.thrallDmgCard || 1) * 1.15; }, 'necromancer'],
+  ['Death staff', '+16% staff damage.', p => p.damage = Math.round(p.damage * 1.16), 'necromancer'],
+  ['Soul vessel', '+18 max HP.', p => { p.maxHp += 18; p.hp += 18; }, 'necromancer'],
+  ['Quick rite', 'Thrall Summon cooldown −1.5s.', p => p.specialMax = Math.max(5, (p.specialMax || 8) - 1.5), 'necromancer'],
+
+  ['On task', '+20% damage to your current assignment.', p => p.taskCard = (p.taskCard || 0) + 0.20, 'slayer'],
+  ['Broader tips', '+14% weapon damage.', p => p.damage = Math.round(p.damage * 1.14), 'slayer'],
+  ['Hardened helm', '+16 max HP and +5% armour.', p => { p.maxHp += 16; p.hp += 16; p.armor = Math.min(armorCap(), p.armor + 0.05); }, 'slayer'],
+  ['Marksman', 'Slayer Strike cooldown −1.5s.', p => p.specialMax = Math.max(5, (p.specialMax || 8) - 1.5), 'slayer'],
+
+  ['Boxer', 'Traps arm faster and last +3s.', p => { p.trapArmCard = 0.2; p.trapLifeCard = (p.trapLifeCard || 0) + 3; }, 'hunter'],
+  ['Sharp javelin', '+16% javelin damage.', p => p.damage = Math.round(p.damage * 1.16), 'hunter'],
+  ['Trail shoes', '+8% move speed (under the +40% cap).', p => addMoveSpeed(p, 0.08), 'hunter'],
+  ['Eagle eye', '+16 range.', p => p.itemRange = (p.itemRange || 0) + 16, 'hunter'],
+
+  ['Catalyse', 'Hits grant +1 essence.', p => p.essCard = (p.essCard || 0) + 1, 'runecrafter'],
+  ['Elemental staff', '+14% staff damage.', p => p.damage = Math.round(p.damage * 1.14), 'runecrafter'],
+  ['Pouch upgrade', 'Essence cap +15.', p => p.essenceMax = (p.essenceMax || 40) + 15, 'runecrafter'],
+  ['Ourania attune', 'Ourania Pulse cooldown −1.5s.', p => p.specialMax = Math.max(5, (p.specialMax || 8) - 1.5), 'runecrafter']
 ];
 
 // 0.4: level-up rewritten. The old version built a separate pop-up that froze the game
@@ -3024,8 +4203,8 @@ function pickUpgrades() {
     if (lb && !picks.includes(lb)) picks[0] = lb;
   }
   // 0.9c: keep non-speed benefits visible, but explain the movement cap.
-  return picks.map(u => /Fleet-footed|Angler.s outfit/.test(u[0]) && moveSpeed() >= player.baseSpeed * 1.40 - 0.001
-    ? [u[0], u[0] === 'Fleet-footed' ? 'Speed maxed (+40%).' : 'Speed maxed (+40%); still increases loot pickup range.', u[2], u[3]] : u);
+  return picks.map(u => /Fleet-footed|Angler.s outfit|^Sneak$/.test(u[0]) && moveSpeed() >= player.baseSpeed * 1.40 - 0.001
+    ? [u[0], u[0] === 'Fleet-footed' ? 'Speed maxed (+40%).' : u[0] === 'Sneak' ? 'Speed maxed (+40%); still +8% crit.' : 'Speed maxed (+40%); still increases loot pickup range.', u[2], u[3]] : u);
 }
 
 function levelUp() {
@@ -3099,6 +4278,7 @@ function levelUp() {
 function endRun() {
   playing = false;
   bag = []; groundItems = []; bagging = false; bagQueue = []; bagPending = []; // 0.10a: items are in-run only
+  woodLogs = []; fires = []; thralls = []; traps = []; player.stealth = 0; player.altar = null; player.runeAltar = null;
   if ($('bagHud')) $('bagHud').style.display = 'none';
   if ($('bagTip')) $('bagTip').style.display = 'none';
   if ($('bagFull')) $('bagFull').style.display = 'none';
@@ -3115,6 +4295,7 @@ function endRun() {
   // 0.9a: event renown was already added during the run; still show it. Base run renown is separate.
   save.renown += renownRun;
   save.best = Math.max(save.best, Math.floor(elapsed));
+  if (elapsed >= 240 && chestsOpened >= 3) save.hunterQuest = true;
   persist();
 
   $('pauseBtn').style.display = 'none';
@@ -3132,7 +4313,7 @@ function endRun() {
        Renown this run: <b>+${renownRun + renownEvent}</b> (spend it in 🌳 Mastery)${renownEvent ? ` · events +${renownEvent}` : ''}<br><!-- 0.8a/0.9a -->
        Permanent renown: <b>${save.renown}</b><br>
        King Black Dragon kills: <b>${save.bossTotal}</b> total · best run <b>${save.bossBest}</b><br><!-- 0.6 -->
-       Attack <b>${sLvl('melee')}</b> · Ranged <b>${sLvl('ranged')}</b> · Magic <b>${sLvl('magic')}</b></p>
+       ${ORDER.map(k => STY[k].sk + ' <b>' + sLvl(k) + '</b>').join(' · ')}</p>
     <p class="small">Permanent coins, skills and renown are saved on this device. Run levels and upgrades reset.</p>
     <button id="again">RETURN TO THE FRONTIER</button>`;
   $('again').onclick = () => {
@@ -3218,6 +4399,61 @@ function update(dt) {
   }
   player.dashIframes = Math.max(0, player.dashIframes - dt);
   player.invuln = Math.max(0, player.invuln - dt);
+  // 0.11a class timers
+  if (player.stealth > 0) {
+    player.stealth -= dt;
+    player.invuln = Math.max(player.invuln, player.stealth);
+    if (player.stealth <= 0) endStealth(false);
+  }
+  if (player.backstab > 0) player.backstab = Math.max(0, player.backstab - dt);
+  if (player.sanctum > 0) player.sanctum = Math.max(0, player.sanctum - dt);
+  if (player.campfireDR > 0) player.campfireDR = Math.max(0, player.campfireDR - dt);
+  if (player.prayCd > 0) player.prayCd = Math.max(0, player.prayCd - dt);
+  if (player.style === 'priest' && player.prayMax) {
+    if ((player.pray || 0) > 0) {
+      let drain = 3.5;
+      if (player.m && player.m.prot3) drain *= 0.75;
+      if (player.m && player.m.protC) drain *= 1.40;
+      player.pray = Math.max(0, player.pray - drain * dt);
+    }
+    if (player.m && player.m.prot4 && player.hp > 0 && player.hp / player.maxHp < 0.15 && player.pray >= 20 && player.prayCd <= 0) {
+      player.pray -= 20; player.prayCd = 20;
+      player.hp = Math.min(player.maxHp, player.hp + healAmt(25));
+      floats.push({ x: player.x, y: player.y - 28, text: '💖 Redemption', life: 0.9, vy: -36, color: '#ffb0c8' });
+    }
+    if (player.altar) {
+      player.altar.life -= dt; player.altar.tick -= dt;
+      if (player.altar.tick <= 0) {
+        player.altar.tick = 0.5;
+        if (Math.hypot(player.x - player.altar.x, player.y - player.altar.y) <= player.altar.r)
+          player.hp = Math.min(player.maxHp, player.hp + 3);
+      }
+      if (player.altar.life <= 0) player.altar = null;
+    }
+  }
+  if (player.style === 'firemaker' && (player.m && (player.m.fuel1 || player.m.fuelC) || player.kindleCard)) {
+    player.kindleT = (player.kindleT || (player.m && player.m.fuelC ? 5 : 8)) - dt;
+    if (player.kindleT <= 0) {
+      player.kindleT = (player.m && player.m.fuelC) ? 5 : (player.kindleCard ? 6 : 8);
+      spawnLog(player.x + 20 * (player.facing || 1), player.y, 20, 6);
+    }
+  }
+  if (typeof updateLogsAndFires === 'function') updateLogsAndFires(dt);
+  if (typeof updateThralls === 'function') updateThralls(dt);
+  if (typeof updateTraps === 'function') updateTraps(dt);
+  if (typeof updateRunes === 'function') updateRunes(dt);
+  if (player.huntBuff > 0) player.huntBuff = Math.max(0, player.huntBuff - dt);
+  if (player.style === 'hunter') {
+    const snareEvery = (player.m && player.m.trapb4) ? 6 : 8;
+    player.snareT = (player.snareT || snareEvery) - dt;
+    if (player.snareT <= 0) {
+      player.snareT = snareEvery;
+      placeTrap('snare', player.x - player.facing * 8, player.y + 10);
+    }
+  }
+  if (player.style === 'slayer' && player.m && player.m.taskC && player.slayerTask && elapsed >= (player.slayerNewAt || 0)) {
+    rollSlayerTask();
+  }
   streakTimer = Math.max(0, streakTimer - dt);
   if (streakTimer <= 0) streak = 0;
   shake = Math.max(0, shake - dt * 2.5);
@@ -3278,6 +4514,9 @@ function update(dt) {
     // 0.4: removed the Berserker attack-speed change (it now boosts damage in attack() instead)
     let aspd = 1 + 0.1 * player.evN;
     if (player.m.zerkC && player.hp / player.maxHp < 0.3) aspd *= 1.20; // 0.8b Fury
+    if (player.style === 'runecrafter' && (player.runes && player.runes.air > 0))
+      aspd *= (player.m && player.m.elem2 ? 1.16 : 1.10);
+    if (player.m && player.m.essC && runeTotal() === 0) aspd *= 0.90;
     attackClock = STY[player.style].rate * player.rm2 / aspd / (player.itemAspd || 1);
   }
 
@@ -3288,11 +4527,16 @@ function update(dt) {
   for (const e of enemies) {
     if (e.hp <= 0) continue;
     let tx = player.x, ty = player.y;
-    if (!e.boss && decoys.length) {
+    if (player.stealth > 0) { // 0.11a Shadow Step: lose aggro, walk to last seen spot
+      tx = player.shadowX; ty = player.shadowY;
+      if (!e.boss) e.windup = 0;
+    } else if (!e.boss && (decoys.length || thralls.length)) {
       let best = null, bd = dist(e, player);
+      if (player.m && player.m.soulC) bd *= 1.35;
       for (const dcy of decoys) { const dd = Math.hypot(dcy.x - e.x, dcy.y - e.y); if (dd < bd) { bd = dd; best = dcy; } }
-      if (best) { tx = best.x; ty = best.y; }
-    }
+      for (const th of thralls) { if (th.hp > 0) { const dd = Math.hypot(th.x - e.x, th.y - e.y); if (dd < bd) { bd = dd; best = th; } } }
+      if (best) { tx = best.x; ty = best.y; e._tgt = best; } else e._tgt = null;
+    } else e._tgt = null;
     let edx = tx - e.x, edy = ty - e.y;
     let ed = Math.hypot(edx, edy) || 1;
     let sp = e.speed * (e.slow > 0 ? 0.38 : e.chill > 0 ? 0.75 : 1);
@@ -3311,6 +4555,11 @@ function update(dt) {
       e.bleed -= dt; e.bleedTick -= dt;
       if (e.bleedTick <= 0) { e.bleedTick = 0.5; hurt(e, Math.max(1, Math.round((e.bleedDps || 0) * 0.5)), false, true); }
     }
+    if ((e.wither || 0) > 0) {
+      e.wither -= dt; e.witherTick = (e.witherTick || 0.5) - dt;
+      if (e.witherTick <= 0) { e.witherTick = 0.5; hurt(e, Math.max(1, Math.round((e.witherDps || 0) * 0.5)), false, true); }
+    }
+    if ((e.slayerMark || 0) > 0) e.slayerMark -= dt;
     if (e.burn > 0) {
       e.burn -= dt; e.burnTick -= dt;
       if (e.burnTick <= 0) { e.burnTick = 0.5; hurt(e, Math.max(1, Math.round(e.burnDps * 0.5)), false, true); }
@@ -3343,8 +4592,20 @@ function update(dt) {
     }
     e.hit = Math.max(0, e.hit - dt);
 
-    if (ed < e.r + player.r && player.invuln <= 0) {
+    if (thralls.length) {
+      for (const th of thralls) {
+        if (th.hp <= 0) continue;
+        if (Math.hypot(e.x - th.x, e.y - th.y) < e.r + th.r) {
+          th.hp -= e.damage * dt * 1.6;
+          break;
+        }
+      }
+    }
+    const pd = Math.hypot(e.x - player.x, e.y - player.y);
+    if (pd < e.r + player.r && player.invuln <= 0 && !(player.stealth > 0)) {
+      player._slayerTaken = slayerTakenMul(e);
       const dmg = e.damage * dt * (1 - armorNow()) * dmgTakenNow(); // 0.8a: Reckless swings
+      player._slayerTaken = 0;
       player.hp -= dmg;
       if (Math.random() < 0.08) shake = Math.max(shake, 0.12);
     }
@@ -3486,7 +4747,7 @@ function update(dt) {
   const specReady = player.specialCd <= 0;
   $('dashBtn').classList.toggle('cd', !dashReady);
   $('abilityBtn').classList.toggle('cd', !specReady);
-  $('abilityBtn').textContent = player.style === 'melee' ? '⚔' : player.style === 'ranged' ? '🏹' : '✦';
+  $('abilityBtn').textContent = ({ melee:'⚔', ranged:'🏹', magic:'✦', fisher:'🎣', woodcutter:'🪓', thief:'🗡', priest:'🙏', firemaker:'🔥', necromancer:'💀', slayer:'🗡', hunter:'📦', runecrafter:'◈' })[player.style] || '✦';
 
   // streak display
   if (streak >= 3) {
@@ -3721,6 +4982,46 @@ function draw() {
     ctx.fillStyle = '#5ec8c055'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill();
     ctx.strokeStyle = '#7ee0d8'; ctx.globalAlpha = 0.7; ctx.lineWidth = 2; ctx.stroke();
   }
+  // 0.11a logs, fires, gilded altar
+  for (const L of woodLogs) {
+    ctx.globalAlpha = Math.min(0.95, 0.4 + L.life * 0.08);
+    ctx.fillStyle = '#6a4a28'; ctx.beginPath(); ctx.ellipse(L.x, L.y, L.r, L.r * 0.55, 0.4, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#3a2818'; ctx.lineWidth = 2; ctx.globalAlpha = 0.8; ctx.stroke();
+  }
+  for (const f of fires) {
+    const flick = 0.35 + 0.15 * Math.sin(elapsed * 9 + f.x);
+    ctx.globalAlpha = Math.min(0.55, flick);
+    ctx.fillStyle = f.ring ? '#ff6a2088' : '#ff8a3c88';
+    ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#ffd27a'; ctx.globalAlpha = 0.6; ctx.lineWidth = 2; ctx.stroke();
+  }
+  for (const t of traps) {
+    ctx.globalAlpha = t.arm > 0 ? 0.35 : 0.7;
+    ctx.strokeStyle = t.kind === 'snare' ? '#c8e080' : '#8fbc6a';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#5a7038';
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(t.x - 6, t.y - 5, 12, 10);
+  }
+  for (const th of thralls) {
+    ctx.globalAlpha = 0.55 + 0.2 * Math.sin(elapsed * 6 + th.x);
+    ctx.fillStyle = th.col;
+    ctx.beginPath(); ctx.arc(th.x, th.y, th.r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#e8e0ff'; ctx.globalAlpha = 0.7; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  if (player.runeAltar) {
+    const a = player.runeAltar;
+    ctx.globalAlpha = 0.22 + 0.08 * Math.sin(elapsed * 5);
+    ctx.fillStyle = '#7ec8e855'; ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#b8ecff'; ctx.globalAlpha = 0.7; ctx.lineWidth = 2; ctx.stroke();
+  }
+  if (player.altar) {
+    const a = player.altar;
+    ctx.globalAlpha = 0.22 + 0.08 * Math.sin(elapsed * 5);
+    ctx.fillStyle = '#f0e6a055'; ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#ffe98a'; ctx.globalAlpha = 0.7; ctx.lineWidth = 2; ctx.stroke();
+  }
   ctx.globalAlpha = 1; ctx.textAlign = 'left';
 
   // player
@@ -3731,7 +5032,7 @@ function draw() {
     ctx.strokeStyle = STY[player.style].col;
     ctx.globalAlpha = 0.6; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(player.x, player.y + 18, 19, 7.5, 0, 0, 7); ctx.stroke();
-    ctx.globalAlpha = player.invuln > 0 && Math.floor(elapsed * 14) % 2 ? 0.45 : 1; // blink while invulnerable
+    ctx.globalAlpha = player.stealth > 0 ? 0.28 : (player.invuln > 0 && Math.floor(elapsed * 14) % 2 ? 0.45 : 1); // 0.11a stealth fade
     const walk = player.moving ? Math.floor(elapsed * 8) % 4 : 0;
     drawFrame('player', 4, 4, (player.dir || 0) * 4 + walk, player.x, player.y - 6, 64);
     ctx.globalAlpha = 1;
@@ -3774,6 +5075,27 @@ function draw() {
     ctx.lineTo(player.x + 16 * player.facing, player.y - 18);
     ctx.moveTo(player.x + 16 * player.facing, player.y - 18);
     ctx.lineTo(player.x + 22 * player.facing, player.y - 10);
+  } else if (player.style === 'thief' || player.style === 'woodcutter') {
+    ctx.moveTo(player.x + 6 * player.facing, player.y + 2);
+    ctx.lineTo(player.x + 18 * player.facing, player.y - 10);
+  } else if (player.style === 'priest') {
+    ctx.moveTo(player.x, player.y + 2);
+    ctx.lineTo(player.x + 14 * player.facing, player.y - 14);
+    ctx.moveTo(player.x + 4 * player.facing, player.y - 6);
+    ctx.lineTo(player.x + 12 * player.facing, player.y - 2);
+  } else if (player.style === 'firemaker') {
+    ctx.moveTo(player.x, player.y + 2);
+    ctx.lineTo(player.x + 12 * player.facing, player.y - 16);
+    ctx.fillStyle = '#ff8a3c';
+    ctx.beginPath(); ctx.arc(player.x + 12 * player.facing, player.y - 16, 3, 0, 7); ctx.fill();
+  } else if (player.style === 'slayer' || player.style === 'hunter') {
+    ctx.moveTo(player.x + 6 * player.facing, player.y + 2);
+    ctx.lineTo(player.x + 20 * player.facing, player.y - 12);
+  } else if (player.style === 'necromancer' || player.style === 'runecrafter') {
+    ctx.moveTo(player.x, player.y - 2);
+    ctx.lineTo(player.x + 12 * player.facing, player.y - 16);
+    ctx.moveTo(player.x + 12 * player.facing, player.y - 16);
+    ctx.lineTo(player.x + 16 * player.facing, player.y - 8);
   } else {
     ctx.moveTo(player.x, player.y - 2);
     ctx.lineTo(player.x + 12 * player.facing, player.y - 16);
