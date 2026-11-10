@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.11a</title>
+<title>Last Stand — Prototype 0.11b</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -203,6 +203,13 @@ body.bossOn #buffs{top:122px}
 @media(max-height:680px){
   .bagslot{width:36px;height:36px;font-size:16px}
 }
+
+/* 0.11b: sound toggle + volume, compact enough for the tight phone menu */
+.sfxrow{display:flex;align-items:center;gap:8px;margin-top:8px;text-align:left}
+.sfxrow #sfxToggle{flex:1.25;width:auto;margin-top:0;padding:8px 10px;min-height:40px;font-size:13px}
+.sfxrow #sfxVol{flex:1;width:auto;margin:0;accent-color:#e8c56a;height:28px}
+.panel.menu-tight .sfxrow{margin-top:6px}
+.panel.menu-tight .sfxrow #sfxToggle{min-height:36px;padding:6px 8px;font-size:12px}
 </style>
 </head>
 <body>
@@ -240,7 +247,7 @@ body.bossOn #buffs{top:122px}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.11a</div><!-- 0.11a: Thief, Priest, Woodcutter, Firemaker; 0.10a: in-run items + 5-slot bag; 0.9c: class dropdown menu -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.11b</div><!-- 0.11a: Thief, Priest, Woodcutter, Firemaker; 0.10a: in-run items + 5-slot bag; 0.9c: class dropdown menu -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, bring treasure home.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -274,6 +281,10 @@ body.bossOn #buffs{top:122px}
     <button id="shopbtn"></button>
     <button id="trainbtn"></button>
     <button id="mastbtn"></button><!-- 0.8a: Mastery trees -->
+    <div class="sfxrow" id="sfxRow">
+      <button type="button" id="sfxToggle" aria-pressed="true">🔊 Sound on</button>
+      <input type="range" id="sfxVol" min="0" max="100" value="35" step="1" aria-label="Sound volume">
+    </div>
     <p class="small" id="saveinfo"></p>
   </div>
 </div>
@@ -855,76 +866,213 @@ for (const cls in TREES) TREES[cls].branches.forEach(br => br.nodes.forEach((n, 
 let save = migrateSave(loadSave()); // 0.8a: migration
 
 /* Audio */
+/* 0.11b SFX: tiny Web Audio synth (no files, no libs). Retro / RuneScape-ish, soft on phone speakers. */
+const SFX_KEY = 'laststand_sfx';
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
-let actx = null;
-function ensureAudio() {
-  if (!actx) actx = new AudioCtx();
-  if (actx.state === 'suspended') actx.resume();
+let sfxPref = { on: true, vol: 0.35 };
+try {
+  const o = JSON.parse(localStorage.getItem(SFX_KEY) || 'null');
+  if (o && typeof o === 'object') {
+    if (typeof o.on === 'boolean') sfxPref.on = o.on;
+    if (typeof o.vol === 'number' && isFinite(o.vol)) sfxPref.vol = Math.max(0, Math.min(1, o.vol));
+  }
+} catch (e) {}
+let actx = null, sfxMaster = null;
+const sfxNoiseMap = typeof WeakMap === 'function' ? new WeakMap() : null;
+const sfxCool = Object.create(null);
+let sfxBurst = [];
+
+function persistSfx() {
+  try { localStorage.setItem(SFX_KEY, JSON.stringify({ on: !!sfxPref.on, vol: +sfxPref.vol })); } catch (e) {}
 }
-function sfx(type) {
-  if (!actx) return;
-  const o = actx.createOscillator();
-  const g = actx.createGain();
-  o.connect(g); g.connect(actx.destination);
-  const now = actx.currentTime;
-  if (type === 'hit') {
-    o.type = 'square'; o.frequency.setValueAtTime(180, now);
-    o.frequency.exponentialRampToValueAtTime(60, now + 0.08);
-    g.gain.setValueAtTime(0.12, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-    o.start(now); o.stop(now + 0.1);
-  } else if (type === 'crit') {
-    o.type = 'sawtooth'; o.frequency.setValueAtTime(420, now);
-    o.frequency.exponentialRampToValueAtTime(180, now + 0.12);
-    g.gain.setValueAtTime(0.15, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-    o.start(now); o.stop(now + 0.14);
-  } else if (type === 'level') {
-    o.type = 'triangle'; o.frequency.setValueAtTime(520, now);
-    o.frequency.setValueAtTime(780, now + 0.08);
-    o.frequency.setValueAtTime(1040, now + 0.16);
-    g.gain.setValueAtTime(0.1, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    o.start(now); o.stop(now + 0.3);
-  } else if (type === 'dash') {
-    o.type = 'sine'; o.frequency.setValueAtTime(90, now);
-    o.frequency.exponentialRampToValueAtTime(40, now + 0.15);
-    g.gain.setValueAtTime(0.1, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-    o.start(now); o.stop(now + 0.18);
-  } else if (type === 'pickup') {
-    o.type = 'sine'; o.frequency.setValueAtTime(660, now);
-    o.frequency.exponentialRampToValueAtTime(990, now + 0.06);
-    g.gain.setValueAtTime(0.07, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-    o.start(now); o.stop(now + 0.1);
-  } else if (type === 'death') {
-    o.type = 'sawtooth'; o.frequency.setValueAtTime(140, now);
-    o.frequency.exponentialRampToValueAtTime(30, now + 0.4);
-    g.gain.setValueAtTime(0.18, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-    o.start(now); o.stop(now + 0.45);
-  } else if (type === 'chest') {
-    // 0.5: bright rising chime for opening a chest
-    o.type = 'triangle'; o.frequency.setValueAtTime(660, now);
-    o.frequency.setValueAtTime(880, now + 0.07);
-    o.frequency.setValueAtTime(1320, now + 0.14);
-    o.frequency.setValueAtTime(1760, now + 0.21);
-    g.gain.setValueAtTime(0.13, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-    o.start(now); o.stop(now + 0.45);
-  } else if (type === 'boss') {
-    // 0.6: deep rumble/roar for the boss warning, arrival and death
-    o.type = 'sawtooth'; o.frequency.setValueAtTime(75, now);
-    o.frequency.exponentialRampToValueAtTime(35, now + 0.9);
-    g.gain.setValueAtTime(0.22, now); g.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
-    o.start(now); o.stop(now + 1.0);
-  } else if (type === 'fire') {
-    // 0.6: whoosh for fire breath / fireball impact
-    o.type = 'sawtooth'; o.frequency.setValueAtTime(320, now);
-    o.frequency.exponentialRampToValueAtTime(70, now + 0.35);
-    g.gain.setValueAtTime(0.12, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
-    o.start(now); o.stop(now + 0.38);
-  } else if (type === 'special') {
-    o.type = 'triangle'; o.frequency.setValueAtTime(220, now);
-    o.frequency.exponentialRampToValueAtTime(80, now + 0.25);
-    g.gain.setValueAtTime(0.14, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    o.start(now); o.stop(now + 0.3);
+function sfxApplyGain() {
+  if (sfxMaster && actx) {
+    const v = sfxPref.on ? sfxPref.vol : 0;
+    try { sfxMaster.gain.setTargetAtTime(v, actx.currentTime, 0.02); } catch (e) { sfxMaster.gain.value = v; }
   }
 }
+function setSfxOn(on) { sfxPref.on = !!on; persistSfx(); sfxApplyGain(); }
+function setSfxVol(v) { sfxPref.vol = Math.max(0, Math.min(1, +v || 0)); persistSfx(); sfxApplyGain(); }
+
+function sfxNoiseBuf(ctx) {
+  if (sfxNoiseMap && sfxNoiseMap.get(ctx)) return sfxNoiseMap.get(ctx);
+  const n = Math.max(1, (ctx.sampleRate * 0.7) | 0);
+  const b = ctx.createBuffer(1, n, ctx.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  if (sfxNoiseMap) sfxNoiseMap.set(ctx, b);
+  return b;
+}
+
+function ensureAudio() {
+  try {
+    if (!AudioCtx) return null;
+    if (!actx) {
+      actx = new AudioCtx();
+      sfxMaster = actx.createGain();
+      sfxMaster.gain.value = sfxPref.on ? sfxPref.vol : 0;
+      sfxMaster.connect(actx.destination);
+    }
+    if (actx.state === 'suspended') actx.resume();
+    return actx;
+  } catch (e) { return null; }
+}
+
+function sfxGain(ctx, dest, t, peak, atk, dur) {
+  const g = ctx.createGain();
+  const p = Math.max(0.0002, peak);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(p, t + Math.max(0.004, atk));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.connect(dest);
+  return g;
+}
+function sfxTone(ctx, dest, t, type, f0, f1, peak, atk, dur, lp) {
+  const g = sfxGain(ctx, dest, t, peak, atk, dur);
+  const o = ctx.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(Math.max(20, f0), t);
+  if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur * 0.92);
+  if (lp) {
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = lp;
+    f.Q.value = 0.7;
+    o.connect(f); f.connect(g);
+  } else o.connect(g);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function sfxNoise(ctx, dest, t, peak, atk, dur, typ, f0, f1, q) {
+  const g = sfxGain(ctx, dest, t, peak, atk, dur);
+  const src = ctx.createBufferSource();
+  src.buffer = sfxNoiseBuf(ctx);
+  src.loop = true;
+  const f = ctx.createBiquadFilter();
+  f.type = typ || 'lowpass';
+  f.frequency.setValueAtTime(Math.max(40, f0), t);
+  if (f1) f.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+  if (q) f.Q.value = q;
+  src.connect(f); f.connect(g);
+  src.start(t); src.stop(t + dur + 0.02);
+}
+function sfxNote(ctx, dest, t, freq, peak, dur, type, lp) {
+  sfxTone(ctx, dest, t, type || 'triangle', freq, freq, peak, 0.01, dur, lp || 3200);
+}
+
+function playSfxInto(ctx, dest, type, t, opt) {
+  const jitter = (opt && opt.jit === 0) ? 1 : (1 + (Math.random() - 0.5) * ((opt && opt.jit) || 0.1));
+  const J = (f) => Math.max(20, f * jitter);
+  if (type === 'hit') {
+    sfxNoise(ctx, dest, t, 0.42, 0.004, 0.07, 'bandpass', J(1400), J(500), 0.9);
+    sfxTone(ctx, dest, t, 'triangle', J(190), J(85), 0.40, 0.005, 0.1, 1800);
+  } else if (type === 'crit') {
+    sfxNoise(ctx, dest, t, 0.38, 0.004, 0.08, 'bandpass', J(1800), J(700), 0.8);
+    sfxTone(ctx, dest, t, 'triangle', J(260), J(110), 0.36, 0.005, 0.12, 2000);
+    sfxNote(ctx, dest, t + 0.02, J(740), 0.20, 0.12, 'triangle', 3000);
+    sfxNote(ctx, dest, t + 0.06, J(1110), 0.14, 0.1, 'sine', 3200);
+  } else if (type === 'cast') {
+    sfxNoise(ctx, dest, t, 0.20, 0.01, 0.1, 'highpass', 900, 1800, 0.5);
+    sfxTone(ctx, dest, t, 'sine', J(420), J(760), 0.28, 0.01, 0.13, 2800);
+    sfxNote(ctx, dest, t + 0.04, J(880), 0.12, 0.1, 'triangle', 3000);
+  } else if (type === 'kill') {
+    sfxTone(ctx, dest, t, 'triangle', J(240), J(90), 0.36, 0.006, 0.18, 1600);
+    sfxNoise(ctx, dest, t, 0.22, 0.005, 0.12, 'lowpass', 900, 300, 0.5);
+  } else if (type === 'hurt') {
+    sfxNoise(ctx, dest, t, 0.30, 0.005, 0.12, 'bandpass', J(500), J(220), 0.8);
+    sfxTone(ctx, dest, t, 'sine', J(180), J(80), 0.34, 0.006, 0.16, 1200);
+  } else if (type === 'level') {
+    const notes = [523, 659, 784, 1047, 1319];
+    notes.forEach((f, i) => sfxNote(ctx, dest, t + i * 0.09, f, 0.32 - i * 0.025, 0.28, 'triangle', 3400));
+  } else if (type === 'chest') {
+    sfxNoise(ctx, dest, t, 0.36, 0.02, 0.28, 'bandpass', 320, 140, 1.2);
+    sfxTone(ctx, dest, t, 'sine', 90, 55, 0.22, 0.02, 0.25, 400);
+    [698, 880, 1175, 1568].forEach((f, i) => sfxNote(ctx, dest, t + 0.18 + i * 0.07, f, 0.26, 0.22, 'triangle', 3600));
+  } else if (type === 'pickup') {
+    sfxTone(ctx, dest, t, 'sine', J(880), J(1180), 0.28, 0.005, 0.08, 3200);
+    sfxNote(ctx, dest, t + 0.045, J(1320), 0.20, 0.07, 'sine', 3400);
+  } else if (type === 'boss') {
+    sfxNoise(ctx, dest, t, 0.50, 0.04, 1.05, 'lowpass', 400, 120, 0.6);
+    sfxTone(ctx, dest, t, 'sawtooth', 78, 36, 0.42, 0.05, 1.1, 280);
+    sfxTone(ctx, dest, t + 0.08, 'triangle', 52, 28, 0.36, 0.06, 1.0, 220);
+    sfxNoise(ctx, dest, t + 0.15, 0.22, 0.05, 0.5, 'bandpass', 600, 200, 1.0);
+  } else if (type === 'death') {
+    [220, 175, 131, 98].forEach((f, i) => sfxTone(ctx, dest, t + i * 0.14, 'triangle', f, f * 0.85, 0.36, 0.02, 0.4, 1400));
+    sfxNoise(ctx, dest, t, 0.28, 0.02, 0.7, 'lowpass', 500, 80, 0.4);
+  } else if (type === 'ui') {
+    sfxNote(ctx, dest, t, 620, 0.16, 0.045, 'triangle', 2400);
+    sfxNote(ctx, dest, t, 1240, 0.08, 0.03, 'sine', 2800);
+  } else if (type === 'dash') {
+    sfxNoise(ctx, dest, t, 0.26, 0.005, 0.12, 'lowpass', 700, 200, 0.5);
+    sfxTone(ctx, dest, t, 'sine', J(110), J(50), 0.30, 0.008, 0.16, 800);
+  } else if (type === 'special') {
+    sfxTone(ctx, dest, t, 'triangle', J(280), J(140), 0.32, 0.01, 0.22, 2000);
+    sfxNote(ctx, dest, t + 0.05, J(420), 0.16, 0.16, 'sine', 2400);
+  } else if (type === 'fire') {
+    sfxNoise(ctx, dest, t, 0.36, 0.02, 0.32, 'bandpass', 900, 280, 0.7);
+    sfxTone(ctx, dest, t, 'sawtooth', J(240), J(70), 0.22, 0.02, 0.3, 900);
+  }
+}
+
+function sfxAllowed(type) {
+  if (!sfxPref.on || sfxPref.vol <= 0.001) return false;
+  if (!actx || !sfxMaster) return false;
+  const now = performance.now();
+  sfxBurst = sfxBurst.filter(x => now - x < 50);
+  if (sfxBurst.length >= 4) return false;
+  const gap = type === 'hurt' ? 140 : type === 'ui' ? 50 : (type === 'hit' || type === 'kill' || type === 'crit' || type === 'cast' || type === 'pickup') ? 45 : 0;
+  if (gap && sfxCool[type] && now - sfxCool[type] < gap) return false;
+  if (gap) sfxCool[type] = now;
+  sfxBurst.push(now);
+  return true;
+}
+
+function sfx(type) {
+  try {
+    if (!sfxAllowed(type)) return;
+    playSfxInto(actx, sfxMaster, type, actx.currentTime);
+  } catch (e) {}
+}
+
+function bindSfxControls() {
+  const t = $('sfxToggle'), v = $('sfxVol');
+  if (t) {
+    const paint = () => {
+      t.textContent = sfxPref.on ? '🔊 Sound on' : '🔇 Sound off';
+      t.setAttribute('aria-pressed', sfxPref.on ? 'true' : 'false');
+    };
+    paint();
+    t.onclick = ev => {
+      ev.stopPropagation();
+      ensureAudio();
+      setSfxOn(!sfxPref.on);
+      paint();
+      if (sfxPref.on) sfx('ui');
+    };
+  }
+  if (v) {
+    v.value = String(Math.round(sfxPref.vol * 100));
+    v.oninput = () => {
+      ensureAudio();
+      setSfxVol((+v.value) / 100);
+      if (!sfxPref.on) {
+        setSfxOn(true);
+        if (t) { t.textContent = '🔊 Sound on'; t.setAttribute('aria-pressed', 'true'); }
+      }
+    };
+    v.onchange = () => { if (sfxPref.on) sfx('pickup'); };
+  }
+}
+
+['pointerdown', 'touchstart', 'click', 'keydown'].forEach(ev => {
+  document.addEventListener(ev, ensureAudio, { capture: true, passive: true });
+});
+document.addEventListener('pointerdown', ev => {
+  try {
+    const el = ev.target && ev.target.closest && ev.target.closest('button, .classopt, .mnode, .bagslot');
+    if (!el || el.id === 'dashBtn' || el.id === 'abilityBtn' || el.id === 'pauseBtn' || el.id === 'sfxToggle') return;
+    sfx('ui');
+  } catch (e) {}
+}, true);
 
 /* ========== SAVE ========== */
 function loadSave() {
@@ -1607,6 +1755,7 @@ function refreshClassPicker() { // 0.9c / 0.11a: sync dropdown label, blurb, Sta
   if ($('startBtn')) $('startBtn').textContent = info.icon + ' Start as ' + info.name;
 }
 function bind() {
+  bindSfxControls();
   $('shopbtn').textContent = '🛒 General store · ' + save.gold + ' coins';
   $('trainbtn').textContent = '📜 Training · ' + pts() + ' points';
   $('shopbtn').onclick = () => store('shop');
@@ -1996,7 +2145,7 @@ function hurt(e, d, isCrit, dot) { // 0.8a: dot = burn tick / Retribution (no on
         color: e.color, size: e.elite ? 4 : 3
       });
     }
-    sfx(isCrit ? 'crit' : 'hit');
+    if (!e.boss) sfx('kill');
     if (e.elite) shake = 0.35;
   }
 }
@@ -2084,6 +2233,10 @@ function attack() {
     const thick = (bolt && ti === 0) ? 5 : (isCrit ? 4 : (player.style === 'fisher' ? 3.2 : 2.5));
     shots.push({ x: player.x, y: player.y, tx: e.x, ty: e.y, life: (bolt && ti === 0) ? 0.22 : 0.14, col: S.col, thick });
 
+    if (ti === 0) {
+      const CAST = { ranged:1, magic:1, hunter:1, necromancer:1, runecrafter:1, priest:1, firemaker:1, fisher:1 };
+      sfx(CAST[player.style] ? 'cast' : (isCrit ? 'crit' : 'hit'));
+    }
     hurt(e, d, isCrit);
     if (player.style === 'necromancer' && e.hp > 0) {
       if (M.deathn2) { e.wither = Math.max(e.wither || 0, 2); e.witherDps = wDmg() * 0.10; e.witherTick = 0.5; }
@@ -3234,13 +3387,13 @@ function tryAddItem(it) {
       const coins = Math.round((12 + elapsed / 8) * coinMul());
       runGold += coins;
       floats.push({ x: player.x, y: player.y - 24, text: '+' + coins + ' ◆', life: 0.8, vy: -34, color: '#ffd24a' });
-      toast(d.n + ' sold for coins (you already have equal or better).');
+      toast(d.n + ' sold for coins (you already have equal or better).'); sfx('pickup');
       return true;
     }
   }
   if (canStack(it)) {
     const ex = bag.find(b => b.id === it.id);
-    if (ex && ex.qty < 3) { ex.qty = Math.min(3, ex.qty + (it.qty || 1)); refreshItems(); toast(d.n + ' added to bag'); return true; }
+    if (ex && ex.qty < 3) { ex.qty = Math.min(3, ex.qty + (it.qty || 1)); refreshItems(); toast(d.n + ' added to bag'); sfx('pickup'); return true; }
     if (ex && ex.qty >= 3 && bag.length >= BAG_SLOTS) return false;
     if (ex && ex.qty >= 3) { /* need a new slot? treat as full stack, convert extras to coins if no room later */ }
   }
@@ -3248,6 +3401,7 @@ function tryAddItem(it) {
   bag.push({ id: it.id, qty: it.qty || 1 });
   refreshItems();
   toast('Found: ' + d.n);
+  sfx('pickup');
   return true;
 }
 
@@ -3432,7 +3586,7 @@ function openChest(c, force, extraRoll) {
     save.chestsTotal = (save.chestsTotal || 0) + 1;
     for (let i = 1; i < (c.rolls || 1); i++) openChest(c, force, true);
   }
-  sfx('chest');
+  if (!extraRoll) sfx('chest');
   shake = Math.max(shake, 0.2);
   for (let i = 0; i < 26; i++) {
     const a = Math.random() * Math.PI * 2, v = rand(60, 190);
@@ -3699,6 +3853,7 @@ function bossHitPlayer(d) {
   let dmg = d * (1 - armorNow()) * dmgTakenNow();
   if (player.bloodShield > 0) { const abs = Math.min(player.bloodShield, dmg); player.bloodShield -= abs; dmg -= abs; }
   player.hp -= dmg;
+  sfx('hurt');
   shake = Math.max(shake, 0.3);
   floats.push({ x: player.x, y: player.y - 22, text: '-' + Math.round(dmg), life: 0.8, vy: -40, color: '#ff6a4a' });
   return true;
@@ -3714,6 +3869,7 @@ function enemyHitPlayer(d, src) {
   player._slayerTaken = 0;
   if (player.bloodShield > 0) { const abs = Math.min(player.bloodShield, dmg); player.bloodShield -= abs; dmg -= abs; }
   player.hp -= dmg;
+  sfx('hurt');
   player.invuln = Math.max(player.invuln, HIT_MERCY);
   shake = Math.max(shake, 0.22);
   floats.push({ x: player.x, y: player.y - 22, text: '-' + Math.round(dmg), life: 0.7, vy: -40, color: '#ff6a4a' });
@@ -4607,6 +4763,7 @@ function update(dt) {
       const dmg = e.damage * dt * (1 - armorNow()) * dmgTakenNow(); // 0.8a: Reckless swings
       player._slayerTaken = 0;
       player.hp -= dmg;
+      sfx('hurt');
       if (Math.random() < 0.08) shake = Math.max(shake, 0.12);
     }
     // 0.5: Ring of recoil: anything touching you takes a hit every 0.4s
@@ -5284,8 +5441,13 @@ function togglePause() {
     $('panel').innerHTML = `
       <h2>PAUSED</h2>
       <p>The frontier waits…</p>
+      <div class="sfxrow" id="sfxRow">
+        <button type="button" id="sfxToggle" aria-pressed="true">🔊 Sound on</button>
+        <input type="range" id="sfxVol" min="0" max="100" value="35" step="1" aria-label="Sound volume">
+      </div>
       <button id="resume">Resume</button>
       <button id="quit">Abandon run</button>`;
+    bindSfxControls();
     $('resume').onclick = () => {
       paused = false;
       $('overlay').style.display = 'none';
