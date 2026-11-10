@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.11b</title>
+<title>Last Stand — Prototype 0.11c</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -247,7 +247,7 @@ body.bossOn #buffs{top:122px}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.11b</div><!-- 0.11a: Thief, Priest, Woodcutter, Firemaker; 0.10a: in-run items + 5-slot bag; 0.9c: class dropdown menu -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.11c</div><!-- 0.11c: Penance horn clears the wave and fights its own foes; 0.11b: synth SFX; 0.11a: Thief, Priest, Woodcutter, Firemaker; 0.10a: in-run items + 5-slot bag; 0.9c: class dropdown menu -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, bring treasure home.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -602,6 +602,8 @@ let nextEventAt = 0;
 let renownEvent = 0; // renown earned from events this run (end-screen line)
 let penanceBuff = 0; // adrenaline seconds left
 let penanceDmg = 1;  // damage mul while buffed
+let waveResumeIn = 0; // 0.11c: short grace before normal waves resume after a swarm
+let wavePoofs = [];   // 0.11c: fade puffs for wave foes the horn removes (no loot)
 let bossNext = 300, bossWarned = false, bossWarnAt = 0;
 const sepGrid = new Map(); // 0.6: reused spatial grid for enemy pushback
 let keys = {};
@@ -1436,6 +1438,7 @@ function start(k) {
   bolts = []; // 0.7c
   decoys = []; firePools = []; woodLogs = []; fires = []; thralls = []; traps = []; // 0.8b / 0.11a
   eventInvite = null; eventFight = null; renownEvent = 0; penanceBuff = 0; penanceDmg = 1;
+  waveResumeIn = 0; wavePoofs = [];
   nextEventAt = 75 + Math.random() * 15; // 0.9a: first horn ~75–90s
   bossNext = BOSS_EVERY; bossWarned = false; bossWarnAt = 0;
   showBossBar(false);
@@ -1861,6 +1864,54 @@ function pickPenanceKind(mix) {
   return { role: 0, kind: 0 };
 }
 function countPenance() { let n = 0; for (const e of enemies) if (e.hp > 0 && e.penance) n++; return n; }
+function countWaveEnemies() {
+  let n = 0;
+  for (const e of enemies) if (e.hp > 0 && !e.penance && !e.boss && !e.penanceFlee && !e.waveDespawn) n++;
+  return n;
+}
+function poofWaveEnemy(e) {
+  // 0.11c: short despawn fade — not a kill, so no XP, coins, streak, or on-kill effects.
+  wavePoofs.push({ x: e.x, y: e.y, r: e.r, color: e.color, kind: e.kind, life: 0.32, maxLife: 0.32 });
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * 6.283;
+    particles.push({ x: e.x, y: e.y, vx: Math.cos(a) * 80, vy: Math.sin(a) * 80,
+      life: 0.32 + Math.random() * 0.12, color: e.color || '#c8b8a0', size: 4 });
+  }
+  for (let i = 0; i < 3; i++) {
+    particles.push({ x: e.x + rand(-8, 8), y: e.y, vx: rand(-18, 18), vy: -50 - Math.random() * 30,
+      life: 0.4, color: '#e8e0d0', size: 5 });
+  }
+  e.hp = 0; e.dead = true; e.waveDespawn = true;
+}
+function clearWaveEnemiesForPenance() {
+  // 0.11c: the horn takes the open field so only Penance remain. Cannot be farmed.
+  let n = 0;
+  for (const e of enemies) {
+    if (e.hp <= 0 || e.penance || e.boss || e.penanceFlee) continue;
+    poofWaveEnemy(e);
+    n++;
+  }
+  enemies = enemies.filter(e => e.hp > 0);
+  bolts = []; // bones/spells from vanished wave foes shouldn't land after the poof
+  return n;
+}
+function updateWavePoofs(dt) {
+  if (!wavePoofs.length) return;
+  for (const p of wavePoofs) p.life -= dt;
+  if (wavePoofs.some(p => p.life <= 0)) wavePoofs = wavePoofs.filter(p => p.life > 0);
+}
+function drawWavePoofs() {
+  for (const p of wavePoofs) {
+    const a = Math.max(0, p.life / (p.maxLife || 0.32));
+    ctx.globalAlpha = a * 0.85;
+    ctx.fillStyle = p.color || '#c8b8a0';
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1 + (1 - a) * 0.55), 0, 7); ctx.fill();
+    ctx.globalAlpha = a * 0.5;
+    ctx.strokeStyle = '#e8e0d0'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.15 + (1 - a) * 1.35), 0, 7); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
 function spawnPenanceOne(roleKind, ang) {
   const kind = roleKind.kind, role = roleKind.role;
   const data = ENEMY_KINDS[kind];
@@ -1924,10 +1975,15 @@ function triggerPenanceSwarm() {
   const tier = eventTier();
   const p = eventParams(tier);
   eventFight = { t: 30, maxT: 30, power, tier, cap: p.cap, gap: p.gap, refill: p.refill, mix: p.mix,
-    trickle: 0, burstLeft: p.burst, burstAng: 0, renownPaid: 0, cleared: false };
+    trickle: 0, burstLeft: p.burst, burstAng: 0, renownPaid: 0, cleared: false,
+    bossDeferFrom: elapsed, wiped: 0 };
+  // 0.11c: sweep the current wave off the field (no kills/XP/loot), then only Penance spawn.
+  eventFight.wiped = clearWaveEnemiesForPenance();
+  spawnClock = 0;
+  waveResumeIn = 0;
   shake = Math.max(shake, 0.3);
   player.invuln = Math.max(player.invuln, 0.55); // 0.9a: brief grace so the burst is readable
-  banner('📯 The Penance pour in!', 'Survive 30s. Clear them for a bonus.', 2.6);
+  banner('📯 The Penance pour in!', 'Wave foes vanish. Survive 30s. Clear them for a bonus.', 2.6);
   try { sfx('special'); } catch (err) {}
 }
 function payoutPenance(cleared) {
@@ -1973,7 +2029,11 @@ function endPenanceFight(flee) {
   if (flee) {
     for (const e of enemies) if (e.penance && e.hp > 0) { e.hp = 0; e.dead = true; e.penanceFlee = true; }
   }
+  // 0.11c: hold the dragon's remaining wait for the swarm's duration so it never lands mid-event.
+  if (eventFight.bossDeferFrom != null) bossNext += Math.max(0, elapsed - eventFight.bossDeferFrom);
   eventFight = null;
+  spawnClock = 0;
+  waveResumeIn = 0.85; // no backlog spike when normal waves return
   nextEventAt = elapsed + 90 + Math.random() * 30;
 }
 function updateEvents(dt) {
@@ -2022,7 +2082,9 @@ function updateEvents(dt) {
     if (eventFight.t <= 0) endPenanceFight(true);
   }
   if (penanceBuff > 0) penanceBuff = Math.max(0, penanceBuff - dt);
+  updateWavePoofs(dt);
 }
+
 
 const ENEMY_KINDS = [
     // 0.7c: damage = touch damage per second (was 8/13/22/28). dmg = one attack hit. reach = melee gap past
@@ -3969,10 +4031,11 @@ function updateBolts(dt) {
 function updateBoss(dt) {
   // schedule: warning 3s ahead, then the dragon lands (never two at once)
   if (!boss) {
-    if (!bossWarned && elapsed >= bossNext - BOSS_WARN) {
+    if (eventFight) {
+      // 0.11c: the dragon waits; remaining time is added back in endPenanceFight.
+    } else if (!bossWarned && elapsed >= bossNext - BOSS_WARN) {
       bossWarned = true; bossWarnAt = elapsed;
-      if (eventFight) endPenanceFight(true); // 0.9a: swarm yields to the dragon
-      eventInvite = null;
+      eventInvite = null; // a waiting horn yields; an active swarm is already deferred above
       banner('⚠ The ground trembles…', 'Something enormous is coming.', BOSS_WARN, true);
       sfx('boss');
       shake = Math.max(shake, 0.35);
@@ -4649,6 +4712,8 @@ function update(dt) {
 
   // 0.5: guaranteed chest around 90 seconds in, dropped a short walk from the player
   // 0.9c: no missed minute rewards after a large simulation step.
+  // 0.11c: timed chests still drop on the minute during a Penance swarm and stay collectible.
+  // Royal chests (from the dragon) are unchanged; the dragon itself is deferred until the swarm ends.
   while (elapsed >= nextChestAt) {
     spawnMinuteChest();
     nextChestAt += 60;
@@ -4656,12 +4721,16 @@ function update(dt) {
 
   // spawn
   // 0.6: normal spawns come 1.8x slower while the boss is alive
-  const spawnRate = Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL * (eventFight ? 1.5 : 1); // 0.7c + 0.9a: softer normals during Penance Swarm
-  if (spawnClock > spawnRate && enemies.length < 90) {
-    spawnClock = 0;
-    spawn();
-    if (elapsed > 100 && Math.random() < 0.45) spawn();
-    if (elapsed > 160 && Math.random() < 0.25) spawn(true); // elite chance
+  // 0.11c: normal waves pause for the whole Penance event, then resume after waveResumeIn (no backlog).
+  if (waveResumeIn > 0) waveResumeIn = Math.max(0, waveResumeIn - dt);
+  if (!eventFight && waveResumeIn <= 0) {
+    const spawnRate = Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL;
+    if (spawnClock > spawnRate && enemies.length < 90) {
+      spawnClock = 0;
+      spawn();
+      if (elapsed > 100 && Math.random() < 0.45) spawn();
+      if (elapsed > 160 && Math.random() < 0.25) spawn(true); // elite chance
+    }
   }
 
   // attack
@@ -4925,6 +4994,7 @@ function update(dt) {
       return;
     }
     if (phoenix) { phoenixSave(); return; } // 0.5: Phoenix necklace cheats death once
+    if (eventFight) endPenanceFight(true); // 0.11c: clean up the swarm; no payout (hp is already 0)
     endRun();
     return;
   }
@@ -5039,6 +5109,15 @@ function draw() {
         ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.ellipse(e.x, e.y + e.r * 0.85, e.r * 1.45, e.r * 0.5, 0, 0, 7); ctx.stroke();
       }
+      if (e.penance) { // 0.11c: crimson + gold ring so Penance read apart from the regular wave
+        const pulse = 0.55 + 0.3 * Math.sin(elapsed * 6);
+        ctx.strokeStyle = 'rgba(200,60,40,' + pulse + ')';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.ellipse(e.x, e.y + e.r * 0.85, e.r * 1.5, e.r * 0.52, 0, 0, 7); ctx.stroke();
+        ctx.strokeStyle = 'rgba(232,200,106,' + (0.35 + 0.2 * Math.sin(elapsed * 6 + 1)) + ')';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(e.x, e.y + e.r * 0.85, e.r * 1.68, e.r * 0.6, 0, 0, 7); ctx.stroke();
+      }
       const size = e.r * 4.15;
       const fr = Math.floor(elapsed * 5 + e.x * 0.02) & 3;
       drawFrame(sheet, 2, 2, fr, e.x, e.y, size);
@@ -5050,7 +5129,7 @@ function draw() {
       const bw = e.r * 2, by = e.y - e.r * 1.55 - 6; // hp bar sits just above the sprite's head
       ctx.fillStyle = '#2a2218';
       ctx.fillRect(e.x - e.r, by, bw, 4);
-      ctx.fillStyle = e.elite ? '#e07a30' : '#c94e43';
+      ctx.fillStyle = e.penance ? '#c85a3a' : (e.elite ? '#e07a30' : '#c94e43');
       ctx.fillRect(e.x - e.r, by, bw * Math.max(0, e.hp / e.maxHp), 4);
       continue;
     }
@@ -5079,14 +5158,20 @@ function draw() {
       ctx.arc(e.x, e.y, e.r + 3, 0, 7);
       ctx.stroke();
     }
+    if (e.penance) {
+      ctx.strokeStyle = 'rgba(200,60,40,' + (0.6 + 0.3 * Math.sin(elapsed * 6)) + ')';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 4, 0, 7); ctx.stroke();
+    }
 
     // hp bar
     const bw = e.r * 2;
     ctx.fillStyle = '#2a2218';
     ctx.fillRect(e.x - e.r, e.y - e.r - 9, bw, 4);
-    ctx.fillStyle = e.elite ? '#e07a30' : '#c94e43';
+    ctx.fillStyle = e.penance ? '#c85a3a' : (e.elite ? '#e07a30' : '#c94e43');
     ctx.fillRect(e.x - e.r, e.y - e.r - 9, bw * Math.max(0, e.hp / e.maxHp), 4);
   }
+  drawWavePoofs();
 
   drawFireballs(); // 0.6
   drawEnemyTelegraphs(true); // 0.7c: marks over heads, aim lines, shockwaves
