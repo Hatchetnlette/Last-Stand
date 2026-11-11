@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.13b</title>
+<title>Last Stand — Prototype 0.14a</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -216,6 +216,21 @@ body.bossOn #buffs{top:122px}
 #bagFull #bagLeave{background:#3d2a20;border-color:#b88a6a}
 body.bagging #dashBtn,body.bagging #abilityBtn,body.bagging #pauseBtn,
 body.bagging #bagHud,body.bagging #bagTip{pointer-events:none}
+#extractKeep{position:fixed;inset:0;background:#07100be6;display:none;align-items:flex-end;justify-content:center;
+  padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));z-index:41}
+#extractKeep .sheet{width:min(480px,100%);background:linear-gradient(165deg,#243528,#121c16);
+  border:1px solid #7a8a5e;border-radius:18px;padding:16px 14px;text-align:center}
+#extractKeep h2{font-size:20px;margin:0 0 6px}
+#extractKeep .newitem{color:#ffd86a;font-weight:800;font-size:16px;margin:6px 0 2px}
+#extractKeep .slots{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:10px 0}
+#extractKeep .slots button{width:auto;min-width:56px;height:auto;min-height:56px;margin:0;padding:6px 8px;flex:none;font-size:13px;border-radius:12px;line-height:1.2}
+#extractKeep #extractSkip,#extractKeep #extractConvert{background:#3d2a20;border-color:#b88a6a}
+body.extracting #dashBtn,body.extracting #abilityBtn,body.extracting #pauseBtn,
+body.extracting #bagHud,body.extracting #bagTip{pointer-events:none}
+#stashRow{margin-top:8px;text-align:left}
+#stashRow .stashslots{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+#stashRow .stashslot{flex:1;min-width:120px;background:#121c16;border:1px solid #4a5c48;border-radius:10px;padding:6px 8px;font-size:12px}
+.coinmath{color:#ffd86a;font-weight:800;font-size:16px;line-height:1.35;margin:8px 0}
 @media(max-height:680px){
   .bagslot{width:36px;height:36px;font-size:16px}
 }
@@ -232,9 +247,9 @@ body.playing #hint{display:none}
 #goalHud{position:fixed;left:12px;right:58px;top:98px;z-index:6;
   text-align:center;pointer-events:none;display:none;
   font-size:12px;font-weight:700;line-height:1.3;color:#ffe9a8;
-  text-shadow:0 2px 4px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  text-shadow:0 2px 4px #000;white-space:normal;overflow:hidden}
 #goalHud span{display:inline-block;background:#0c1410cc;border:1px solid #4a5c48;
-  border-radius:10px;padding:3px 10px;max-width:100%}
+  border-radius:10px;padding:3px 10px;max-width:100%;white-space:normal}
 body.bossOn #goalHud{top:122px}
 body.playing #buffs{top:128px}
 body.bossOn.playing #buffs{top:152px}
@@ -301,11 +316,17 @@ body.bagging #dpsMeter{pointer-events:none}
   <div class="slots" id="bagFullSlots"></div>
   <button type="button" id="bagLeave">Leave it on the ground</button>
 </div></div>
+<div id="extractKeep"><div class="sheet">
+  <h2 id="extractKeepTitle">BRING ONE ITEM HOME</h2>
+  <p id="extractKeepLead">Pick one worn item for your Stash, or convert everything to coins.</p>
+  <div class="slots" id="extractKeepSlots"></div>
+  <button type="button" id="extractSkip">Skip — convert all to coins</button>
+</div></div>
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.13b</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
-    <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, bring treasure home.</p>
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.14a</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, and extract at the shrine after the first dragon. Death keeps half your coins.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
     <div class="classpick">
@@ -343,6 +364,7 @@ body.bagging #dpsMeter{pointer-events:none}
       <input type="range" id="sfxVol" min="0" max="100" value="35" step="1" aria-label="Sound volume">
     </div>
     <p class="small" id="saveinfo"></p>
+    <div id="stashRow"></div>
   </div>
 </div>
 
@@ -663,6 +685,16 @@ let bagQueue = [];      // 0.10a: items waiting on a full bag
 let bagPending = [];    // 0.10a: items rolled from the chest being opened
 let bagTipIdx = -1;
 const BAG_SLOTS = 5;
+// 0.14a: Extraction Shrine after the first dragon; stash (view + pick, no in-run wear yet)
+const EXTRACT_CHANNEL = 3;
+const EXTRACT_SHRINE_R = 36;
+const EXTRACT_SHRINE_DIST = 200;
+const EXTRACT_DEATH_KEEP = 0.5;
+const EXTRACT_MUL_PER = 0.20;
+const EXTRACT_RENOWN_PER = 5;
+const STASH_SLOTS = 2;
+const BAG_SALVAGE = { common: 8, uncommon: 15, rare: 30, unique: 50 };
+let extractShrine = null, extractChannel = 0, extractSurged = false, extractPicking = false;
 // 0.5: timed power spikes, in seconds left (ticked with game time, so they pause with the game)
 let buffs = { dagger:0, recoil:0, glory:0, boots:0 };
 let phoenix = false;   // 0.5: Phoenix necklace held (saves you once)
@@ -873,6 +905,13 @@ function nextGoal() {
   if (eventFight) return '📯 Penance swarm ' + fmt(Math.max(0, eventFight.t));
   if (eventInvite) return '📯 Penance horn ' + Math.ceil(eventInvite.life) + 's';
   if (boss) return '🐉 King Black Dragon · 👑 royal chest on kill';
+  if (extractShrine && extractChannel > 0)
+    return '⛩ Stand still to extract · ' + Math.max(0, EXTRACT_CHANNEL - extractChannel).toFixed(1) + 's';
+  if (extractShrine) {
+    const dragonAtSoon = bossWarned ? Math.max(bossNext, (bossWarnAt || 0) + (typeof BOSS_WARN === 'number' ? BOSS_WARN : 3)) : bossNext;
+    if (dragonAtSoon - elapsed > 30)
+      return 'Extraction Shrine open - extract or push deeper';
+  }
   const items = [];
   const dragonAt = bossWarned ? Math.max(bossNext, (bossWarnAt || 0) + (typeof BOSS_WARN === 'number' ? BOSS_WARN : 3)) : bossNext;
   if (!boss) items.push({ t: dragonAt, k: 'dragon' });
@@ -1361,6 +1400,23 @@ function drawMinimap(force) {
     const p = clampEdge(toX(eventInvite.x), toY(eventInvite.y), 5);
     m.strokeStyle = '#e8c86a'; m.lineWidth = 2;
     m.beginPath(); m.arc(p.x, p.y, 5, 0, 7); m.stroke();
+  }
+  // 0.14a: Extraction Shrine
+  if (extractShrine) {
+    const p = clampEdge(toX(extractShrine.x), toY(extractShrine.y), 6);
+    const pulse = 0.75 + 0.25 * Math.sin((extractShrine.t || 0) * 5);
+    const sz = 5 * (S / 96);
+    m.fillStyle = '#ffe27a';
+    m.strokeStyle = '#3a2a08';
+    m.lineWidth = 1.5;
+    m.globalAlpha = pulse;
+    m.beginPath();
+    m.moveTo(p.x, p.y - sz);
+    m.lineTo(p.x + sz, p.y);
+    m.lineTo(p.x, p.y + sz);
+    m.lineTo(p.x - sz, p.y);
+    m.closePath(); m.fill(); m.stroke();
+    m.globalAlpha = 1;
   }
   // dragon
   if (boss) {
@@ -1882,9 +1938,19 @@ function migrateSave(s) {
   s.chestsTotal = num(s.chestsTotal);
   s.shopSpent = num(s.shopSpent);
   s.hunterQuest = !!s.hunterQuest;
+  // 0.14a: stash is a persistent 2-slot trunk. Sanitize without touching ITEMS (it is declared later).
+  if (!Array.isArray(s.stash)) s.stash = [];
+  s.stash = s.stash.filter(it => it && (typeof it === 'string' || typeof it.id === 'string')).slice(0, STASH_SLOTS).map(it => {
+    const id = typeof it === 'string' ? it : it.id;
+    const qty = (it && typeof it.qty === 'number' && isFinite(it.qty) && it.qty > 0) ? Math.floor(it.qty) : 1;
+    return { id, qty };
+  });
+  if (!Array.isArray(s.stashWear)) s.stashWear = [];
+  s.stashWear = s.stashWear.filter(slot => typeof slot === 'string').slice(0, STASH_SLOTS);
   return s;
 }
 function persist() {
+  if (typeof sanitizeStash === 'function') sanitizeStash();
   if (save) save.gold = toGold(save.gold);
   localStorage.setItem('laststand_save_v3_test', JSON.stringify(save));
 }
@@ -2228,6 +2294,7 @@ function start(k) {
   document.body.classList.remove('bagging');
   if ($('bagFull')) $('bagFull').style.display = 'none';
   if ($('bagTip')) $('bagTip').style.display = 'none';
+  if (typeof resetExtractState === 'function') resetExtractState();
   hideToast();
   buffs = { dagger:0, recoil:0, glory:0, boots:0 };
   $('lootBanner').style.opacity = '0';
@@ -2605,6 +2672,7 @@ function bind() {
   const fu = fisherUnlocked();
   $('saveinfo').textContent = `Saved on this device · Coins ${toGold(save.gold)} · Best ${fmt(save.best)} · Attack ${sLvl('melee')} · Ranged ${sLvl('ranged')} · Magic ${sLvl('magic')}` +
     (fu ? ` · Fishing ${sLvl('fisher')}` : '');
+  if (typeof renderStashMenu === 'function') renderStashMenu();
 }
 bind();
 
@@ -2617,9 +2685,11 @@ function hideToast() {
 /* 0.10a: never draw a toast over the bag-full sheet, level-up, pause, or end-run overlay.
    Menu/Mastery/Shop toasts still show (those overlays are not in a run). Toasts are not queued. */
 function toastBlocked() {
-  if (bagging) return true;
+  if (bagging || extractPicking) return true;
   const bf = $('bagFull');
   if (bf && bf.style.display === 'flex') return true;
+  const ek = $('extractKeep');
+  if (ek && ek.style.display === 'flex') return true;
   if (leveling || paused) return true;
   const ov = $('overlay');
   if (playing && ov && ov.style.display === 'flex') return true;
@@ -3349,6 +3419,7 @@ function doDash() {
   if (joystick.active) { dx = joystick.x; dy = joystick.y; }
   if (Math.hypot(dx, dy) < 0.05) { dx = player.facing; dy = 0; }
   let mag = Math.hypot(dx, dy) || 1;
+  if (typeof cancelExtractChannel === 'function') cancelExtractChannel();
   const ox = player.x, oy = player.y;
   for (let i = 0; i < 5; i++) {
     player.x += (dx / mag) * 19;
@@ -4807,6 +4878,271 @@ function spawnMinuteChest() {
   return dropChest(player.x + Math.cos(a) * 220, player.y + Math.sin(a) * 220);
 }
 
+
+function resetExtractState() {
+  extractShrine = null;
+  extractChannel = 0;
+  extractSurged = false;
+  extractPicking = false;
+  document.body.classList.remove('extracting');
+  if ($('extractKeep')) $('extractKeep').style.display = 'none';
+}
+function sanitizeStash() {
+  if (!save) return;
+  let ready = false;
+  try { ready = typeof ITEMS === 'object' && !!ITEMS; } catch (e) { ready = false; }
+  if (!Array.isArray(save.stash)) save.stash = [];
+  if (!ready) {
+    save.stash = save.stash.filter(it => it && typeof it.id === 'string').slice(0, STASH_SLOTS);
+    return;
+  }
+  save.stash = save.stash.filter(it => {
+    const d = itemDef(it && it.id);
+    return d && itemWearable(d);
+  }).slice(0, STASH_SLOTS).map(it => itemClone(it.id, it.qty || 1));
+  if (!Array.isArray(save.stashWear)) save.stashWear = [];
+}
+function renderStashMenu() {
+  const el = $('stashRow');
+  if (!el) return;
+  let ready = false;
+  try { ready = typeof ITEMS === 'object' && !!ITEMS; } catch (e) { return; }
+  if (!ready) return;
+  sanitizeStash();
+  if (!save.stash.length) {
+    el.innerHTML = '<div class="small">Stash empty — extract with a worn item to bring one home. Wearing stash items comes in 0.14b.</div>';
+    return;
+  }
+  let h = '<div class="small">Stash (safe on death · wearing comes in 0.14b)</div><div class="stashslots">';
+  for (let i = 0; i < STASH_SLOTS; i++) {
+    const it = save.stash[i], d = it && itemDef(it.id);
+    h += '<div class="stashslot">' + (d ? (d.icon + ' ' + d.n) : 'Empty') + '</div>';
+  }
+  h += '</div>';
+  el.innerHTML = h;
+}
+function fmtCoins(n) {
+  n = Math.floor(+n || 0);
+  return n.toLocaleString('en-US');
+}
+function bagSalvageCoins(it) {
+  const d = itemDef(it && it.id);
+  if (!d) return 0;
+  const qty = (it && it.qty > 0) ? it.qty : 1;
+  const each = BAG_SALVAGE[d.tier] || BAG_SALVAGE.common;
+  return each * qty;
+}
+function extractMultiplier() {
+  return 1 + EXTRACT_MUL_PER * Math.max(0, (bossesSlain || 0) - 1);
+}
+function runEarnedCoins() {
+  return Math.floor(toGold(runGold) + elapsed / 11);
+}
+function playerMoveInputMag() {
+  let dx = joystick.x, dy = joystick.y;
+  if (!joystick.active) {
+    dx = (keys.ArrowRight || keys.d ? 1 : 0) - (keys.ArrowLeft || keys.a ? 1 : 0);
+    dy = (keys.ArrowDown || keys.s ? 1 : 0) - (keys.ArrowUp || keys.w ? 1 : 0);
+  }
+  return Math.hypot(dx, dy);
+}
+function onExtractShrine() {
+  if (!extractShrine || !player) return false;
+  return Math.hypot(player.x - extractShrine.x, player.y - extractShrine.y) <= EXTRACT_SHRINE_R + (player.r || 14) * 0.35;
+}
+function cancelExtractChannel() {
+  extractChannel = 0;
+  extractSurged = false;
+}
+function spawnExtractShrine(nearX, nearY) {
+  if (extractShrine) return extractShrine;
+  const tryAt = (x, y) => typeof hitsSolid !== 'function' || !hitsSolid(x, y, EXTRACT_SHRINE_R * 0.7);
+  const chestOk = (x, y) => chests.every(c => Math.hypot(x - c.x, y - c.y) > 70);
+  let x = nearX + EXTRACT_SHRINE_DIST, y = nearY, found = false;
+  const dists = [EXTRACT_SHRINE_DIST, 240, 280, 160, 320, 120];
+  for (const dist of dists) {
+    for (let i = 0; i < 24; i++) {
+      const a = i * Math.PI / 12 + 0.17;
+      const nx = nearX + Math.cos(a) * dist, ny = nearY + Math.sin(a) * dist;
+      if (tryAt(nx, ny) && chestOk(nx, ny)) { x = nx; y = ny; found = true; break; }
+    }
+    if (found) break;
+  }
+  if (!found) {
+    for (let r = 40; r <= 800 && !found; r += 20) {
+      for (let a = 0; a < Math.PI * 2; a += 0.25) {
+        const nx = nearX + Math.cos(a) * r, ny = nearY + Math.sin(a) * r;
+        if (tryAt(nx, ny)) { x = nx; y = ny; found = true; break; }
+      }
+    }
+  }
+  extractShrine = { x, y, r: EXTRACT_SHRINE_R, t: 0 };
+  return extractShrine;
+}
+function wornItemsForStash() {
+  const slots = ['body', 'helm', 'jewelry', 'cape', 'weapon', 'trinket'];
+  const out = [];
+  const seen = new Set();
+  for (const slot of slots) {
+    const it = wornOf(slot);
+    if (!it || seen.has(it)) continue;
+    const d = itemDef(it.id);
+    if (d && itemWearable(d)) { out.push(it); seen.add(it); }
+  }
+  return out;
+}
+function closeExtractKeep() {
+  extractPicking = false;
+  document.body.classList.remove('extracting');
+  if ($('extractKeep')) $('extractKeep').style.display = 'none';
+}
+function openExtractKeep(worn) {
+  extractPicking = true;
+  hideToast();
+  stopLoop();
+  resetJoystick();
+  document.body.classList.add('extracting');
+  const title = $('extractKeepTitle'), lead = $('extractKeepLead'), row = $('extractKeepSlots'), skip = $('extractSkip');
+  if (title) title.textContent = 'BRING ONE ITEM HOME';
+  if (lead) lead.textContent = 'Pick one worn item for your Stash, or convert everything to coins. Stash items are safe if you die next run. Wearing them comes in 0.14b.';
+  if (skip) { skip.style.display = 'block'; skip.textContent = 'Skip — convert all to coins'; }
+  row.innerHTML = worn.map((it, i) => {
+    const d = itemDef(it.id);
+    return '<button type="button" data-keep="' + i + '">' + (d ? d.icon + '<br>' + d.n : '?') + '</button>';
+  }).join('');
+  row.querySelectorAll('[data-keep]').forEach(btn => {
+    btn.onclick = () => chooseExtractItem(worn[+btn.dataset.keep]);
+  });
+  skip.onclick = () => finishExtract(null);
+  $('extractKeep').style.display = 'flex';
+}
+function chooseExtractItem(it) {
+  sanitizeStash();
+  if ((save.stash || []).length < STASH_SLOTS) { finishExtract(it); return; }
+  openExtractReplace(it);
+}
+function openExtractReplace(it) {
+  const d = itemDef(it.id);
+  const title = $('extractKeepTitle'), lead = $('extractKeepLead'), row = $('extractKeepSlots'), skip = $('extractSkip');
+  if (title) title.textContent = 'STASH IS FULL';
+  if (lead) lead.textContent = 'Replace a stash item with ' + (d ? d.icon + ' ' + d.n : 'this find') + ', or convert the new find to coins.';
+  row.innerHTML = (save.stash || []).map((s, i) => {
+    const sd = itemDef(s.id);
+    return '<button type="button" data-rep="' + i + '">' + (sd ? sd.icon + '<br>' + sd.n : '?') + '</button>';
+  }).join('');
+  row.querySelectorAll('[data-rep]').forEach(btn => {
+    btn.onclick = () => finishExtract(it, +btn.dataset.rep);
+  });
+  if (skip) { skip.style.display = 'block'; skip.textContent = 'Convert the new find to coins'; skip.onclick = () => finishExtract(null); }
+}
+function beginExtractPickup() {
+  if (player && player.hp <= 0) { cancelExtractChannel(); return; }
+  extractPicking = true;
+  hideToast();
+  stopLoop();
+  resetJoystick();
+  const worn = wornItemsForStash();
+  if (!worn.length) { finishExtract(null); return; }
+  openExtractKeep(worn);
+}
+function finishExtract(kept, replaceIdx) {
+  let bagBonus = 0;
+  for (const it of bag) {
+    if (kept && it === kept) continue;
+    bagBonus += bagSalvageCoins(it);
+  }
+  let keptCopy = null;
+  if (kept) {
+    keptCopy = itemClone(kept.id, kept.qty || 1);
+    if (!Array.isArray(save.stash)) save.stash = [];
+    if (typeof replaceIdx === 'number' && replaceIdx >= 0 && replaceIdx < save.stash.length) {
+      bagBonus += bagSalvageCoins(save.stash[replaceIdx]);
+      save.stash[replaceIdx] = keptCopy;
+    } else if (save.stash.length < STASH_SLOTS) {
+      save.stash.push(keptCopy);
+    } else {
+      bagBonus += bagSalvageCoins(keptCopy);
+      keptCopy = null;
+    }
+  }
+  closeExtractKeep();
+  endRun('extract', { bagBonus: bagBonus, kept: keptCopy });
+}
+function updateExtract(dt) {
+  if (!extractShrine || extractPicking || !playing || leveling || bagging || paused) {
+    if (!extractShrine) { extractChannel = 0; extractSurged = false; }
+    else extractShrine.t = (extractShrine.t || 0) + dt;
+    return;
+  }
+  extractShrine.t = (extractShrine.t || 0) + dt;
+  const moving = playerMoveInputMag() > 0.05 || !!(player && player.moving);
+  if (!onExtractShrine() || moving || (player && player.hp <= 0) || eventFight) {
+    cancelExtractChannel();
+    return;
+  }
+  if (extractChannel <= 0 && !extractSurged) {
+    extractSurged = true;
+    if (!eventFight && (typeof waveResumeIn === 'number' ? waveResumeIn <= 0 : true) && enemies.length < LIVE_CAP) {
+      spawn();
+      if (enemies.length < LIVE_CAP) spawn();
+    }
+    if (typeof banner === 'function') banner('⛩ Extraction', 'Stand still to extract. Move or dash cancels.', 2.2);
+  }
+  extractChannel += dt;
+  spawnClock += dt * 1.8;
+  for (const e of enemies) {
+    if (!e || e.hp <= 0 || e.boss) continue;
+    const d = Math.hypot(e.x - player.x, e.y - player.y);
+    if (d < 340 && d > 1) {
+      const spd = 42;
+      e.x += (player.x - e.x) / d * spd * dt;
+      e.y += (player.y - e.y) / d * spd * dt;
+    }
+  }
+  if (extractChannel >= EXTRACT_CHANNEL) {
+    extractChannel = EXTRACT_CHANNEL;
+    if (player && player.hp <= 0) { cancelExtractChannel(); return; }
+    beginExtractPickup();
+  }
+}
+function drawExtractShrine() {
+  if (!extractShrine) return;
+  const s = extractShrine;
+  const bob = Math.sin((s.t || 0) * 2.2) * 2;
+  const glow = 0.28 + 0.16 * Math.sin((s.t || 0) * 3.1);
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath(); ctx.ellipse(s.x, s.y + 16, 22, 8, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(232,197,106,' + glow + ')';
+  ctx.beginPath(); ctx.arc(s.x, s.y + bob, 32, 0, 7); ctx.fill();
+  ctx.fillStyle = '#3a3f4a';
+  ctx.beginPath(); ctx.arc(s.x, s.y + 6 + bob * 0.3, 18, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#8a9080'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#1a2430';
+  ctx.beginPath(); ctx.arc(s.x, s.y + bob, 12, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#e8c56a'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = '#ffe9a8'; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 6; i++) {
+    const a = (s.t || 0) * 0.6 + i * Math.PI / 3;
+    ctx.beginPath();
+    ctx.moveTo(s.x + Math.cos(a) * 14, s.y + bob + Math.sin(a) * 14);
+    ctx.lineTo(s.x + Math.cos(a) * 20, s.y + bob + Math.sin(a) * 20);
+    ctx.stroke();
+  }
+  const prog = extractChannel > 0 ? Math.min(1, extractChannel / EXTRACT_CHANNEL) : 0;
+  ctx.save();
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = 'rgba(255,226,122,0.25)';
+  ctx.beginPath(); ctx.arc(s.x, s.y + bob, 28, 0, 7); ctx.stroke();
+  if (prog > 0) {
+    ctx.strokeStyle = '#ffe27a';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y + bob, 28, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog, false);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // 0.5: big banner in the middle of the screen (no pause, fades by itself)
 function banner(title, sub, time, danger) {
   const b = $('lootBanner');
@@ -5328,6 +5664,7 @@ function bossDefeated(e) {
   }
   // 0.9c: royal chest is immediate; no ground-chest cap or expiry.
   dropChest(e.x, e.y, true); // 0.9c: immediate royal reward, walkable ground
+  if (bossesSlain === 1) spawnExtractShrine(e.x, e.y);
   for (let i = 0; i < 60; i++) {
     const a = Math.random() * 6.283, v = rand(60, 260);
     particles.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.6 + Math.random() * 0.5,
@@ -5743,11 +6080,19 @@ function levelUp() {
 }
 
 /* ========== END RUN ========== */
-function endRun() {
+function endRun(reason, extra) {
   cancelLevelUi();
   stopLoop();
   playing = false;
   paused = false;
+  reason = reason || 'death';
+  extra = extra || {};
+  if (reason !== 'extract') {
+    extractPicking = false;
+    document.body.classList.remove('extracting');
+    if ($('extractKeep')) $('extractKeep').style.display = 'none';
+    cancelExtractChannel();
+  }
   bag = []; groundItems = []; magnets = []; bagging = false; bagQueue = []; bagPending = []; // 0.10a: items are in-run only
   woodLogs = []; fires = []; thralls = []; traps = []; player.stealth = 0; player.altar = null; player.runeAltar = null;
   document.body.classList.remove('bagging');
@@ -5761,16 +6106,35 @@ function endRun() {
     save.bossTotal = (save.bossTotal || 0) + bossesSlain;            // 0.6: lifetime boss kills
     save.bossBest = Math.max(save.bossBest || 0, bossesSlain);       // 0.6: most in one run
     resetJoystick(); // 0.4: hide the joystick when the run ends
-    sfx('death');
-    const earned = Math.floor(toGold(runGold) + elapsed / 11);
-    save.gold = toGold(save.gold) + earned;
-    const renownRun = Math.max(1, Math.floor(elapsed / 28) + Math.floor(kills / 22)) + 8 * bossesSlain; // 0.8a: +8 per boss
+    if (reason === 'extract') sfx('boss'); else sfx('death');
+    const earned = runEarnedCoins();
+    const mul = reason === 'extract' ? extractMultiplier() : 1;
+    const bagBonus = reason === 'extract' ? Math.floor(extra.bagBonus || 0) : 0;
+    const paid = reason === 'extract'
+      ? Math.floor(earned * mul) + bagBonus
+      : Math.floor(earned * EXTRACT_DEATH_KEEP);
+    let coinLine;
+    if (reason === 'extract') {
+      coinLine = bagBonus > 0
+        ? ('Extracted: ' + fmtCoins(earned) + ' × ' + mul.toFixed(2) + ' + ' + fmtCoins(bagBonus) + ' bag = ' + fmtCoins(paid))
+        : ('Extracted: ' + fmtCoins(earned) + ' × ' + mul.toFixed(2) + ' = ' + fmtCoins(paid));
+    } else {
+      const verb = reason === 'abandon' ? 'Abandoned' : 'Died';
+      coinLine = verb + ': kept 50% of ' + fmtCoins(earned) + ' = ' + fmtCoins(paid);
+    }
+    save.gold = toGold(save.gold) + paid;
+    let renownRun = Math.max(1, Math.floor(elapsed / 28) + Math.floor(kills / 22)) + 8 * bossesSlain; // 0.8a: +8 per boss
+    const extractRenown = reason === 'extract' ? EXTRACT_RENOWN_PER * bossesSlain : 0;
+    renownRun += extractRenown;
     // 0.9a: event renown was already added during the run; still show it. Base run renown is separate.
     save.renown += renownRun;
     save.best = Math.max(save.best, Math.floor(elapsed));
     if (elapsed >= 240 && chestsOpened >= 3) save.hunterQuest = true;
+    const kept = extra.kept || null;
+    const keptName = kept && itemDef(kept.id) ? (itemDef(kept.id).icon + ' ' + itemDef(kept.id).n) : '';
     persist();
-    lastRunSummary = { earned, renownRun, renownEvent, elapsed, kills, chestsOpened, bossesSlain,
+    lastRunSummary = { earned, paid, mul, bagBonus, coinLine, reason, extractRenown, keptName,
+      renownRun, renownEvent, elapsed, kills, chestsOpened, bossesSlain,
       gold: save.gold, renown: save.renown, bossTotal: save.bossTotal, bossBest: save.bossBest };
     runEnded = true;
   }
@@ -5780,28 +6144,34 @@ function endRun() {
   $('abilityBtn').style.display = 'none';
   if (typeof hideRunHud === 'function') hideRunHud();
 
-  const sum = lastRunSummary || { earned: 0, renownRun: 0, renownEvent: 0, elapsed, kills, chestsOpened, bossesSlain,
+  const sum = lastRunSummary || { earned: 0, paid: 0, coinLine: '', reason: reason, mul: 1, bagBonus: 0, extractRenown: 0, keptName: '',
+    renownRun: 0, renownEvent: 0, elapsed, kills, chestsOpened, bossesSlain,
     gold: save.gold, renown: save.renown, bossTotal: save.bossTotal || 0, bossBest: save.bossBest || 0 };
+  const title = sum.reason === 'extract' ? 'YOU MADE IT OUT' : 'THE FRONTIER CLAIMS YOU';
+  const keptLine = sum.keptName ? ('<br>Kept in stash: <b>' + sum.keptName + '</b>') : '';
+  const extractRenownBit = sum.extractRenown ? (` · extract +${sum.extractRenown}`) : '';
   $('overlay').style.display = 'flex';
   $('panel').innerHTML = `
-    <h2>THE FRONTIER CLAIMS YOU</h2>
+    <h2>${title}</h2>
+    <p class="coinmath">${sum.coinLine || ''}</p>
     <p>You survived <b>${fmt(sum.elapsed)}</b> and defeated <b>${sum.kills}</b> enemies.<br>
        Chests opened: <b>${sum.chestsOpened}</b><br><!-- 0.5 -->
-       Bosses slain: <b>${sum.bossesSlain}</b></p><!-- 0.6 -->
-    <p>Run coins: <b>${sum.earned}</b><br>
+       Bosses slain: <b>${sum.bossesSlain}</b>${keptLine}</p><!-- 0.6 -->
+    <p>Run coins (full): <b>${sum.earned}</b>${sum.reason === 'extract' ? ' · multiplier <b>×' + (sum.mul != null ? Number(sum.mul).toFixed(2) : '1.00') + '</b>' : ''}<br>
+       Coins banked this run: <b>${sum.paid != null ? sum.paid : sum.earned}</b><br>
        Permanent coin purse: <b>${sum.gold}</b><br>
-       Renown this run: <b>+${sum.renownRun + sum.renownEvent}</b> (spend it in 🌳 Mastery)${sum.renownEvent ? ` · events +${sum.renownEvent}` : ''}<br><!-- 0.8a/0.9a -->
+       Renown this run: <b>+${sum.renownRun + sum.renownEvent}</b> (spend it in 🌳 Mastery)${sum.renownEvent ? ` · events +${sum.renownEvent}` : ''}${extractRenownBit}<br><!-- 0.8a/0.9a -->
        Permanent renown: <b>${sum.renown}</b><br>
        King Black Dragon kills: <b>${sum.bossTotal}</b> total · best run <b>${sum.bossBest}</b><br><!-- 0.6 -->
        ${ORDER.map(k => STY[k].sk + ' <b>' + sLvl(k) + '</b>').join(' · ')}</p>
-    <p class="small">Permanent coins, skills and renown are saved on this device. Run levels and upgrades reset.</p>
+    <p class="small">Permanent coins, skills and renown are saved on this device. Run levels and upgrades reset. The bag is emptied; stash items stay in camp.</p>
     <button type="button" id="again">RETURN TO THE FRONTIER</button>`;
   if ($('again')) $('again').onclick = showFrontierMenu;
 }
 
 /* ========== UPDATE ========== */
 function update(dt) {
-  if (paused || bagging) return; // 0.10a: bag-full sheet pauses the run
+  if (paused || bagging || extractPicking) return; // 0.10a: bag-full sheet pauses the run. 0.14a: extract pick too.
 
 
   elapsed += dt;
@@ -5976,6 +6346,9 @@ function update(dt) {
       }
     }
   }
+
+  if (typeof updateExtract === 'function') updateExtract(dt);
+  if (extractPicking || !playing) return;
 
   // 0.5: guaranteed chest around 90 seconds in, dropped a short walk from the player
   // 0.9c: no missed minute rewards after a large simulation step.
@@ -6262,7 +6635,7 @@ function update(dt) {
   }
 
   // While leveling, just sit still (the modal is already on screen)
-  if (leveling || bagging) return;
+  if (leveling || bagging || extractPicking) return;
 
   // particles & floats
   for (const p of particles) {
@@ -6387,6 +6760,7 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(x, y + 7); ctx.lineTo(x + 26, y + 7); ctx.stroke();
     ctx.fillStyle = '#ffd24a'; ctx.fillRect(c.x - 3, y + 5, 6, 6); // lock
   }
+  if (typeof drawExtractShrine === 'function') drawExtractShrine();
   if (typeof drawGroundItems === 'function') drawGroundItems();
 
   // 0.7b: obstacles in view
@@ -6701,6 +7075,7 @@ function draw() {
   // 0.5: gold arrows at the screen edge pointing toward any chest you can't see
   // 0.6: (now shared edgeArrow helper) + a bigger red arrow for the boss
   for (const c of chests) edgeArrow(c.x + ox, c.y + oy, '#ffd24a', '#5e3818', 0.75 + 0.25 * Math.sin(c.t * 5), 1);
+  if (extractShrine) edgeArrow(extractShrine.x + ox, extractShrine.y + oy, '#ffe27a', '#3a2a08', 0.85 + 0.15 * Math.sin((extractShrine.t || 0) * 5), 1.25);
   for (const g of groundItems) edgeArrow(g.x + ox, g.y + oy, '#c8e8a0', '#3a5a30', 0.7 + 0.2 * Math.sin((g.t || 0) * 5), 0.85);
   for (const mag of magnets) edgeArrow(mag.x + ox, mag.y + oy, '#7ae0ff', '#2a6a80', 0.8 + 0.2 * Math.sin((mag.t || 0) * 6), 1.15);
   if (boss) edgeArrow(boss.x + ox, boss.y + oy, '#ff3a2a', '#3a0d0a', 0.8 + 0.2 * Math.sin(elapsed * 6), 1.35);
@@ -6906,7 +7281,7 @@ function togglePause() {
     };
     $('quit').onclick = () => {
       paused = false;
-      endRun();
+      endRun('abandon');
     };
   } else {
     $('overlay').style.display = 'none';
@@ -6935,13 +7310,14 @@ document.addEventListener('pointerdown', ev => {
 
 // 0.4: auto-pause when you switch apps, lock the phone, or click away from the window
 function autoPause() {
-  if (playing && !paused && !leveling && !bagging) togglePause();
+  if (playing && !paused && !leveling && !bagging && !extractPicking) togglePause();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); });
 addEventListener('blur', autoPause);
 
 // initial save text
 $('saveinfo').textContent = `Saved on this device · Coins ${toGold(save.gold)} · Renown ${save.renown} · Best survival ${fmt(save.best)}`;
+if (typeof renderStashMenu === 'function') renderStashMenu();
 })();
 </script>
 </body>
