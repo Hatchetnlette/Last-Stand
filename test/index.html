@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.12a</title>
+<title>Last Stand — Prototype 0.12b</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -290,7 +290,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.12a</div><!-- 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.12b</div><!-- 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, bring treasure home.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -614,6 +614,7 @@ const $ = id => document.getElementById(id);
 
 let W = 0, H = 0, dpr = 1;
 let last = 0, elapsed = 0, playing = false, paused = false, leveling = false;
+let runEnded = false, levelSafetyTimer = 0, levelSafetyTap = null, lastRunSummary = null;
 let player, enemies = [], orbs = [], shots = [], particles = [], floats = [];
 let kills = 0, runGold = 0, spawnClock = 0, attackClock = 0;
 let shake = 0, streak = 0, streakTimer = 0;
@@ -1997,7 +1998,34 @@ function gain(d) {
 }
 
 /* ========== START ========== */
+
+// 0.12b: leftover level-up timers/listeners must not outlive the run.
+function cancelLevelUi() {
+  if (levelSafetyTimer) { clearTimeout(levelSafetyTimer); levelSafetyTimer = 0; }
+  if (levelSafetyTap) {
+    document.removeEventListener('pointerdown', levelSafetyTap, true);
+    levelSafetyTap = null;
+  }
+  leveling = false;
+}
+function showFrontierMenu() {
+  cancelLevelUi();
+  $('panel').innerHTML = MENU;
+  bind();
+}
+
 function start(k) {
+  // 0.12b: drop any end-screen / level-up leftovers before building the new run
+  cancelLevelUi();
+  runEnded = false;
+  lastRunSummary = null;
+  paused = false;
+  bagging = false;
+  playing = false;
+  stopLoop();
+  if ($('overlay')) $('overlay').style.display = 'none';
+  if ($('bagFull')) $('bagFull').style.display = 'none';
+  document.body.classList.remove('bagging');
   ensureAudio();
   player = newPlayer();
   // 0.7b: new obstacle layout every run, with a clear area around the start
@@ -3393,9 +3421,10 @@ function holyBolt() {
   player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + healAmt(heal));
   healSplat(healAmt(heal));
   const t = enemies.filter(e => e.hp > 0).sort((a, b) => dist(a, player) - dist(b, player)).slice(0, n);
+  const myRun = runId;
   t.forEach((e, i) => {
     setTimeout(() => {
-      if (!playing || paused || leveling || bagging) return;
+      if (!playing || paused || leveling || bagging || myRun !== runId) return;
       if (e.hp <= 0) return;
       shots.push({ x: player.x, y: player.y, tx: e.x, ty: e.y, life: 0.16, col: '#f5e6a0', thick: 3.5, shape: 'priest' });
       hurt(e, Math.round(wDmg() * 1.35), false, false, 'special');
@@ -5229,12 +5258,10 @@ function levelUp() {
 
   // 0.4: one function that applies a choice and gets the game running again
   let done = false;
-  let safetyTimer = 0; // 0.4: declared up here so choose() can always clear it
   const choose = idx => {
     if (done) return;
     done = true;
-    document.removeEventListener('pointerdown', safetyTap, true);
-    clearTimeout(safetyTimer);
+    cancelLevelUi();
     try {
       const u = picks[idx] || picks[0];
       if (u && typeof u[2] === 'function') u[2](player);
@@ -5242,6 +5269,8 @@ function levelUp() {
     } catch (err) { /* 0.4: never stay frozen because an upgrade failed */ }
     $('overlay').style.display = 'none';
     leveling = false;
+    // 0.12b: a leftover level-up must not revive a dead run
+    if (player.hp <= 0) { endRun(); return; }
     playing = true;
     startLoop(); // 0.4: restarts the loop only if none is running (no stacking)
   };
@@ -5270,8 +5299,9 @@ function levelUp() {
   function safetyTap(ev) {
     if (!menuVisible()) { ev.preventDefault(); choose(0); }
   }
+  levelSafetyTap = safetyTap;
   document.addEventListener('pointerdown', safetyTap, true);
-  safetyTimer = setTimeout(() => { if (!menuVisible()) choose(0); }, 600);
+  levelSafetyTimer = setTimeout(() => { if (!menuVisible()) choose(0); }, 600);
 
   resetJoystick(); // 0.4: let go of the joystick while the level-up menu is open
   try { sfx('level'); } catch (e) {} // 0.4: sound last, so it can't block the menu
@@ -5279,7 +5309,10 @@ function levelUp() {
 
 /* ========== END RUN ========== */
 function endRun() {
+  cancelLevelUi();
+  stopLoop();
   playing = false;
+  paused = false;
   bag = []; groundItems = []; bagging = false; bagQueue = []; bagPending = []; // 0.10a: items are in-run only
   woodLogs = []; fires = []; thralls = []; traps = []; player.stealth = 0; player.altar = null; player.runeAltar = null;
   document.body.classList.remove('bagging');
@@ -5288,43 +5321,47 @@ function endRun() {
   if ($('bagFull')) $('bagFull').style.display = 'none';
   hideToast();
   bannerTimer = 0; $('lootBanner').style.opacity = '0'; // 0.5: clear the loot banner
-  showBossBar(false); fireballs = []; // 0.6: hide boss bar
-  save.bossTotal = (save.bossTotal || 0) + bossesSlain;            // 0.6: lifetime boss kills
-  save.bossBest = Math.max(save.bossBest || 0, bossesSlain);       // 0.6: most in one run
-  resetJoystick(); // 0.4: hide the joystick when the run ends
-  sfx('death');
-  const earned = Math.floor(runGold + elapsed / 11);
-  save.gold += earned;
-  const renownRun = Math.max(1, Math.floor(elapsed / 28) + Math.floor(kills / 22)) + 8 * bossesSlain; // 0.8a: +8 per boss
-  // 0.9a: event renown was already added during the run; still show it. Base run renown is separate.
-  save.renown += renownRun;
-  save.best = Math.max(save.best, Math.floor(elapsed));
-  if (elapsed >= 240 && chestsOpened >= 3) save.hunterQuest = true;
-  persist();
+  showBossBar(false); fireballs = []; boss = null; // 0.6: hide boss bar. 0.12b: drop the boss handle
+  if (!runEnded) {
+    save.bossTotal = (save.bossTotal || 0) + bossesSlain;            // 0.6: lifetime boss kills
+    save.bossBest = Math.max(save.bossBest || 0, bossesSlain);       // 0.6: most in one run
+    resetJoystick(); // 0.4: hide the joystick when the run ends
+    sfx('death');
+    const earned = Math.floor(runGold + elapsed / 11);
+    save.gold += earned;
+    const renownRun = Math.max(1, Math.floor(elapsed / 28) + Math.floor(kills / 22)) + 8 * bossesSlain; // 0.8a: +8 per boss
+    // 0.9a: event renown was already added during the run; still show it. Base run renown is separate.
+    save.renown += renownRun;
+    save.best = Math.max(save.best, Math.floor(elapsed));
+    if (elapsed >= 240 && chestsOpened >= 3) save.hunterQuest = true;
+    persist();
+    lastRunSummary = { earned, renownRun, renownEvent, elapsed, kills, chestsOpened, bossesSlain,
+      gold: save.gold, renown: save.renown, bossTotal: save.bossTotal, bossBest: save.bossBest };
+    runEnded = true;
+  }
 
   $('pauseBtn').style.display = 'none';
   $('dashBtn').style.display = 'none';
   $('abilityBtn').style.display = 'none';
   if (typeof hideRunHud === 'function') hideRunHud();
 
+  const sum = lastRunSummary || { earned: 0, renownRun: 0, renownEvent: 0, elapsed, kills, chestsOpened, bossesSlain,
+    gold: save.gold, renown: save.renown, bossTotal: save.bossTotal || 0, bossBest: save.bossBest || 0 };
   $('overlay').style.display = 'flex';
   $('panel').innerHTML = `
     <h2>THE FRONTIER CLAIMS YOU</h2>
-    <p>You survived <b>${fmt(elapsed)}</b> and defeated <b>${kills}</b> enemies.<br>
-       Chests opened: <b>${chestsOpened}</b><br><!-- 0.5 -->
-       Bosses slain: <b>${bossesSlain}</b></p><!-- 0.6 -->
-    <p>Run coins: <b>${earned}</b><br>
-       Permanent coin purse: <b>${save.gold}</b><br>
-       Renown this run: <b>+${renownRun + renownEvent}</b> (spend it in 🌳 Mastery)${renownEvent ? ` · events +${renownEvent}` : ''}<br><!-- 0.8a/0.9a -->
-       Permanent renown: <b>${save.renown}</b><br>
-       King Black Dragon kills: <b>${save.bossTotal}</b> total · best run <b>${save.bossBest}</b><br><!-- 0.6 -->
+    <p>You survived <b>${fmt(sum.elapsed)}</b> and defeated <b>${sum.kills}</b> enemies.<br>
+       Chests opened: <b>${sum.chestsOpened}</b><br><!-- 0.5 -->
+       Bosses slain: <b>${sum.bossesSlain}</b></p><!-- 0.6 -->
+    <p>Run coins: <b>${sum.earned}</b><br>
+       Permanent coin purse: <b>${sum.gold}</b><br>
+       Renown this run: <b>+${sum.renownRun + sum.renownEvent}</b> (spend it in 🌳 Mastery)${sum.renownEvent ? ` · events +${sum.renownEvent}` : ''}<br><!-- 0.8a/0.9a -->
+       Permanent renown: <b>${sum.renown}</b><br>
+       King Black Dragon kills: <b>${sum.bossTotal}</b> total · best run <b>${sum.bossBest}</b><br><!-- 0.6 -->
        ${ORDER.map(k => STY[k].sk + ' <b>' + sLvl(k) + '</b>').join(' · ')}</p>
     <p class="small">Permanent coins, skills and renown are saved on this device. Run levels and upgrades reset.</p>
-    <button id="again">RETURN TO THE FRONTIER</button>`;
-  $('again').onclick = () => {
-    $('panel').innerHTML = MENU;
-    bind();
-  };
+    <button type="button" id="again">RETURN TO THE FRONTIER</button>`;
+  if ($('again')) $('again').onclick = showFrontierMenu;
 }
 
 /* ========== UPDATE ========== */
@@ -5740,6 +5777,28 @@ function update(dt) {
   renderBuffs();
   if (typeof renderBag === 'function' && playing) renderBag();
 
+  // 0.12b: resolve death before opening a level-up or leaving a bag sheet up.
+  // The dragon dumps 1.6× next XP and often leaves bones/fire in the air. The old
+  // order opened LEVEL UP (or a bag sheet) and returned, so the death check at the
+  // end of update never ran. The run sat on that sheet with hp already at 0:
+  // pause/abandon did nothing, and starting a new run could stick on the same end screen.
+  if (player.hp <= 0) {
+    // 0.10a Ring of life: one save at 1 HP. Phoenix is a separate, later save if you have both.
+    if (!player.lifeUsed && bag.some(b => itemDef(b.id) && itemDef(b.id).life)) {
+      player.lifeUsed = true;
+      player.hp = 1;
+      player.invuln = 1.5;
+      shake = 0.3;
+      banner('💚 Ring of life!', 'You cling to 1 HP.', 2.2);
+    } else if (phoenix) {
+      phoenixSave(); // 0.5: Phoenix necklace cheats death once
+    } else {
+      if (eventFight) endPenanceFight(true); // 0.11c: clean up the swarm; no payout (hp is already 0)
+      endRun();
+      return;
+    }
+  }
+
   if (player.xp >= player.next && !leveling && !bagging) {
     levelUp();
     return;
@@ -5786,21 +5845,6 @@ function update(dt) {
     $('streak').style.opacity = '0';
   }
 
-  if (player.hp <= 0) {
-    // 0.10a Ring of life: one save at 1 HP. Phoenix is a separate, later save if you have both.
-    if (!player.lifeUsed && bag.some(b => itemDef(b.id) && itemDef(b.id).life)) {
-      player.lifeUsed = true;
-      player.hp = 1;
-      player.invuln = 1.5;
-      shake = 0.3;
-      banner('💚 Ring of life!', 'You cling to 1 HP.', 2.2);
-      return;
-    }
-    if (phoenix) { phoenixSave(); return; } // 0.5: Phoenix necklace cheats death once
-    if (eventFight) endPenanceFight(true); // 0.11c: clean up the swarm; no payout (hp is already 0)
-    endRun();
-    return;
-  }
 }
 
 /* ========== DRAW ========== */
