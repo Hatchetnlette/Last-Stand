@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.11d</title>
+<title>Last Stand — Prototype 0.11e</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -249,7 +249,7 @@ body.bagging #bagHud,body.bagging #bagTip{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.11d</div><!-- 0.11d: thrall HP scales with run time; 0.11c: Penance horn clears the wave and fights its own foes; 0.11b: synth SFX; 0.11a: Thief, Priest, Woodcutter, Firemaker; 0.10a: in-run items + 5-slot bag; 0.9c: class dropdown menu -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.11e</div><!-- 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, bring treasure home.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -642,7 +642,7 @@ const TREES = {
   ranged: { name: 'Ranged', icon: '🏹', skill: 'Ranged', branches: [
     { id: 'dead', name: 'Deadeye', icon: '🎯', blurb: 'Huge crits. Elite and boss killer.', nodes: [
       ['dead1', 'Steady aim', '🎯', '+5% crit chance.', p => p.crit += 0.05],
-      ['dead2', 'Ruby tips', '💎', 'Crit damage 2.4× → 2.7×.', p => p.critMul = 2.7],
+      ['dead2', 'Ruby tips', '💎', 'Crit damage 2.4× → 2.7×.', p => p.critMul = Math.max(p.critMul || 2.4, 2.7)],
       ['dead3', 'Long shot', '🔭', '+15% damage to targets more than 120px away.'],
       ['dead4', "Hunter's focus", '🦌', '+20% damage to elites, giants and bosses.'],
       ['deadC', 'Dragon Hunter Bolt', '🐉', 'Every 4th attack fires a piercing bolt down its whole line. It always crits and does +25% to bosses.', null, 'Base attack speed −8%.']] },
@@ -650,7 +650,7 @@ const TREES = {
       ['rapid1', 'Quick draw', '⚡', '+8% attack speed.', p => p.rm2 /= 1.08],
       ['rapid2', 'Volley', '🎆', 'Barrage fires 7 arrows instead of 5, and its cooldown drops from 8s to 7s.', p => p.specialMax = 7],
       ['rapid3', 'Split arrow', '🔱', 'Your attacks hit 1 extra target for 60% damage.', p => p.split = 1],
-      ['rapid4', 'Ammo pouch', '👝', 'Rapid fire card 12% → 15% faster; Twin shot card also gives +10% damage.'],
+      ['rapid4', 'Ammo pouch', '👝', 'Rapid fire follow-up deals 100% damage (up from 70%); Twin shot card also gives +10% damage.'],
       ['rapidC', 'Toxic Blowpipe', '🧪', '+35% attack speed. Hits apply venom (20% weapon damage per second for 4s, stacks 3×).', null, '−20% damage per arrow.']] },
     { id: 'skirm', name: 'Skirmisher', icon: '👢', blurb: 'Hit and run. Dodging powers you up.', nodes: [
       ['skirm1', 'Light feet', '🪶', '+6% move speed.', p => addMoveSpeed(p, 0.06)],
@@ -663,7 +663,7 @@ const TREES = {
     { id: 'pyro', name: 'Pyromancer', icon: '🔥', blurb: 'Burn the horde. Bigger splash.', nodes: [
       ['pyro1', 'Kindling', '🪵', 'Spell splash radius +12px.', p => p.blast += 12],
       ['pyro2', 'Ignite', '🔥', 'Spells set their target on fire for 3s: 10% of your weapon damage per second (does not stack).'],
-      ['pyro3', 'Fire Blast mastery', '☄', 'Splash damage 48% → 60%.', p => p.splashMul = 0.6],
+      ['pyro3', 'Fire Blast mastery', '☄', 'Splash damage 48% → 60%.', p => p.splashMul = Math.max(p.splashMul || 0, 0.6)],
       ['pyro4', 'Wildfire', '🌋', 'A burning enemy that dies passes its burn to 1 enemy within 70px.'],
       ['pyroC', 'Inferno', '♨', 'Kills may leave fire pools; Arcane Nova becomes Fire Wave (+25% damage, ignites everything).', null, 'The Nova no longer slows.']] },
     { id: 'ice', name: 'Ancient Ice', icon: '❄', blurb: 'Slow and stop attacks before they land.', nodes: [
@@ -1674,7 +1674,7 @@ function mastery(cls, sel) {
 function cardText(u) {
   const m = player.m || {};
   if (u[0] === 'Berserker' && m.zerk4) return "Damage increased by 30% while below 55% HP. (Warlord's call)";
-  if (u[0] === 'Rapid fire' && m.rapid4) return 'Attack 15% faster. (Ammo pouch)';
+  if (u[0] === 'Rapid fire' && m.rapid4) return 'Every 5th attack fires a follow-up shot at the same target for 100% damage. (Ammo pouch)';
   if (u[0] === 'Twin shot' && m.rapid4) return 'Fire at one extra target, and +10% damage. (Ammo pouch)';
   if (u[0] === 'Eat a lobster') { // 0.8b Cook
     if (m.cook2) return 'Restore 90 health and gain +12 max HP. (Chef\'s kiss)';
@@ -2276,6 +2276,7 @@ function attack() {
     if (player.style === 'hunter') {
       if (M.track4 && ((e.root || 0) > 0 || (e.slow || 0) > 0)) d = Math.round(d * 1.15);
       if ((player.huntBuff || 0) > 0) d = Math.round(d * 1.20);
+      if (player.javelinVuln && ((e.root || 0) > 0 || (e.slow || 0) > 0)) d = Math.round(d * (1 + player.javelinVuln));
     }
 
     let isCrit = Math.random() < (player.crit || 0);
@@ -2303,6 +2304,14 @@ function attack() {
       sfx(CAST[player.style] ? 'cast' : (isCrit ? 'crit' : 'hit'));
     }
     hurt(e, d, isCrit);
+    // 0.11e Rapid fire: every 5th attack adds a follow-up on the primary target
+    if (ti === 0 && player.rapidFifth && player.hitN % 5 === 0 && e.hp > 0) {
+      const fd = Math.round(d * (player.m && player.m.rapid4 ? 1 : 0.70));
+      shots.push({ x: player.x, y: player.y, tx: e.x, ty: e.y, life: 0.12, col: S.col, thick: 2.2 });
+      hurt(e, Math.max(1, fd), false);
+    }
+    // 0.11e Death staff: refund a sliver of Thrall Summon cooldown
+    if (ti === 0 && player.riteHit) player.specialCd = Math.max(0, (player.specialCd || 0) - player.riteHit);
     if (player.style === 'necromancer' && e.hp > 0) {
       if (M.deathn2) { e.wither = Math.max(e.wither || 0, 2); e.witherDps = wDmg() * 0.10; e.witherTick = 0.5; }
       if (M.deathn4) e.chill = Math.max(e.chill || 0, 0.6);
@@ -2310,7 +2319,7 @@ function attack() {
     if (player.style === 'runecrafter') {
       grantEssence(1 + (M.ess1 ? 1 : 0) + (player.itemEss || 0) + (player.essCard || 0));
       if ((player.runes.fire || 0) > 0 && e.hp > 0) {
-        const rr = M.elem1 ? 50 : 40, fm = M.elem1 ? 0.40 : 0.30;
+        const rr = M.elem1 ? 50 : 40, fm = (M.elem1 ? 0.40 : 0.30) + (player.elemCard ? 0.15 : 0);
         const sd = Math.max(1, Math.round(d * fm));
         for (const o of enemies) {
           if (o === e || o.hp <= 0) continue;
@@ -2318,7 +2327,7 @@ function attack() {
         }
       }
       if ((player.runes.death || 0) > 0 && e.hp > 0 && !e.boss && e.maxHp) {
-        const thresh = M.elem3 ? 0.25 : 0.18;
+        const thresh = (M.elem3 ? 0.25 : 0.18) + (player.elemCard ? 0.07 : 0);
         if (e.hp / e.maxHp < thresh) { e.hp = 0; hurt(e, 1, true); }
       }
     }
@@ -2331,7 +2340,7 @@ function attack() {
         else { e.freezeT = e.elite ? 0.6 : 1.2; e.windup = 0; }
       }
     }
-    const doReel = (M.harp3 && Math.random() < 0.30) || (M.harp4 && isCrit) || spike;
+    const doReel = (M.harp3 && Math.random() < 0.30) || (M.harp4 && isCrit) || spike || (player.hookCard && player.style === 'fisher');
     if (doReel && ti === 0 && e.hp > 0 && !e.boss) {
       const dd = dist(e, player) || 1;
       e.x -= (e.x - player.x) / dd * 45; e.y -= (e.y - player.y) / dd * 45;
@@ -2357,6 +2366,9 @@ function attack() {
       if (M.smite1) {
         const heal = Math.min(4, Math.max(1, Math.round(d * 0.03)));
         player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + heal);
+      }
+      if (player.smiteHealCard) {
+        player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + player.smiteHealCard);
       }
       if (M.smite3 || player.prayHit) refillPray(1, true);
       if (M.smiteC && player.hitN % 4 === 0) {
@@ -2509,6 +2521,11 @@ function doSpecial() {
         hitN++;
       }
     }
+    if (player.soulWhirl && hitN) {
+      const heal = Math.min(24, hitN * player.soulWhirl);
+      player.hp = Math.min(player.maxHp, player.hp + heal);
+      floats.push({ x: player.x, y: player.y - 28, text: '+' + heal, life: 0.7, vy: -34, color: '#8fef9a' });
+    }
     if (M.whirl4) player.specialCd = Math.max(0, player.specialCd - Math.min(3, hitN * 0.2));
     for (let i = 0; i < 18; i++) {
       const a = (i / 18) * Math.PI * 2;
@@ -2516,7 +2533,7 @@ function doSpecial() {
     }
   } else if (player.style === 'ranged') {
     const targets = enemies.filter(e => e.hp > 0 && dist(e, player) < player.range * 1.15)
-      .sort((a, b) => dist(a, player) - dist(b, player)).slice(0, M.rapid2 ? 7 : 5);
+      .sort((a, b) => dist(a, player) - dist(b, player)).slice(0, (M.rapid2 ? 7 : 5) + (player.eagleBarrage || 0));
     const myRun = runId;
     targets.forEach((e, i) => {
       setTimeout(() => {
@@ -2592,8 +2609,10 @@ function castNet() { // 0.8b Fisher special
 function netPulse(cx, cy, R, mul) {
   const M = player.m;
   const slowT = M.net2 ? 2.8 : 1.8;
+  let netCaught = 0;
   for (const e of enemies) {
     if (e.hp <= 0 || Math.hypot(e.x - cx, e.y - cy) > R) continue;
+    netCaught++;
     hurt(e, Math.round(player.damage * 1.30 * mul), false);
     e.slow = Math.max(e.slow || 0, slowT);
     if (M.net3 && !e.boss) e.root = Math.max(e.root || 0, 0.75);
@@ -2605,6 +2624,11 @@ function netPulse(cx, cy, R, mul) {
       e.y += (e.y - cy) / dd * push;
     }
     if (e.hp <= 0) floats.push({ x: e.x, y: e.y - 20, text: 'Caught!', life: 0.7, vy: -34, color: '#5ec8c0' });
+  }
+  if (player.netHealCard && netCaught) {
+    const heal = Math.min(32, netCaught * player.netHealCard);
+    player.hp = Math.min(player.maxHp, player.hp + heal);
+    floats.push({ x: player.x, y: player.y - 28, text: '🦞 +' + heal, life: 0.7, vy: -34, color: '#5ec8c0' });
   }
   for (let i = 0; i < 20; i++) {
     const a = (i / 20) * Math.PI * 2;
@@ -2676,7 +2700,7 @@ function startStealth() {
 function endStealth(fromHit) {
   if (player.stealth <= 0 && !fromHit) return;
   player.stealth = 0;
-  player.backstab = fromHit ? 0 : 2.5;
+  player.backstab = fromHit ? 0 : (2.5 + (player.backstabBonus || 0));
   const M = player.m || {};
   if (M.shadC) {
     player.invuln = Math.max(player.invuln, 0.4);
@@ -2720,7 +2744,7 @@ function spawnLog(x, y, r, life) {
       px = x + Math.cos(a) * 24; py = y + Math.sin(a) * 24;
     }
   }
-  woodLogs.push({ x: px, y: py, r: r || 22, life: life || 6, splinterCd: 0 });
+  woodLogs.push({ x: px, y: py, r: r || 22, life: (life || 6) + (player.logLifeCard || 0), splinterCd: 0 });
   if (woodLogs.length > 6) woodLogs.shift();
   if (player.m && player.m.forestC) {
     player.hp = Math.min(player.maxHp, player.hp + healAmt(8));
@@ -2757,7 +2781,7 @@ function timberSlam() {
   floats.push({ x: player.x + ux * 40, y: player.y + uy * 40 - 16, text: '🌲 Timber!', life: 0.8, vy: -30, color: '#c4a06a' });
 }
 function fireRadius(base) {
-  return (player.m && player.m.kindle3 ? 38 : base);
+  return (player.m && player.m.kindle3 ? 38 : base) + (player.fireRadCard || 0);
 }
 function fireLifetime(base) {
   let t = base + (player.m && player.m.kindle1 ? 1.2 : 0) + (player.fireDur || 0);
@@ -2887,6 +2911,10 @@ function onSlayerKill(e) {
   if (player.m && player.m.task3) player.hp = Math.min(player.maxHp, player.hp + 4);
   if (player.slayerTask.have >= player.slayerTask.need) {
     floats.push({ x: player.x, y: player.y - 30, text: '✅ Task complete', life: 1.1, vy: -32, color: '#c8e080' });
+    if (player.taskFinishCard) {
+      player.hp = Math.min(player.maxHp, player.hp + 18);
+      player.specialCd = Math.max(0, (player.specialCd || 0) - 2);
+    }
     if (player.m && player.m.taskC) {
       openChest({ x: player.x, y: player.y - 20, rolls: 1 }, null, false);
     }
@@ -2903,6 +2931,10 @@ function thrallCap() {
   return Math.min(THRALL_HARD_CAP, (player.m && player.m.thrallC) ? 4 : 3);
 }
 function expireThrall(th, natural) {
+  if (player.soulVesselHeal) {
+    player.hp = Math.min(player.maxHp, player.hp + player.soulVesselHeal);
+    floats.push({ x: player.x, y: player.y - 26, text: '+' + player.soulVesselHeal, life: 0.7, vy: -32, color: '#b89ae8' });
+  }
   if (natural && player.m && player.m.thrallC) {
     const sd = Math.round(wDmg() * 0.80);
     for (const e of enemies) if (e.hp > 0 && Math.hypot(e.x - th.x, e.y - th.y) < 70) hurt(e, sd, false);
@@ -3437,6 +3469,7 @@ function dmgTakenNow() {
   }
   if (player.style === 'necromancer' && player.m && player.m.soul4 && thralls.some(th => th.hp > 0)) m *= 0.92;
   if (player._slayerTaken) m *= player._slayerTaken;
+  if (player.graniteStill && (player.stillT || 0) >= 0.6) m *= 0.75;
   return m;
 }
 
@@ -4339,64 +4372,64 @@ const upgrades = [
 
   // style specific
   ['Whirlwind', 'Your swings also hit every enemy around you.', p => { p.sweep = (p.sweep || 0) + 32; p.sweepCard = 1; }, 'melee'],
-  ['Soul harvest', 'Heal 5 health per kill.', p => p.kh = (p.kh || 0) + 5, 'melee'],
-  ['Granite skin', 'Take 18% less damage.', p => p.armor = Math.min(armorCap(), p.armor + 0.18), 'melee'],
+  ['Soul harvest', 'Whirlwind heals you for 6 HP per enemy it hits.', p => p.soulWhirl = 6, 'melee'],
+  ['Granite skin', 'If you stand still for 0.6s, take 25% less damage.', p => p.graniteStill = true, 'melee'],
   ['Berserker', 'Damage increased by 20% while below 40% HP.', p => p.berserk = true, 'melee'],
 
   ['Twin shot', 'Fire at one extra target.', p => { p.multi = (p.multi || 0) + 1; if (p.m && p.m.rapid4) p.damage = Math.round(p.damage * 1.1); }, 'ranged'], // 0.8a: Ammo pouch
-  ['Ruby bolts', '+12% chance to crit for 2.4x damage.', p => p.crit = (p.crit || 0) + 0.12, 'ranged'],
-  ['Eagle eye', '+12% range and +18% damage.', p => { p.rm *= 1.12; p.damage = Math.round(p.damage * 1.18); }, 'ranged'],
-  ['Rapid fire', 'Attack 12% faster.', p => p.rm2 = Math.max(0.3, p.rm2 * (p.m && p.m.rapid4 ? 0.85 : 0.88)), 'ranged'], // 0.8a: Ammo pouch
+  ['Ruby bolts', 'Crits deal 2.8× damage (up from 2.4×).', p => p.critMul = Math.max(p.critMul || 2.4, 2.8), 'ranged'],
+  ['Eagle eye', 'Barrage fires 2 extra arrows, and its cooldown −1.5s.', p => { p.eagleBarrage = (p.eagleBarrage || 0) + 2; p.specialMax = Math.max(5, (p.specialMax || 8) - 1.5); }, 'ranged'],
+  ['Rapid fire', 'Every 5th attack fires a follow-up shot at the same target for 70% damage.', p => p.rapidFifth = true, 'ranged'],
 
   ['Blast radius', 'Spell splash reaches further.', p => p.blast = (p.blast || 0) + 28, 'magic'],
   ['Ice barrage', 'Enemies you hit are slowed.', p => p.freeze = 1, 'magic'],
-  ['Arcane focus', '+28% spell damage.', p => p.damage = Math.round(p.damage * 1.28), 'magic'],
+  ['Arcane focus', 'Splash hits deal 70% damage (up from 48%) and reach 12px further.', p => { p.splashMul = Math.max(p.splashMul || 0.48, 0.70); p.blast = (p.blast || 0) + 12; }, 'magic'],
   ['Mana shield', 'Gain 20 max HP and 8% armour.', p => { p.maxHp += 20; p.hp += 20; p.armor = Math.min(armorCap(), p.armor + 0.08); }, 'magic'],
 
   // 0.8b Fisher
-  ['Hooked', 'Deal 18% more damage, but attack 8% slower.', p => { p.damage = Math.round(p.damage * 1.18); p.rm2 *= 1.08; }, 'fisher'],
+  ['Hooked', 'Harpoon hits reel the target 45px toward you.', p => p.hookCard = true, 'fisher'],
   ['Net practice', 'Cast Net radius +25px.', p => { p.netBonus = (p.netBonus || 0) + 25; }, 'fisher'],
-  ['Fishy treats', 'Heal 4 health per kill.', p => p.kh = (p.kh || 0) + 4, 'fisher'],
+  ['Fishy treats', 'Cast Net heals you for 8 HP per enemy caught (max 32 per cast).', p => p.netHealCard = 8, 'fisher'],
   ['Angler\'s outfit', 'Move 12% faster and pull loot from further away.', p => { addMoveSpeed(p, 0.12); p.magnet += 20; }, 'fisher'],
 
   // 0.11a new classes
   ['Sneak', '+8% crit. Move 6% faster.', p => { p.crit = (p.crit || 0) + 0.08; addMoveSpeed(p, 0.06); }, 'thief'],
   ['Palm', 'Pickpocket yields +1 coin per hit.', p => p.filchCard = (p.filchCard || 0) + 1, 'thief'],
   ['Blackjack practice', 'Blackjack chance +10% and stuns last 0.2s longer.', p => { p.jackChance = (p.jackChance || 0) + 0.10; p.jackTime = (p.jackTime || 0) + 0.2; }, 'thief'],
-  ['Dagger mastery', '+16% dagger damage.', p => p.damage = Math.round(p.damage * 1.16), 'thief'],
+  ['Dagger mastery', 'Shadow Step cooldown −1.5s, and the backstab window lasts 0.8s longer.', p => { p.specialMax = Math.max(5, (p.specialMax || 8) - 1.5); p.backstabBonus = (p.backstabBonus || 0) + 0.8; }, 'thief'],
 
   ['Mending', 'Heal 5 health per kill and +10 max HP.', p => { p.kh = (p.kh || 0) + 5; p.maxHp += 10; p.hp += 10; }, 'priest'],
-  ['Smite harder', '+16% holy damage.', p => p.damage = Math.round(p.damage * 1.16), 'priest'],
+  ['Smite harder', 'Holy Bolt cooldown −1.5s, and attacks heal you for 3 HP.', p => { p.specialMax = Math.max(5, (p.specialMax || 8) - 1.5); p.smiteHealCard = (p.smiteHealCard || 0) + 3; }, 'priest'],
   ['Devotion', '+15 max prayer points and refill 15.', p => { p.prayMax = (p.prayMax || 50) + 15; p.pray = Math.min(p.prayMax, (p.pray || 0) + 15); }, 'priest'],
   ['Hallowed', 'Attacks restore 1 prayer point.', p => p.prayHit = true, 'priest'],
 
   ['Wide chop', 'Cleave reaches further and hits harder.', p => { p.sweep = (p.sweep || 0) + 20; p.sweepMul = Math.max(p.sweepMul || 0.35, 0.50); p.sweepCard = 1; }, 'woodcutter'],
-  ['Seasoned oak', '+18% axe damage.', p => p.damage = Math.round(p.damage * 1.18), 'woodcutter'],
+  ['Seasoned oak', 'Timber! cooldown −1.5s, and dropped logs last 2s longer.', p => { p.specialMax = Math.max(5, (p.specialMax || 8) - 1.5); p.logLifeCard = (p.logLifeCard || 0) + 2; }, 'woodcutter'],
   ['Hard hat', '+25 max HP and +6% armour.', p => { p.maxHp += 25; p.hp += 25; p.armor = Math.min(armorCap(), p.armor + 0.06); }, 'woodcutter'],
   ['Stack of logs', 'Timber! drops an extra log.', p => p.extraLog = (p.extraLog || 0) + 1, 'woodcutter'],
 
   ['Hotter fires', 'Ground fires deal 25% more damage and last 1s longer.', p => { p.fireDpsMul = (p.fireDpsMul || 1) * 1.25; p.fireDur = (p.fireDur || 0) + 1; }, 'firemaker'],
-  ['Firestarter', '+14% lantern damage.', p => p.damage = Math.round(p.damage * 1.14), 'firemaker'],
+  ['Firestarter', 'Ground fires are 16px wider.', p => p.fireRadCard = (p.fireRadCard || 0) + 16, 'firemaker'],
   ['Oil flask', 'Attacks have +10% chance to drop a fire.', p => p.fireChance = (p.fireChance || 0) + 0.10, 'firemaker'],
   ['Campcraft', 'Drop a log at your feet every 6s.', p => { p.kindleT = Math.min(p.kindleT || 8, 6); p.kindleCard = true; }, 'firemaker'],
 
   ['Dark apprentice', 'Thralls last +2s and deal 15% more.', p => { p.thrallLifeCard = (p.thrallLifeCard || 0) + 2; p.thrallDmgCard = (p.thrallDmgCard || 1) * 1.15; }, 'necromancer'],
-  ['Death staff', '+16% staff damage.', p => p.damage = Math.round(p.damage * 1.16), 'necromancer'],
-  ['Soul vessel', '+18 max HP.', p => { p.maxHp += 18; p.hp += 18; }, 'necromancer'],
+  ['Death staff', 'Staff hits refund 0.3s of Thrall Summon cooldown.', p => p.riteHit = (p.riteHit || 0) + 0.3, 'necromancer'],
+  ['Soul vessel', '+8 max HP. When a thrall dies, you heal 10 HP.', p => { p.maxHp += 8; p.hp += 8; p.soulVesselHeal = (p.soulVesselHeal || 0) + 10; }, 'necromancer'],
   ['Quick rite', 'Thrall Summon cooldown −1.5s.', p => p.specialMax = Math.max(5, (p.specialMax || 8) - 1.5), 'necromancer'],
 
   ['On task', '+20% damage to your current assignment.', p => p.taskCard = (p.taskCard || 0) + 0.20, 'slayer'],
-  ['Broader tips', '+14% weapon damage.', p => p.damage = Math.round(p.damage * 1.14), 'slayer'],
+  ['Broader tips', 'Finishing an assignment heals 18 HP and shortens Slayer Strike by 2s.', p => p.taskFinishCard = true, 'slayer'],
   ['Hardened helm', '+16 max HP and +5% armour.', p => { p.maxHp += 16; p.hp += 16; p.armor = Math.min(armorCap(), p.armor + 0.05); }, 'slayer'],
   ['Marksman', 'Slayer Strike cooldown −1.5s.', p => p.specialMax = Math.max(5, (p.specialMax || 8) - 1.5), 'slayer'],
 
   ['Boxer', 'Traps arm faster and last +3s.', p => { p.trapArmCard = 0.2; p.trapLifeCard = (p.trapLifeCard || 0) + 3; }, 'hunter'],
-  ['Sharp javelin', '+16% javelin damage.', p => p.damage = Math.round(p.damage * 1.16), 'hunter'],
-  ['Trail shoes', '+8% move speed (under the +40% cap).', p => addMoveSpeed(p, 0.08), 'hunter'],
-  ['Eagle eye', '+16 range.', p => p.itemRange = (p.itemRange || 0) + 16, 'hunter'],
+  ['Sharp javelin', 'Snared or slowed enemies take 25% more damage, and Box Trap cooldown −1s.', p => { p.javelinVuln = (p.javelinVuln || 0) + 0.25; p.specialMax = Math.max(5, (p.specialMax || 8) - 1); }, 'hunter'],
+  ['Trail shoes', 'Dash cooldown −0.5s.', p => p.dashMax = Math.max(1.2, (p.dashMax || 2.4) - 0.5), 'hunter'],
+  ['Hawk eye', '+16 range, and auto-snares drop 2s faster.', p => { p.itemRange = (p.itemRange || 0) + 16; p.hawkSnare = (p.hawkSnare || 0) + 2; }, 'hunter'],
 
   ['Catalyse', 'Hits grant +1 essence.', p => p.essCard = (p.essCard || 0) + 1, 'runecrafter'],
-  ['Elemental staff', '+14% staff damage.', p => p.damage = Math.round(p.damage * 1.14), 'runecrafter'],
+  ['Elemental staff', 'Fire rune splash is 15 points stronger, and death runes execute 7 points earlier.', p => p.elemCard = true, 'runecrafter'],
   ['Pouch upgrade', 'Essence cap +15.', p => p.essenceMax = (p.essenceMax || 40) + 15, 'runecrafter'],
   ['Ourania attune', 'Ourania Pulse cooldown −1.5s.', p => p.specialMax = Math.max(5, (p.specialMax || 8) - 1.5), 'runecrafter']
 ];
@@ -4405,9 +4438,42 @@ const upgrades = [
 // but never appeared on some phones. Now the choices go into the same #overlay/#panel
 // as the start menu (known to show on phones), the risky bits can't stop it from
 // opening, and there is a safety net so the game can never stay frozen.
+function alreadyHasUpgrade(u) {
+  // 0.11e: one-shot cards are not offered again after they have already applied
+  const n = u[0];
+  if (n === 'Berserker') return !!player.berserk;
+  if (n === 'Ice barrage') return !!player.freeze;
+  if (n === 'Hallowed') return !!player.prayHit;
+  if (n === 'Campcraft') return !!player.kindleCard;
+  return false;
+}
+// 0.11e: cards that still share a primary stat are not offered side by side
+const UPGRADE_FAMILIES = {
+  'Keen edge': ['dmg'],
+  'Quick hands': ['as'],
+  'Stout constitution': ['hp'],
+  'Fleet-footed': ['spd'],
+  'Long reach': ['range'],
+  'Thick skin': ['armor'],
+  'Bloodlust': ['kh'],
+  'Critical eye': ['crit'],
+  'Mana shield': ['hp', 'armor'],
+  "Angler's outfit": ['spd'],
+  'Sneak': ['crit', 'spd'],
+  'Mending': ['kh', 'hp'],
+  'Hard hat': ['hp', 'armor'],
+  'Hardened helm': ['hp', 'armor'],
+  'Soul vessel': ['hp'],
+  'Hawk eye': ['range']
+};
+function upgradeFamilies(u) { return UPGRADE_FAMILIES[u[0]] || []; }
+function upgradesOverlap(a, b) {
+  const A = upgradeFamilies(a), B = upgradeFamilies(b);
+  return A.some(f => B.includes(f));
+}
 function pickUpgrades() {
-  const styleUps = upgrades.filter(u => u[3] === player.style);
-  const generic = upgrades.filter(u => !u[3]);
+  const styleUps = upgrades.filter(u => u[3] === player.style && !alreadyHasUpgrade(u));
+  const generic = upgrades.filter(u => !u[3] && !alreadyHasUpgrade(u));
   const shuffle = arr => {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
@@ -4416,7 +4482,30 @@ function pickUpgrades() {
     }
     return a;
   };
-  let picks = shuffle(styleUps).slice(0, 2).concat(shuffle(generic).slice(0, 1));
+  // two class cards first, skipping any same-stat pair when another class card can take the slot
+  let picks = [];
+  for (const u of shuffle(styleUps)) {
+    if (picks.length >= 2) break;
+    if (picks.some(p => upgradesOverlap(p, u))) continue;
+    picks.push(u);
+  }
+  for (const u of shuffle(styleUps)) {
+    if (picks.length >= 2) break;
+    if (!picks.includes(u)) picks.push(u);
+  }
+  // one generic that does not copy a stat already on the table
+  for (const u of shuffle(generic)) {
+    if (picks.some(p => p === u || upgradesOverlap(p, u))) continue;
+    picks.push(u);
+    break;
+  }
+  for (const u of shuffle(generic.concat(styleUps))) {
+    if (picks.length >= 3) break;
+    if (picks.includes(u)) continue;
+    if (picks.some(p => upgradesOverlap(p, u))) continue;
+    picks.push(u);
+  }
+  // last resort: fill even if a mild overlap remains, rather than show fewer than 3 cards
   for (const u of shuffle(generic.concat(styleUps))) {
     if (picks.length >= 3) break;
     if (!picks.includes(u)) picks.push(u);
@@ -4425,7 +4514,7 @@ function pickUpgrades() {
   // 0.8a Warlord's call: the Berserker card is offered in each of the first 3 level-ups until taken
   if (player.m && player.m.zerk4 && player.style === 'melee' && !player.berserk && player.level <= 4) {
     const bz = upgrades.find(u => u[0] === 'Berserker');
-    if (!picks.includes(bz)) picks[0] = bz;
+    if (bz && !picks.includes(bz)) picks[0] = bz;
   }
   // 0.8b Fishy business: force lobster early only when hurt (so it does not steal damage cards at full HP)
   if (player.m && player.m.cook1 && player.style === 'fisher' && !player.ateLobster && player.level <= 4 && player.hp / player.maxHp < 0.75) {
@@ -4598,7 +4687,12 @@ function update(dt) {
     player.dmgTaken = 0.7; // 30% less damage during spin
     if (player.cycPulse <= 0) {
       player.cycPulse = 0.4;
-      for (const e of enemies) if (e.hp > 0 && dist(e, player) < 115) hurt(e, Math.round(player.damage * 0.80), false);
+      let cHits = 0;
+      for (const e of enemies) if (e.hp > 0 && dist(e, player) < 115) { hurt(e, Math.round(player.damage * 0.80), false); cHits++; }
+      if (player.soulWhirl && cHits) {
+        const heal = Math.min(18, cHits * 2);
+        player.hp = Math.min(player.maxHp, player.hp + heal);
+      }
       for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; particles.push({ x: player.x + Math.cos(a) * 40, y: player.y + Math.sin(a) * 40, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, life: 0.25, color: '#ffd27a', size: 4 }); }
     }
     if (player.cyclone <= 0) player.dmgTaken = player._dmgBase || (player.m.zerk3 ? 1.05 : 1);
@@ -4675,7 +4769,7 @@ function update(dt) {
   if (typeof updateRunes === 'function') updateRunes(dt);
   if (player.huntBuff > 0) player.huntBuff = Math.max(0, player.huntBuff - dt);
   if (player.style === 'hunter') {
-    const snareEvery = (player.m && player.m.trapb4) ? 6 : 8;
+    const snareEvery = Math.max(4, ((player.m && player.m.trapb4) ? 6 : 8) - (player.hawkSnare || 0));
     player.snareT = (player.snareT || snareEvery) - dt;
     if (player.snareT <= 0) {
       player.snareT = snareEvery;
@@ -4701,6 +4795,9 @@ function update(dt) {
   // 0.7a: sprite row (0 down, 1 left, 2 right, 3 up) and whether to animate the walk
   player.moving = mag > 0.05;
   if (player.moving) player.dir = Math.abs(dx) > Math.abs(dy) ? (dx >= 0 ? 2 : 1) : (dy >= 0 ? 0 : 3);
+  // 0.11e Granite skin: track time spent standing still
+  if (player.moving) player.stillT = 0;
+  else player.stillT = (player.stillT || 0) + dt;
 
   let spd = moveSpeed(); // 0.9c: additive, at most class base × 1.40
   player.x += dx * spd * dt;
