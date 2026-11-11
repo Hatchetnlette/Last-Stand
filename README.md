@@ -11,6 +11,7 @@ Test build: Prototype 0.11a (12 classes) at https://hatchetnlette.github.io/Last
 0.12a (test link): live DPS meter, hitsplat damage numbers, next-threat goal text, minimap, clearer spell shapes
 Test link 0.12b: fixes freeze/stuck end screen after a dragon kill (death now resolves before level-up; new run fully resets).
 Test link 0.12c: item bonuses (crit/prayer/cleave) now come off when unequipped; chest banners always match the loot.
+Test link: 0.13b - XP orb/coin merging, rare magnet drop, late-game scaling and freeze fix (0.13a), food as wearable passive gear, bag item info on tap and in the pause menu, small late minimum-damage floor.
 Last checked: 2026-11-06 14:08 America/Chicago
 
 Play it at https://hatchetnlette.github.io/Last-Stand/
