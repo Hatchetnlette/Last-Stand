@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.12b</title>
+<title>Last Stand — Prototype 0.12c</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -290,7 +290,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.12b</div><!-- 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.12c</div><!-- 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, bring treasure home.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -4121,18 +4121,27 @@ function refreshItems() {
   player.itemUnique = st.unique;
   player.itemDharok = st.dharok;
   // 0.11a unique extras (dagger crit, holy book prayer, infernal axe cleave, tome fire duration)
-  if (st.crit && !player._itemCritApplied) { player.crit = (player.crit || 0) + st.crit; player._itemCritApplied = st.crit; }
-  else if (st.crit && player._itemCritApplied !== st.crit) {
-    player.crit = (player.crit || 0) - (player._itemCritApplied || 0) + st.crit;
-    player._itemCritApplied = st.crit;
+  // 0.12c: also remove those bonuses when the unique is dropped or swapped off
+  const newCrit = st.crit || 0;
+  if ((player._itemCritApplied || 0) !== newCrit) {
+    player.crit = (player.crit || 0) - (player._itemCritApplied || 0) + newCrit;
+    player._itemCritApplied = newCrit;
   }
-  if (st.pray && player.prayMax) {
-    const delta = st.pray - (player._itemPrayApplied || 0);
-    player.prayMax += delta;
-    player.pray = Math.min(player.prayMax, (player.pray || 0) + Math.max(0, delta));
-    player._itemPrayApplied = st.pray;
+  const newPray = st.pray || 0;
+  if (player.prayMax || player._itemPrayApplied) {
+    const delta = newPray - (player._itemPrayApplied || 0);
+    if (delta) {
+      player.prayMax = Math.max(0, (player.prayMax || 0) + delta);
+      if (delta > 0) player.pray = Math.min(player.prayMax, (player.pray || 0) + delta);
+      else player.pray = Math.min(player.prayMax, player.pray || 0);
+      player._itemPrayApplied = newPray;
+    }
   }
-  if (st.sweep) player.sweep = (player.sweep || 0) + (st.sweep - (player._itemSweepApplied || 0)), player._itemSweepApplied = st.sweep;
+  const newSweep = st.sweep || 0;
+  if ((player._itemSweepApplied || 0) !== newSweep) {
+    player.sweep = (player.sweep || 0) + (newSweep - (player._itemSweepApplied || 0));
+    player._itemSweepApplied = newSweep;
+  }
   player.itemFireDur = st.unique && st.unique.id === 'tome_of_fire' ? 1.2 : 1;
   player.itemThrallLife = (st.unique && st.unique.id === 'ancient_sceptre' ? (st.unique.thrallLife || 2) : 0) * (st.unique && st.unique.cls && st.unique.cls !== player.style ? 0.80 : 1);
   player.itemTask = 0;
@@ -4444,14 +4453,23 @@ function openChest(c, force, extraRoll) {
     phoenix = true;
     banner('🔥 Phoenix necklace!', 'The next time you would die this run, you rise again.');
   }
-  if (!extraRoll && c.rolls > 1) $('lootBanner').querySelector('b').textContent = '🎁 Rich chest · ' + c.rolls + ' loot rolls!';
+  // 0.12c: item-only chests used to leave the previous banner up (e.g. "Phoenix necklace!")
+  // and a 4-item rich chest could set the title while the banner stayed hidden.
   if (!extraRoll) {
     const found = bagPending.slice();
     bagPending = [];
     const names = found.map(it => (itemDef(it.id) || {}).n).filter(Boolean);
-    if (names.length) {
+    const foundLine = names.length ? ('Found: ' + names.join(', ')) : '';
+    if (c.rolls > 1) {
+      const prevSub = (($('lootBanner').querySelector('span') || {}).textContent || '').trim();
+      const sub = [prevSub, foundLine].filter(Boolean).join(' · ');
+      banner('🎁 Rich chest · ' + c.rolls + ' loot rolls!', sub);
+    } else if (kind === 'item' && names.length) {
+      const d0 = itemDef(found[0].id) || {};
+      banner('🎁 ' + names[0] + (names.length > 1 ? ' +' + (names.length - 1) : ''), d0.d || foundLine);
+    } else if (foundLine) {
       const sub = $('lootBanner').querySelector('span');
-      if (sub) sub.textContent = (sub.textContent ? sub.textContent + ' · ' : '') + 'Found: ' + names.join(', ');
+      if (sub) sub.textContent = (sub.textContent ? sub.textContent + ' · ' : '') + foundLine;
     }
     found.forEach(offerItem);
   }
