@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.12c</title>
+<title>Last Stand — Prototype 0.13b</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -185,12 +185,26 @@ body.bossOn #buffs{top:122px}
 .bagslot .bq{position:absolute;bottom:-2px;right:-2px;font-size:9px;line-height:12px;background:#0c1410;
   border:1px solid #6a7a5a;border-radius:6px;padding:0 3px;color:#ffe9a8;font-weight:800}
 #bagTip{position:fixed;right:58px;top:calc(58px + env(safe-area-inset-top));z-index:9;
-  width:min(210px,56vw);background:#0c1410ee;border:1px solid #e8c56a;border-radius:12px;
-  padding:8px 10px;color:#f3efe0;display:none;pointer-events:auto;text-align:left;
+  width:min(240px,calc(100vw - 150px));max-width:58vw;background:#0c1410f2;border:1px solid #e8c56a;border-radius:12px;
+  padding:10px 12px;color:#f3efe0;display:none;pointer-events:auto;text-align:left;
   box-shadow:0 8px 24px #000c}
-#bagTip .tn{color:#ffd86a;font-weight:800;font-size:13px}
-#bagTip .td{font-size:12px;color:#eef0e2;margin:4px 0 0;line-height:1.35}
-#bagTip button{margin-top:8px;padding:8px 10px;min-height:36px;font-size:13px}
+#bagTip .tn{color:#ffd86a;font-weight:800;font-size:15px;line-height:1.3}
+#bagTip .td{font-size:14px;color:#eef0e2;margin:6px 0 0;line-height:1.4}
+#bagTip .tw{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;border:1px solid #e8c56a;
+  color:#ffe9a8;font-size:11px;font-weight:800;vertical-align:middle}
+#bagTip button{margin-top:8px;padding:8px 10px;min-height:40px;font-size:14px}
+.bagslot.worn{border-color:#9ecf7a;box-shadow:0 0 6px #7ec97855}
+.bagslot.worn.on{border-color:#e8c56a;box-shadow:0 0 8px #e8c56a66}
+/* 0.13b: bag contents + buffs on the pause screen */
+.pausebag{margin:12px 0 4px;text-align:left;background:#0c1410cc;border:1px solid #6a7a5a;border-radius:12px;padding:8px 10px}
+.pausebag-h{color:#ffd86a;font-weight:800;font-size:14px;margin:0 0 6px}
+.pausebag-i{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid #2a3a2c}
+.pausebag-i:first-of-type{border-top:0}
+.pausebag-ic{font-size:22px;line-height:1.2;width:28px;text-align:center;flex:none}
+.pausebag-n{color:#ffe9a8;font-weight:800;font-size:13px}
+.pausebag-d{color:#eef0e2;font-size:12px;line-height:1.35;margin-top:1px}
+.pausebag-e{color:#8a9a80;font-size:12px;padding:5px 0;border-top:1px solid #2a3a2c}
+.pausebag-e:first-of-type{border-top:0}
 #bagFull{position:fixed;inset:0;background:#07100be6;display:none;align-items:flex-end;justify-content:center;
   padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));z-index:40}
 #bagFull .sheet{width:min(480px,100%);background:linear-gradient(165deg,#243528,#121c16);
@@ -290,7 +304,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.12c</div><!-- 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.13b</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, bring treasure home.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -337,6 +351,21 @@ body.bagging #dpsMeter{pointer-events:none}
 /* ========== CORE SETUP ========== */
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+// 0.13a: clamp every arc/ellipse radius so a negative value can never throw IndexSizeError and freeze the loop.
+(function () {
+  const proto = CanvasRenderingContext2D.prototype;
+  const _arc = proto.arc, _ellipse = proto.ellipse;
+  proto.arc = function (x, y, r, a0, a1, ccw) {
+    r = +r; if (!isFinite(r) || r < 0) r = 0;
+    return _arc.call(this, x, y, r, a0, a1, ccw);
+  };
+  proto.ellipse = function (x, y, rx, ry, rot, a0, a1, ccw) {
+    rx = +rx; ry = +ry;
+    if (!isFinite(rx) || rx < 0) rx = 0;
+    if (!isFinite(ry) || ry < 0) ry = 0;
+    return _ellipse.call(this, x, y, rx, ry, rot, a0, a1, ccw);
+  };
+})();
 
 /* ========== 0.7a: SPRITES ========== */
 // 0.7a: Grok's sprite sheets, shrunk (512px sheets, coin 192px) and embedded so the game stays one file.
@@ -628,6 +657,7 @@ let runId = 0;
 let chests = [], chestsOpened = 0, nextChestAt = 60;
 let bag = [];           // 0.10a: up to BAG_SLOTS in-run items {id, qty}
 let groundItems = [];   // 0.10a: items left on the floor {x,y,id,qty,t}
+let magnets = [];       // 0.13a: rare magnet pickups {x,y,t,r}
 let bagging = false;    // 0.10a: swap-or-leave sheet is open (run paused)
 let bagQueue = [];      // 0.10a: items waiting on a full bag
 let bagPending = [];    // 0.10a: items rolled from the chest being opened
@@ -663,6 +693,52 @@ const HUD_KEY = 'laststand_hud';
 const DPS_WIN = 5;
 const SPLAT_CAP = 60;
 const FX_CAP = 40;
+// 0.13a long-haul caps and late-game curve. Early game (0:00–5:00) is unchanged.
+const ORB_CAP = 300;
+const ORB_CLOSE = 22;       // orbs this close combine into a bigger orb (XP and coins kept)
+const ORB_AGE_MERGE = 18;   // old leftover orbs merge into a neighbour — never auto-collected or deleted
+const ORB_FAR_MERGE = 580;  // far leftover orbs merge into a neighbour
+const MAGNET_CHANCE = 0.0022;       // 0.22% on a regular kill; no timer, pity, or schedule
+const MAGNET_ELITE_CHANCE = 0.0055; // 0.55% on an elite
+const MAGNET_HOME_SPD = 820;        // how fast a magnet yanks every orb to you
+const CHEST_CAP = 10;      // unopened ordinary chests; royal/dragon chests are never auto-opened or deleted
+const LIVE_CAP = 90;
+const MERGE_HOLD = 5;      // seconds at the live cap before a trash pack becomes an elite
+const MERGE_PACK = 5;
+const LATE_START = 300;    // scaling and pack-merges start at 5:00
+function clamp01(x) {
+  x = +x;
+  if (!(x > 0)) return 0;
+  if (x > 1) return 1;
+  return x;
+}
+function toGold(n) {
+  n = Math.round(Number(n) || 0);
+  return n > 0 ? n : 0;
+}
+function addRunGold(n) { runGold = toGold(runGold) + toGold(n); }
+function lateScale(t) {
+  const late = Math.max(0, (t == null ? elapsed : t) - LATE_START);
+  if (late <= 0) return { hp: 1, dmg: 1, xp: 1 };
+  // HP: 1 + 7*(1-exp(-late/3900)) → 15:00 ×2.00, 30:00 ×3.24, 60:00 ×5.00 (soft-caps toward ×8)
+  // Damage lags HP so hits stay survivable: 1 + 2.2*(1-exp(-late/2800)) → 15:00 ×1.42, 30:00 ×1.91, 60:00 ×2.52
+  // XP/gold: 1 + 0.45*(hpMul-1) so late kills pay more without exploding the purse
+  const hp = 1 + 7 * (1 - Math.exp(-late / 3900));
+  return { hp, dmg: 1 + 2.2 * (1 - Math.exp(-late / 2800)), xp: 1 + 0.45 * (hp - 1) };
+}
+// 0.13b: a landed hit (or a second of contact) always keeps a little sting after 5:00,
+// so a stacked tank cannot shrink trash damage to literally zero. Early game is unchanged
+// (floor is 1, which is already below a typical early hit). A 90% total-DR safety net
+// only matters if stacked multipliers would have gone past that — melee granite+defender
+// sits around 81% and is not nerfed.
+const TAKEN_FLOOR = 0.10;
+function takenFrac() {
+  return Math.max(TAKEN_FLOOR, (1 - armorNow()) * dmgTakenNow());
+}
+function minSwingDmg() {
+  return lateScale().dmg;
+}
+let capHold = 0;
 const DPS_LABEL = {
   attack: 'Attack', special: 'Special', thralls: 'Thralls', fire: 'Fire',
   dot: 'DoT', items: 'Items', traps: 'Traps', other: 'Other'
@@ -921,6 +997,9 @@ function fxBurst(kind, x, y, r, extra) {
   const life = kind === 'ringfire' || kind === 'net' || kind === 'ourania' ? 0.55 : 0.42;
   const f = { kind, x, y, r: r || 80, life, max: life, t: 0, ang: 0 };
   if (extra) Object.assign(f, extra);
+  if (!(f.r > 0)) f.r = 0;
+  if (!(f.max > 0)) f.max = Math.max(0.01, f.life || 0.4);
+  if (f.life > f.max) f.max = f.life;
   pushFx(f);
 }
 function updateSpellFx(dt) {
@@ -931,7 +1010,8 @@ function updateSpellFx(dt) {
   }
   for (const f of spellFx) {
     f.life -= dt; f.t += dt;
-    if (f.live && player && player.cyclone > 0) { f.life = 0.4; f.x = player.x; f.y = player.y; }
+    if (f.live && player && player.cyclone > 0) { f.life = 0.4; f.max = Math.max(f.max || 0, 0.4); f.x = player.x; f.y = player.y; }
+    if (f.max > 0 && f.life > f.max && !f.live) f.life = f.max;
   }
   if (spellFx.some(f => f.life <= 0)) spellFx = spellFx.filter(f => f.life > 0);
 }
@@ -955,9 +1035,9 @@ function drawCross(cx, cy, r, w) {
 }
 function drawSpellFx() {
   for (const f of spellFx) {
-    const a = Math.max(0, f.life / (f.max || 0.4));
+    const a = clamp01(f.life / (f.max > 0 ? f.max : 0.4));
     const grow = 1 - a * 0.35;
-    const R = f.r * (0.55 + 0.55 * (1 - a));
+    const R = Math.max(0, (f.r > 0 ? f.r : 0) * (0.55 + 0.55 * (1 - a)));
     ctx.save();
     ctx.globalAlpha = Math.min(1, a * 1.15);
     const k = f.kind;
@@ -1263,6 +1343,18 @@ function drawMinimap(force) {
   for (const g of groundItems) {
     const p = clampEdge(toX(g.x), toY(g.y), 3);
     m.beginPath(); m.arc(p.x, p.y, 2, 0, 7); m.fill();
+  }
+  // 0.13a: magnet pickups
+  for (const mag of magnets) {
+    const p = clampEdge(toX(mag.x), toY(mag.y), 5);
+    const pulse = 0.7 + 0.3 * Math.sin((mag.t || 0) * 6);
+    m.fillStyle = '#7ae0ff';
+    m.strokeStyle = '#ffd24a';
+    m.lineWidth = 1.5;
+    m.globalAlpha = pulse;
+    m.beginPath(); m.arc(p.x, p.y, 4.2 * (S / 96), 0, 7); m.fill();
+    m.stroke();
+    m.globalAlpha = 1;
   }
   // penance horn
   if (eventInvite) {
@@ -1770,7 +1862,7 @@ function loadSave() {
 // automatically) and add the Mastery trees. Old saves keep all their banked renown. Unknown node ids are dropped.
 function migrateSave(s) {
   const num = v => (typeof v === 'number' && isFinite(v) && v >= 0) ? v : 0;
-  s.gold = num(s.gold); s.renown = Math.floor(num(s.renown)); s.best = num(s.best);
+  s.gold = Math.round(num(s.gold)); s.renown = Math.floor(num(s.renown)); s.best = num(s.best);
   const fill = (o, keys) => { o = (o && typeof o === 'object') ? o : {}; for (const k of keys) o[k] = num(o[k]); return o; };
   s.sk = fill(s.sk, Object.keys(TREES));
   s.shop = fill(s.shop, ['hp', 'arm', 'boots', 'mag', 'coin', 'dash']);
@@ -1793,6 +1885,7 @@ function migrateSave(s) {
   return s;
 }
 function persist() {
+  if (save) save.gold = toGold(save.gold);
   localStorage.setItem('laststand_save_v3_test', JSON.stringify(save));
 }
 
@@ -1987,7 +2080,7 @@ function applyStyle(k) {
 function gain(d) {
   const k = player.style;
   const before = sLvl(k);
-  save.sk[k] += d * 0.55 * ((player.xpMul || 1) + (player.itemGloryX || 0));
+  save.sk[k] += d * 0.55 * ((player.xpMul || 1) + (player.itemGloryX || 0) + (player.itemXp || 0));
   const after = sLvl(k);
   if (after > before) {
     toast('Congratulations! Your ' + STY[k].sk + ' level is now ' + after + '.');
@@ -2120,10 +2213,11 @@ function start(k) {
   player.armor = Math.min(armorCap(), player.armor);
   if (player.m.guardC) player.armor = Math.min(armorCap(), player.armor); // Defender raises the cap
 
-  enemies = []; orbs = []; shots = []; particles = []; floats = [];
+  enemies = []; orbs = []; magnets = []; shots = []; particles = []; floats = [];
   splats = []; spellFx = []; dpsLog = []; dpsDomAt = 0; goalDomAt = 0; miniAt = -1; dmgSrc = 'attack';
   kills = 0; runGold = 0; elapsed = 0;
-  spawnClock = 0; attackClock = 0.25;
+  spawnClock = 0; attackClock = 0.25; capHold = 0;
+  window.__updLogged = 0; window.__drawLogged = 0; window.__updErrs = 0; window.__drawLoopErrs = 0;
   shake = 0; streak = 0; streakTimer = 0;
   playing = true; paused = false; leveling = false;
   // 0.5: fresh chests and buffs every run
@@ -2465,7 +2559,7 @@ function refreshClassPicker() { // 0.9c / 0.11a: sync dropdown label, blurb, Sta
 }
 function bind() {
   bindSfxControls();
-  $('shopbtn').textContent = '🛒 General store · ' + save.gold + ' coins';
+  $('shopbtn').textContent = '🛒 General store · ' + toGold(save.gold) + ' coins';
   $('trainbtn').textContent = '📜 Training · ' + pts() + ' points';
   $('shopbtn').onclick = () => store('shop');
   $('trainbtn').onclick = () => store('tal');
@@ -2509,7 +2603,7 @@ function bind() {
     if (!ev.target.closest || !ev.target.closest('.classpick')) closeClassList();
   };
   const fu = fisherUnlocked();
-  $('saveinfo').textContent = `Saved on this device · Coins ${save.gold} · Best ${fmt(save.best)} · Attack ${sLvl('melee')} · Ranged ${sLvl('ranged')} · Magic ${sLvl('magic')}` +
+  $('saveinfo').textContent = `Saved on this device · Coins ${toGold(save.gold)} · Best ${fmt(save.best)} · Attack ${sLvl('melee')} · Ranged ${sLvl('ranged')} · Magic ${sLvl('magic')}` +
     (fu ? ` · Fishing ${sLvl('fisher')}` : '');
 }
 bind();
@@ -2647,6 +2741,12 @@ function spawnPenanceOne(roleKind, ang) {
     e.speed = data.speed * 1.30;
     e.hp = e.maxHp = Math.max(8, Math.round(data.hp * 0.80));
   }
+  const sc = lateScale();
+  if (sc.hp !== 1 || sc.dmg !== 1) {
+    e.hp = e.maxHp = Math.max(1, Math.round(e.maxHp * sc.hp));
+    e.damage = data.damage * sc.dmg;
+    e.dmg = Math.max(1, Math.round(data.dmg * sc.dmg));
+  }
   enemies.push(e);
   return e;
 }
@@ -2699,7 +2799,7 @@ function payoutPenance(cleared) {
   const renBase = 3 + Math.floor(elapsed / 80);
   const renClear = cleared ? (2 + Math.floor(power)) : 0;
   const ren = renBase + renClear;
-  runGold += coins;
+  addRunGold(coins);
   save.renown += ren;
   renownEvent += ren;
   eventFight.renownPaid = ren;
@@ -2718,7 +2818,7 @@ function payoutPenance(cleared) {
     const keys4 = Object.keys(BUFFS);
     const k = keys4[Math.floor(Math.random() * keys4.length)];
     buffs[k] = buffs[k] > 0 ? Math.min(BUFF_MAX, buffs[k] + BUFF_TIME) : BUFF_TIME;
-    runGold += Math.round(18 * power);
+    addRunGold(Math.round(18 * power));
     banner('📯 Swarm cleared!', '+' + coins + ' coins · +' + ren + ' renown · bonus buff/coins · adrenaline', 3.2);
   } else {
     banner('📯 Swarm survived!', '+' + coins + ' coins · +' + ren + ' renown · adrenaline', 3.0);
@@ -2807,6 +2907,76 @@ const ENEMY_KINDS = [
     { name:'Cultist',    hp:50,  speed:32, damage:3,  r:12, xp:17, gold:3, color:'#6f6ae0', weak:'melee', // 0.7c: new
       ak:'magic', dmg:9,  reach:270, wind:0.85, rate:3.6, keep:180 }
 ];
+function mergeTrashPack() {
+  // 0.13a: when the 90-cap field has been full, fuse a nearby trash pack into one bigger elite.
+  // Combined leftover HP and XP/gold are kept; bosses, Penance, and existing elites are left alone.
+  const trash = [];
+  for (const e of enemies) {
+    if (e.hp > 0 && !e.dead && !e.boss && !e.penance && !e.penanceFlee && !e.elite) trash.push(e);
+  }
+  if (trash.length < 4) return false;
+  let seed = trash[0], bestN = -1, nearList = [];
+  for (let i = 0; i < trash.length; i++) {
+    const a = trash[i], near = [];
+    for (let j = 0; j < trash.length; j++) {
+      if (i === j) continue;
+      const b = trash[j];
+      if (Math.hypot(a.x - b.x, a.y - b.y) < 170) near.push(b);
+    }
+    if (near.length > bestN) { bestN = near.length; seed = a; nearList = near; }
+  }
+  nearList.sort((a, b) => Math.hypot(a.x - seed.x, a.y - seed.y) - Math.hypot(b.x - seed.x, b.y - seed.y));
+  const pack = [seed];
+  for (const e of nearList) { if (pack.length >= MERGE_PACK) break; pack.push(e); }
+  if (pack.length < 4) {
+    trash.sort((a, b) => Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y));
+    pack.length = 0;
+    for (let i = 0; i < Math.min(MERGE_PACK, trash.length); i++) pack.push(trash[i]);
+  }
+  if (pack.length < 4) return false;
+  let hp = 0, xp = 0, gold = 0, hit = 0, touch = 0, x = 0, y = 0;
+  for (const e of pack) {
+    hp += Math.max(0, e.hp);
+    xp += e.xp || 0;
+    gold += e.gold || 0;
+    if ((e.dmg || 0) > hit) hit = e.dmg || 0;
+    if ((e.damage || 0) > touch) touch = e.damage || 0;
+    x += e.x; y += e.y;
+    e.hp = 0; e.dead = true; e._merged = true;
+  }
+  x /= pack.length; y /= pack.length;
+  const data = ENEMY_KINDS[3];
+  const sc = lateScale();
+  const ogreHit = Math.max(1, Math.round(data.dmg * sc.dmg));
+  const ogreTouch = data.damage * sc.dmg;
+  enemies = enemies.filter(e => !e._merged);
+  enemies.push({
+    x, y, ...data,
+    kind: 3, side: Math.random() < 0.5 ? -1 : 1,
+    name: 'Elite pack', color: '#a03a28', elite: true, merged: true,
+    hp, maxHp: Math.max(1, Math.round(hp)),
+    damage: Math.max(ogreTouch, touch * 1.25),
+    dmg: Math.max(ogreHit, Math.round(hit * 1.25)),
+    xp: Math.max(1, Math.round(xp)), gold: Math.max(1, Math.round(gold)),
+    r: Math.min(30, data.r + 2 + pack.length),
+    hit: 0, slow: 0, cd: rand(0.6, 1.6), windup: 0, windT: 0, slamT: 0, losT: 0, los: false,
+    dead: false
+  });
+  for (let i = 0; i < 14; i++) {
+    const a = i / 14 * 6.283;
+    particles.push({ x, y, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, life: 0.4, color: '#ff8a3c', size: 4 });
+  }
+  return true;
+}
+function maybeMergePacks(dt) {
+  if (elapsed < LATE_START || eventFight) { capHold = 0; return; }
+  let n = 0;
+  for (const e of enemies) if (e.hp > 0 && !e.dead) n++;
+  if (n < LIVE_CAP) { capHold = Math.max(0, capHold - dt * 2); return; }
+  capHold += dt;
+  if (capHold < MERGE_HOLD) return;
+  capHold = mergeTrashPack() ? 0 : MERGE_HOLD * 0.4;
+}
 function spawn(forceElite = false) {
   const a = rand(0, Math.PI * 2);
   const distSpawn = Math.max(W, H) * 0.58 + 60;
@@ -2814,20 +2984,26 @@ function spawn(forceElite = false) {
   const y = player.y + Math.sin(a) * distSpawn;
 
   let t = 0;
-  if (window.__forceT !== undefined) t = window.__forceT;
-  else if (elapsed > 180) t = Math.random() < 0.18 ? 3 : (Math.random() < 0.35 ? 2 : (Math.random() < 0.45 ? 1 : 0));
+  if (elapsed > 180) t = Math.random() < 0.18 ? 3 : (Math.random() < 0.35 ? 2 : (Math.random() < 0.45 ? 1 : 0));
   else if (elapsed > 110) t = Math.random() < 0.28 ? 2 : (Math.random() < 0.4 ? 1 : 0);
   else if (elapsed > 50) t = Math.random() < 0.32 ? 1 : 0;
   if (elapsed > 110 && t !== 3 && Math.random() < 0.13) t = 4; // 0.7c: cultists join from 1:50
 
   if (forceElite) t = 3;
+  if (window.__forceT !== undefined) t = window.__forceT;
 
   const data = ENEMY_KINDS[t];
+  const sc = lateScale();
+  const hp = Math.max(1, Math.round(data.hp * sc.hp));
   enemies.push({
     x, y, ...data,
     kind: t, // 0.7a: which sprite sheet to use
     side: Math.random() < 0.5 ? -1 : 1, // 0.7b: preferred side for walking round obstacles
-    maxHp: data.hp,
+    maxHp: hp, hp,
+    damage: data.damage * sc.dmg,
+    dmg: Math.max(1, Math.round(data.dmg * sc.dmg)),
+    xp: Math.max(1, Math.round(data.xp * sc.xp)),
+    gold: Math.max(1, Math.round(data.gold * sc.xp)),
     hit: 0,
     slow: 0,
     cd: rand(0.6, 1.6), windup: 0, windT: 0, slamT: 0, losT: 0, los: false, // 0.7c: attack state
@@ -2866,7 +3042,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
     streak++;
     streakTimer = 2.8;
     if (typeof onEnemyKilled === 'function') onEnemyKilled(e);
-    if (player.kh) player.hp = Math.min(player.maxHp, player.hp + player.kh);
+    if (player.kh || player.itemKh) player.hp = Math.min(player.maxHp, player.hp + (player.kh || 0) + healAmt(player.itemKh || 0));
     if (e.burn > 0 && M.pyro4) { // 0.8a Wildfire
       let best = null, bd = 70;
       for (const o of enemies) { if (o === e || o.hp <= 0 || o.burn > 0) continue; const od = dist(o, e); if (od < bd) { bd = od; best = o; } }
@@ -2881,7 +3057,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
     // 0.11a: Gloves of Silence burst; Firemaker embers
     if (player.style === 'thief' && M.pocketC) {
       const c = Math.max(2, Math.round(8 * coinMul()));
-      runGold += c;
+      addRunGold(c);
       floats.push({ x: e.x, y: e.y - 20, text: '👜 +' + c + ' ◆', life: 0.7, vy: -34, color: '#ffd24a' });
     }
     if (player.style === 'firemaker' && M.kindle4 && (e.burn > 0) && Math.random() < 0.40)
@@ -2894,7 +3070,8 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
       // Survive/clear payout is the only reward. On-kill heals/effects above still run.
     } else {
     const g = Math.max(1, Math.round(e.gold * coinMul())); // 0.10a
-    orbs.push({ x: e.x, y: e.y, xp: e.xp, gold: g, r: e.elite ? 9 : 6, elite: !!e.elite });
+    orbs.push({ x: e.x, y: e.y, xp: e.xp, gold: g, r: e.elite ? 9 : 6, elite: !!e.elite, age: 0 });
+    maybeDropMagnet(e);
     // 0.5: chest drop chance: Elite Ogre always, Hill giant 6%, everyone else 1.5%
     // 0.9c: ordinary enemies/elites never drop chests; minute timer and dragon only.
     }
@@ -3085,7 +3262,7 @@ function attack() {
       }
       if (M.forest3 && e.hp <= 0 && Math.random() < 0.10) {
         const c = Math.max(1, Math.round(6 * coinMul()));
-        runGold += c;
+        addRunGold(c);
         floats.push({ x: e.x, y: e.y - 18, text: '🪺 +' + c, life: 0.7, vy: -34, color: '#ffd24a' });
       }
     }
@@ -3355,7 +3532,7 @@ function pickpocketCoins(isCrit) {
   const n = Math.floor(player._pocketFrac);
   player._pocketFrac -= n;
   if (n <= 0) return;
-  runGold += n;
+  addRunGold(n);
   if (Math.random() < 0.45 || n >= 2)
     floats.push({ x: player.x, y: player.y - 22, text: '👜 +' + n + ' ◆', life: 0.55, vy: -32, color: '#ffd24a' });
 }
@@ -3993,11 +4170,11 @@ const ITEMS = {
   dharok_helm:   { id:'dharok_helm',   n:"Dharok's helm",      icon:'💀', kind:'set',   slot:'helm',   tier:'unique',    set:'dharok', d:'Dharok set. 1pc +4% dmg, 2pc +8%, 3pc more damage the lower your HP (up to +45%).' },
   dharok_body:   { id:'dharok_body',   n:"Dharok's platebody", icon:'💀', kind:'set',   slot:'body',   tier:'unique',    set:'dharok', d:'Dharok set. 1pc +4% dmg, 2pc +8%, 3pc more damage the lower your HP (up to +45%).' },
   dharok_axe:    { id:'dharok_axe',    n:"Dharok's greataxe",  icon:'🪓', kind:'set',   slot:'weapon', tier:'unique',    set:'dharok', cls:'melee', d:'Overrides your weapon. Counts as a Dharok piece.' },
-  trout:         { id:'trout',         n:'Trout',              icon:'🐟', kind:'food',  slot:'food',   tier:'common',    heal:20, d:'Eat to restore 20 HP.' },
-  lobster:       { id:'lobster',       n:'Lobster',            icon:'🦞', kind:'food',  slot:'food',   tier:'common',    heal:35, d:'Eat to restore 35 HP.' },
-  swordfish:     { id:'swordfish',     n:'Swordfish',          icon:'🐟', kind:'food',  slot:'food',   tier:'uncommon',  heal:45, d:'Eat to restore 45 HP.' },
-  shark:         { id:'shark',         n:'Shark',              icon:'🦈', kind:'food',  slot:'food',   tier:'rare',      heal:60, d:'Eat to restore 60 HP.' },
-  manta:         { id:'manta',         n:'Manta ray',          icon:'🪸', kind:'food',  slot:'food',   tier:'unique',    heal:75, d:'Eat to restore 75 HP.' },
+  trout:         { id:'trout',         n:'Trout',              icon:'🐟', kind:'food',  slot:'trinket',tier:'common',    magnet:10, d:'A modest catch. +10 pickup range.' },
+  lobster:       { id:'lobster',       n:'Lobster',            icon:'🦞', kind:'food',  slot:'trinket',tier:'common',    hp:8, d:'A hearty catch. +8 max HP.' },
+  swordfish:     { id:'swordfish',     n:'Swordfish',          icon:'🐟', kind:'food',  slot:'trinket',tier:'uncommon',  aspd:0.08, d:'Swift and sharp. +8% attack speed.' },
+  shark:         { id:'shark',         n:'Shark',              icon:'🦈', kind:'food',  slot:'trinket',tier:'rare',      dmg:0.06, kh:4, d:'Apex predator. +6% damage, and heal 4 HP on each kill.' },
+  manta:         { id:'manta',         n:'Manta ray',          icon:'🪸', kind:'food',  slot:'trinket',tier:'unique',    hp:10, xp:0.12, regen:2, d:'A rare ocean bounty. +10 max HP, +12% skill XP this run, and regenerate 2 HP per second.' },
   att_pot:       { id:'att_pot',       n:'Attack potion',      icon:'🧪', kind:'potion',slot:'potion', tier:'common',    pot:'atk',  mul:0.15, dur:20, d:'+15% damage for 20s.' },
   super_att:     { id:'super_att',     n:'Super attack',       icon:'🧪', kind:'potion',slot:'potion', tier:'uncommon',  pot:'atk',  mul:0.25, dur:20, d:'+25% damage for 20s.' },
   super_rest:    { id:'super_rest',    n:'Super restore',      icon:'🧪', kind:'potion',slot:'potion', tier:'rare',      pot:'restore', d:'Heal 30 and shorten special cooldown by 2s. Priest also restores 20 prayer points.' },
@@ -4045,11 +4222,20 @@ function rollItem(royal) {
   return itemClone(id, 1);
 }
 
+function itemWearable(d) {
+  return d && (d.kind === 'equip' || d.kind === 'set' || d.kind === 'food');
+}
+function itemIsWorn(it) {
+  if (!it) return false;
+  const d = itemDef(it.id);
+  return !!(d && itemWearable(d) && wornOf(d.slot) === it);
+}
+
 function wornOf(slot) {
   let best = null, bestI = -1;
   bag.forEach((it, i) => {
     const d = itemDef(it.id);
-    if (!d || d.slot !== slot || (d.kind !== 'equip' && d.kind !== 'set')) return;
+    if (!d || d.slot !== slot || !itemWearable(d)) return;
     if (it.pin || bestI < 0) { best = it; bestI = i; }
   });
   // last-tapped pin wins; otherwise the last item of that slot in the bag
@@ -4057,7 +4243,7 @@ function wornOf(slot) {
   if (pinned) return pinned;
   for (let i = bag.length - 1; i >= 0; i--) {
     const d = itemDef(bag[i].id);
-    if (d && d.slot === slot && (d.kind === 'equip' || d.kind === 'set')) return bag[i];
+    if (d && d.slot === slot && itemWearable(d)) return bag[i];
   }
   return null;
 }
@@ -4066,10 +4252,10 @@ function refreshItems() {
   const st = {
     armor:0, dmg:1, aspd:1, range:0, magnet:0, wealth:0, gloryCoin:0, gloryXp:0,
     taken:0, cd:1, blast:0, net:0, pierce:0, chill:0, darkbow:0, maul:0, hp:0,
-    unique:null, dharok:0
+    unique:null, dharok:0, kh:0, regen:0, xp:0, spd:0
   };
   const seen = {};
-  for (const slot of ['body','helm','jewelry','cape','weapon']) {
+  for (const slot of ['body','helm','jewelry','cape','weapon','trinket']) {
     const it = wornOf(slot);
     if (!it) continue;
     const d = itemDef(it.id);
@@ -4094,6 +4280,10 @@ function refreshItems() {
     if (d.darkbow) st.darkbow = 1;
     if (d.maul) st.maul = 1;
     if (d.hp) st.hp += d.hp;
+    if (d.kh) st.kh += d.kh;
+    if (d.regen) st.regen += d.regen;
+    if (d.xp) st.xp += d.xp;
+    if (d.spd) st.spd += d.spd;
     if (d.crit) st.crit = (st.crit || 0) + d.crit * scale;
     if (d.pray) st.pray = (st.pray || 0) + d.pray;
     if (d.sweep) st.sweep = (st.sweep || 0) + d.sweep;
@@ -4147,11 +4337,19 @@ function refreshItems() {
   player.itemTask = 0;
   player.itemTrapLife = (st.unique && st.unique.id === 'magic_net' ? (st.unique.trapLife || 3) : 0) * (st.unique && st.unique.cls && st.unique.cls !== player.style ? 0.80 : 1);
   player.itemEss = 0;
-  for (const slot of ['body','helm','jewelry','cape','weapon']) {
+  for (const slot of ['body','helm','jewelry','cape','weapon','trinket']) {
     const it = wornOf(slot); if (!it) continue;
     const d = itemDef(it.id); if (!d) continue;
     if (d.task) player.itemTask += d.task;
     if (d.ess) player.itemEss += d.ess;
+  }
+  player.itemKh = st.kh || 0;
+  player.itemRegen = st.regen || 0;
+  player.itemXp = st.xp || 0;
+  const newSpd = st.spd || 0;
+  if ((player._itemSpdApplied || 0) !== newSpd) {
+    addMoveSpeed(player, newSpd - (player._itemSpdApplied || 0));
+    player._itemSpdApplied = newSpd;
   }
   if (st.hp && player.maxHp && player._itemHpApplied !== st.hp) {
     const delta = st.hp - (player._itemHpApplied || 0);
@@ -4197,22 +4395,30 @@ function dmgTakenNow() {
 
 function canStack(it) {
   const d = itemDef(it.id);
-  return d && (d.kind === 'food' || d.kind === 'potion');
+  return d && d.kind === 'potion';
 }
 function tryAddItem(it) {
   const d = itemDef(it.id);
   if (!d) return true;
   // same-or-worse body/helm already worn → convert to a little treasure so the bag is not clogged
-  if ((d.slot === 'body' || d.slot === 'helm') && (d.kind === 'equip' || d.kind === 'set')) {
+  if ((d.slot === 'body' || d.slot === 'helm') && itemWearable(d)) {
     const have = wornOf(d.slot);
     const rank = { common:1, uncommon:2, rare:3, unique:4 };
     if (have && (rank[itemDef(have.id).tier] || 0) >= (rank[d.tier] || 0) && itemDef(have.id).slot === d.slot && d.tier !== 'unique') {
       const coins = Math.round((12 + elapsed / 8) * coinMul());
-      runGold += coins;
+      addRunGold(coins);
       floats.push({ x: player.x, y: player.y - 24, text: '+' + coins + ' ◆', life: 0.8, vy: -34, color: '#ffd24a' });
       toast(d.n + ' sold for coins (you already have equal or better).'); sfx('pickup');
       return true;
     }
+  }
+  // 0.13b: a second copy of the same worn food/trinket sells (different foods can share the bag)
+  if (d.slot === 'trinket' && itemWearable(d) && bag.some(b => b.id === it.id)) {
+    const coins = Math.round((12 + elapsed / 8) * coinMul());
+    addRunGold(coins);
+    floats.push({ x: player.x, y: player.y - 24, text: '+' + coins + ' ◆', life: 0.8, vy: -34, color: '#ffd24a' });
+    toast(d.n + ' sold for coins (you already have one).'); sfx('pickup');
+    return true;
   }
   if (canStack(it)) {
     const ex = bag.find(b => b.id === it.id);
@@ -4291,37 +4497,36 @@ function renderBag() {
   for (let i = 0; i < BAG_SLOTS; i++) {
     const it = bag[i], d = it && itemDef(it.id);
     const on = bagTipIdx === i ? ' on' : '';
-    h += '<button type="button" class="bagslot' + on + '" data-bag="' + i + '">' +
+    const worn = itemIsWorn(it) ? ' worn' : '';
+    h += '<button type="button" class="bagslot' + on + worn + '" data-bag="' + i + '"' +
+      (d ? ' aria-label="' + d.n + '"' : '') + '>' +
       (d ? d.icon : '') + (d && it.qty > 1 ? '<span class="bq">' + it.qty + '</span>' : '') + '</button>';
   }
   el.innerHTML = h;
-  el.querySelectorAll('[data-bag]').forEach(btn => btn.onclick = ev => {
-    ev.stopPropagation();
-    tapBagSlot(+btn.dataset.bag);
+  el.querySelectorAll('[data-bag]').forEach(btn => {
+    const i = +btn.dataset.bag;
+    btn.onclick = ev => { ev.stopPropagation(); tapBagSlot(i); };
+    btn.onpointerenter = ev => { if (ev.pointerType === 'mouse') hoverBagSlot(i); };
+    btn.onpointerleave = ev => { if (ev.pointerType === 'mouse') scheduleHideBagTip(); };
   });
 }
-function hideBagTip() {
-  bagTipIdx = -1;
-  if ($('bagTip')) $('bagTip').style.display = 'none';
-  renderBag();
-}
-function tapBagSlot(i) {
+let bagTipSticky = false;
+let bagTipHoverTimer = 0;
+function bagTipHtml(i) {
   const it = bag[i], d = it && itemDef(it.id);
-  if (!d) { hideBagTip(); return; }
-  if (bagTipIdx === i && (d.kind === 'food' || d.kind === 'potion')) { useBagItem(i); return; }
-  bagTipIdx = i;
-  // last-tapped equip of a slot becomes the worn one
-  if (d.kind === 'equip' || d.kind === 'set') {
-    bag.forEach(b => { if (itemDef(b.id) && itemDef(b.id).slot === d.slot) b.pin = false; });
-    it.pin = true;
-    refreshItems();
-  }
-  const tip = $('bagTip');
-  tip.innerHTML = '<div class="tn">' + d.icon + ' ' + d.n + (it.qty > 1 ? ' ×' + it.qty : '') + '</div>' +
-    '<div class="td">' + d.d + ((d.kind === 'equip' || d.kind === 'set') ? ' Worn while in your bag.' : ' Tap again or Use to consume.') + '</div>' +
-    ((d.kind === 'food' || d.kind === 'potion') ? '<button type="button" id="bagUse">Use</button>' : '') +
+  if (!d) return '';
+  const worn = itemIsWorn(it);
+  let extra = '';
+  if (d.kind === 'potion') extra = ' Tap again or Use to drink.';
+  else if (worn) extra = ' Worn while in your bag.';
+  else if (itemWearable(d)) extra = ' Tap to wear this one.';
+  return '<div class="tn">' + d.icon + ' ' + d.n + (it.qty > 1 ? ' ×' + it.qty : '') +
+    (worn ? ' <span class="tw">Worn</span>' : '') + '</div>' +
+    '<div class="td">' + d.d + extra + '</div>' +
+    (d.kind === 'potion' ? '<button type="button" id="bagUse">Use</button>' : '') +
     '<button type="button" id="bagDrop">Drop</button>';
-  tip.style.display = 'block';
+}
+function bindBagTipButtons(i) {
   if ($('bagUse')) $('bagUse').onclick = ev => { ev.stopPropagation(); useBagItem(i); };
   if ($('bagDrop')) $('bagDrop').onclick = ev => {
     ev.stopPropagation();
@@ -4330,16 +4535,59 @@ function tapBagSlot(i) {
     hideBagTip(); refreshItems();
     toast(itemDef(gone.id).n + ' left on the ground');
   };
+  const tip = $('bagTip');
+  if (tip) {
+    tip.onpointerenter = () => { if (bagTipHoverTimer) { clearTimeout(bagTipHoverTimer); bagTipHoverTimer = 0; } };
+    tip.onpointerleave = ev => { if (ev.pointerType === 'mouse') scheduleHideBagTip(); };
+  }
+}
+function showBagTip(i, sticky) {
+  const it = bag[i], d = it && itemDef(it.id);
+  if (!d) { hideBagTip(); return; }
+  if (bagTipHoverTimer) { clearTimeout(bagTipHoverTimer); bagTipHoverTimer = 0; }
+  bagTipIdx = i;
+  if (sticky) bagTipSticky = true;
+  const tip = $('bagTip');
+  tip.innerHTML = bagTipHtml(i);
+  tip.style.display = 'block';
+  bindBagTipButtons(i);
   renderBag();
+}
+function scheduleHideBagTip() {
+  if (bagTipSticky) return;
+  if (bagTipHoverTimer) clearTimeout(bagTipHoverTimer);
+  bagTipHoverTimer = setTimeout(() => { bagTipHoverTimer = 0; if (!bagTipSticky) hideBagTip(); }, 220);
+}
+function hoverBagSlot(i) {
+  const it = bag[i], d = it && itemDef(it.id);
+  if (!d) return;
+  if (bagTipSticky && bagTipIdx === i) return;
+  if (bagTipSticky && bagTipIdx !== i) return; // keep the tapped tip until they tap outside
+  showBagTip(i, false);
+}
+function hideBagTip() {
+  bagTipIdx = -1;
+  bagTipSticky = false;
+  if (bagTipHoverTimer) { clearTimeout(bagTipHoverTimer); bagTipHoverTimer = 0; }
+  if ($('bagTip')) $('bagTip').style.display = 'none';
+  renderBag();
+}
+function tapBagSlot(i) {
+  const it = bag[i], d = it && itemDef(it.id);
+  if (!d) { hideBagTip(); return; }
+  if (bagTipSticky && bagTipIdx === i && d.kind === 'potion') { useBagItem(i); return; }
+  // last-tapped wearable of a slot becomes the worn one
+  if (itemWearable(d)) {
+    bag.forEach(b => { if (itemDef(b.id) && itemDef(b.id).slot === d.slot) b.pin = false; });
+    it.pin = true;
+    refreshItems();
+  }
+  showBagTip(i, true);
 }
 function useBagItem(i) {
   const it = bag[i], d = it && itemDef(it.id);
-  if (!d || (d.kind !== 'food' && d.kind !== 'potion')) return;
-  if (d.kind === 'food') {
-    player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + d.heal);
-    player.chewLock = 0.4;
-    healSplat(d.heal);
-  } else if (d.pot === 'atk') {
+  if (!d || d.kind !== 'potion') return;
+  if (d.pot === 'atk') {
     player.potAtk = d.dur; player.potAtkMul = d.mul;
   } else if (d.pot === 'restore') {
     player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + 30);
@@ -4377,6 +4625,168 @@ function drawGroundItems() {
   }
 }
 
+function orbVisualR(o) {
+  const v = Math.max(0, (o.xp || 0) + (o.gold || 0) * 3);
+  return Math.min(18, Math.max(o.elite ? 9 : 6, 5.5 + Math.sqrt(v) * 0.32));
+}
+function mergeOrbs(keep, extra) {
+  // Combine two orbs into one bigger orb. XP and coins are added exactly; nothing is dropped.
+  const w1 = (keep.xp || 0) + (keep.gold || 0) + 0.01;
+  const w2 = (extra.xp || 0) + (extra.gold || 0) + 0.01;
+  const w = w1 + w2;
+  keep.x = (keep.x * w1 + extra.x * w2) / w;
+  keep.y = (keep.y * w1 + extra.y * w2) / w;
+  keep.xp = (keep.xp || 0) + (extra.xp || 0);
+  keep.gold = (keep.gold || 0) + (extra.gold || 0);
+  if (extra.elite) keep.elite = true;
+  if (extra.home) keep.home = true;
+  keep.r = orbVisualR(keep);
+  keep.age = Math.min(keep.age || 0, extra.age || 0);
+  return keep;
+}
+function nearestOrbIndex(i, skipHome) {
+  const a = orbs[i];
+  let ni = -1, nd = Infinity;
+  for (let j = 0; j < orbs.length; j++) {
+    if (j === i) continue;
+    const b = orbs[j];
+    if (skipHome && b.home) continue;
+    const dx = a.x - b.x, dy = a.y - b.y, d = dx * dx + dy * dy;
+    if (d < nd) { nd = d; ni = j; }
+  }
+  return ni;
+}
+function mergeOrbsNearby() {
+  // Piles sitting on the same spot combine. Total XP and coins are preserved exactly.
+  const R2 = ORB_CLOSE * ORB_CLOSE;
+  let guard = 0;
+  for (;;) {
+    if (orbs.length < 2 || guard++ > 80) break;
+    let found = false;
+    outer: for (let i = 0; i < orbs.length; i++) {
+      const a = orbs[i];
+      if (a.home) continue;
+      for (let j = i + 1; j < orbs.length; j++) {
+        const b = orbs[j];
+        if (b.home) continue;
+        const dx = a.x - b.x, dy = a.y - b.y;
+        if (dx * dx + dy * dy <= R2) {
+          mergeOrbs(a, b);
+          orbs.splice(j, 1);
+          found = true;
+          break outer;
+        }
+      }
+    }
+    if (!found) break;
+  }
+}
+function mergeOldFarOrbs() {
+  // Old or far leftover orbs merge into a neighbour so the field stays tidy.
+  // They are never deleted and never auto-collected — the XP and coins stay on the map.
+  if (orbs.length < 2) return;
+  const px = player ? player.x : 0, py = player ? player.y : 0;
+  const avoid = (player && (player.magnet + (player.itemMagnet || 0))) || 0;
+  const avoid2 = avoid * avoid;
+  let n = 0;
+  for (let i = orbs.length - 1; i >= 0 && n < 8; i--) {
+    const a = orbs[i];
+    if (a.home) continue;
+    const d2 = (a.x - px) * (a.x - px) + (a.y - py) * (a.y - py);
+    if (avoid2 && d2 < avoid2) continue;
+    const far = d2 >= ORB_FAR_MERGE * ORB_FAR_MERGE;
+    const old = (a.age || 0) >= ORB_AGE_MERGE;
+    if (!far && !old) continue;
+    const ni = nearestOrbIndex(i, true);
+    if (ni < 0) continue;
+    mergeOrbs(orbs[ni], a);
+    orbs.splice(i, 1);
+    n++;
+  }
+}
+function enforceOrbCap() {
+  if (orbs.length <= ORB_CAP) return;
+  // Merge the farthest orb into its nearest neighbour until we are at the cap. Total XP and gold are preserved.
+  while (orbs.length > ORB_CAP) {
+    let fi = 0, fd = -1;
+    const px = player ? player.x : 0, py = player ? player.y : 0;
+    for (let i = 0; i < orbs.length; i++) {
+      const o = orbs[i], d = (o.x - px) * (o.x - px) + (o.y - py) * (o.y - py);
+      if (d > fd) { fd = d; fi = i; }
+    }
+    const ni = nearestOrbIndex(fi, false);
+    if (ni < 0) break;
+    mergeOrbs(orbs[ni], orbs[fi]);
+    orbs.splice(fi, 1);
+  }
+}
+function cleanupOrbs() {
+  mergeOrbsNearby();
+  mergeOldFarOrbs();
+  enforceOrbCap();
+}
+function maybeDropMagnet(e) {
+  // 0.13a: a pure low-chance roll on a kill. No timer or schedule.
+  if (!e || e.boss || e.penance || e.penanceFlee) return false;
+  const chance = e.elite ? MAGNET_ELITE_CHANCE : MAGNET_CHANCE;
+  if (Math.random() >= chance) return false;
+  magnets.push({ x: e.x, y: e.y, t: Math.random() * 6, r: 16 });
+  return true;
+}
+function triggerMagnet(m) {
+  for (const o of orbs) o.home = true;
+  toast('🧲 Magnet! All orbs pulled in');
+  const x = (m && m.x) || player.x, y = (m && m.y) || player.y;
+  floats.push({ x, y: y - 26, text: '🧲 Magnet!', life: 1.0, vy: -34, color: '#7ae0ff' });
+  sfx('pickup');
+  shake = Math.max(shake, 0.18);
+  for (let i = 0; i < 18; i++) {
+    const a = i / 18 * 6.283, v = rand(60, 180);
+    particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.45, color: i % 2 ? '#7ae0ff' : '#ffd24a', size: 4 });
+  }
+}
+function updateMagnets(dt) {
+  const pull = ((player.magnet || 0) + (player.itemMagnet || 0)) * 0.5;
+  for (const m of magnets) {
+    m.t = (m.t || 0) + dt;
+    const d = dist(player, m);
+    if (d < pull) {
+      const od = d || 1;
+      m.x += (player.x - m.x) / od * 160 * dt;
+      m.y += (player.y - m.y) / od * 160 * dt;
+    }
+    if (d < player.r + 18) { m.got = true; triggerMagnet(m); }
+  }
+  if (magnets.some(m => m.got)) magnets = magnets.filter(m => !m.got);
+}
+function drawMagnets() {
+  for (const m of magnets) {
+    const bob = Math.sin((m.t || 0) * 4) * 3;
+    const pulse = 0.35 + 0.25 * Math.sin((m.t || 0) * 6);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(m.x, m.y + 12, 12, 5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(122,224,255,' + pulse + ')';
+    ctx.beginPath(); ctx.arc(m.x, m.y + bob, 20, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(m.x, m.y + bob, 14 + Math.sin((m.t || 0) * 8) * 2, 0, 7); ctx.stroke();
+    ctx.font = '20px system-ui,Segoe UI,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('🧲', m.x, m.y + bob);
+  }
+}
+function enforceChestCap() {
+  // 0.13a: ordinary unopened chests are capped. Royal / dragon chests are never auto-opened or removed.
+  if (chests.length <= CHEST_CAP) return;
+  while (chests.length > CHEST_CAP) {
+    const i = chests.findIndex(c => !c.royal && !c.got);
+    if (i < 0) break;
+    const c = chests[i];
+    c.got = true;
+    try { openChest(c); } catch (err) {}
+    chests.splice(i, 1);
+  }
+}
 function dropChest(x, y, royal) {
   // 0.9c: search until the complete chest footprint is on walkable ground.
   let found = !hitsSolid(x, y, 26);
@@ -4388,6 +4798,7 @@ function dropChest(x, y, royal) {
   }
   if (!found) return false;
   chests.push({ x, y, t: Math.random() * 6, royal: !!royal, rolls: royal ? 1 : TIMED_CHEST_ROLLS });
+  enforceChestCap();
   return true;
 }
 const TIMED_CHEST_ROLLS = 4; // 0.9c: old 15.92 opens/run vs minute-chest pilot 4.00; 4 rolls ≈ old total loot
@@ -4446,7 +4857,7 @@ function openChest(c, force, extraRoll) {
   } else if (kind === 'treasure') {
     const coins = Math.round((25 + elapsed / 4) * coinMul()); // 0.10a
     const xp = Math.round(player.next * 0.5);
-    runGold += coins;
+    addRunGold(coins);
     player.xp += xp; // if this fills the bar, the normal level-up menu opens next frame
     banner('💰 Treasure! +' + coins + ' coins', '+' + xp + ' XP');
   } else {
@@ -4687,8 +5098,9 @@ function spawnBoss() {
 function bossHitPlayer(d) {
   if (player.invuln > 0) return false;
   if (shieldBlock()) return true;
-  let dmg = d * (1 - armorNow()) * dmgTakenNow();
+  let dmg = d * takenFrac();
   if (player.bloodShield > 0) { const abs = Math.min(player.bloodShield, dmg); player.bloodShield -= abs; dmg -= abs; }
+  if (dmg > 0 && dmg < minSwingDmg()) dmg = minSwingDmg();
   player.hp -= dmg;
   sfx('hurt');
   shake = Math.max(shake, 0.3);
@@ -4702,9 +5114,10 @@ function enemyHitPlayer(d, src) {
   if (player.invuln > 0) return false;
   if (shieldBlock()) return false;
   player._slayerTaken = slayerTakenMul(src);
-  let dmg = d * (1 - armorNow()) * dmgTakenNow();
+  let dmg = d * takenFrac();
   player._slayerTaken = 0;
   if (player.bloodShield > 0) { const abs = Math.min(player.bloodShield, dmg); player.bloodShield -= abs; dmg -= abs; }
+  if (dmg > 0 && dmg < minSwingDmg()) dmg = minSwingDmg();
   player.hp -= dmg;
   sfx('hurt');
   player.invuln = Math.max(player.invuln, HIT_MERCY);
@@ -4905,9 +5318,13 @@ function bossDefeated(e) {
   const coins = Math.round((150 + elapsed / 2) * coinMul()); // 0.10a
   const xp = Math.round(player.next * 1.6);
   const N = 12;
+  let leftG = coins, leftX = xp;
   for (let i = 0; i < N; i++) {
     const a = (i / N) * 6.283, r = rand(20, 55);
-    orbs.push({ x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r, xp: xp / N, gold: coins / N, r: 9, elite: true });
+    const g = (i === N - 1) ? leftG : Math.round(coins / N);
+    const xpv = xp / N;
+    leftG -= g;
+    orbs.push({ x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r, xp: xpv, gold: toGold(g), r: 9, elite: true });
   }
   // 0.9c: royal chest is immediate; no ground-chest cap or expiry.
   dropChest(e.x, e.y, true); // 0.9c: immediate royal reward, walkable ground
@@ -4967,7 +5384,7 @@ function drawBossWarnings() {
   if (boss && boss.atk && boss.atk.type === 'breath') {
     const a = boss.atk;
     const warn = a.phase === 'warn';
-    const p = warn ? 1 - a.t / BREATH_WARN : 1;
+    const p = warn ? clamp01(1 - a.t / BREATH_WARN) : 1;
     ctx.fillStyle = warn ? 'rgba(255,50,30,' + (0.12 + 0.22 * p) + ')' : 'rgba(255,110,30,0.45)';
     ctx.beginPath(); ctx.moveTo(boss.x, boss.y);
     ctx.arc(boss.x, boss.y, BREATH_RANGE, a.ang - BREATH_HALF, a.ang + BREATH_HALF);
@@ -4981,7 +5398,7 @@ function drawBossWarnings() {
     }
   }
   for (const f of fireballs) {
-    const p = 1 - f.t / f.T;
+    const p = clamp01(1 - f.t / (f.T > 0 ? f.T : 1));
     if (f.blocked) { // 0.7b: this one will hit an obstacle, so only a small marker
       ctx.strokeStyle = 'rgba(255,180,80,' + (0.3 + 0.5 * p) + ')'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(f.tx, f.ty, 10, 0, 7); ctx.stroke();
@@ -5002,13 +5419,13 @@ function drawEnemyTelegraphs(top) {
       ctx.beginPath(); ctx.ellipse(e.x, e.y + e.r * 0.6, e.r * 1.6, e.r * 0.75, 0, 0, 7); ctx.fill();
     }
     if (top && e.slamT > 0) { // shockwave ring racing out to the edge of the slam
-      const q = 1 - e.slamT / SLAM_WAVE;
+      const q = clamp01(1 - e.slamT / SLAM_WAVE);
       ctx.strokeStyle = 'rgba(255,190,110,' + (0.9 * (1 - q)) + ')';
       ctx.lineWidth = 5 * (1 - q) + 1.5;
       ctx.beginPath(); ctx.ellipse(e.x, e.y + e.r * 0.5, e.reach * (0.35 + 0.75 * q), e.reach * (0.35 + 0.75 * q) * 0.72, 0, 0, 7); ctx.stroke();
     }
     if (!(e.windup > 0)) continue;
-    const p = Math.min(1, 1 - e.windup / (e.windT || 1)), col = ATK_COL[e.ak];
+    const p = clamp01(1 - e.windup / (e.windT > 0 ? e.windT : 1)), col = ATK_COL[e.ak];
     if (!top) {
       if (e.ak === 'slam') { // ground zone that fills up; when it's full, it hits
         ctx.fillStyle = 'rgba(255,110,40,' + (0.12 + 0.1 * p) + ')';
@@ -5065,7 +5482,7 @@ function drawBolts() {
 
 function drawFireballs() {
   for (const f of fireballs) {
-    const p = 1 - f.t / f.T;
+    const p = clamp01(1 - f.t / (f.T > 0 ? f.T : 1));
     const x = f.sx + (f.tx - f.sx) * p, y = f.sy + (f.ty - f.sy) * p - Math.sin(p * Math.PI) * 90;
     ctx.fillStyle = '#ff6a2a'; ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.fill();
     ctx.fillStyle = '#ffe07a'; ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
@@ -5331,7 +5748,7 @@ function endRun() {
   stopLoop();
   playing = false;
   paused = false;
-  bag = []; groundItems = []; bagging = false; bagQueue = []; bagPending = []; // 0.10a: items are in-run only
+  bag = []; groundItems = []; magnets = []; bagging = false; bagQueue = []; bagPending = []; // 0.10a: items are in-run only
   woodLogs = []; fires = []; thralls = []; traps = []; player.stealth = 0; player.altar = null; player.runeAltar = null;
   document.body.classList.remove('bagging');
   if ($('bagHud')) $('bagHud').style.display = 'none';
@@ -5345,8 +5762,8 @@ function endRun() {
     save.bossBest = Math.max(save.bossBest || 0, bossesSlain);       // 0.6: most in one run
     resetJoystick(); // 0.4: hide the joystick when the run ends
     sfx('death');
-    const earned = Math.floor(runGold + elapsed / 11);
-    save.gold += earned;
+    const earned = Math.floor(toGold(runGold) + elapsed / 11);
+    save.gold = toGold(save.gold) + earned;
     const renownRun = Math.max(1, Math.floor(elapsed / 28) + Math.floor(kills / 22)) + 8 * bossesSlain; // 0.8a: +8 per boss
     // 0.9a: event renown was already added during the run; still show it. Base run renown is separate.
     save.renown += renownRun;
@@ -5575,13 +5992,14 @@ function update(dt) {
   if (waveResumeIn > 0) waveResumeIn = Math.max(0, waveResumeIn - dt);
   if (!eventFight && waveResumeIn <= 0) {
     const spawnRate = Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL;
-    if (spawnClock > spawnRate && enemies.length < 90) {
+    if (spawnClock > spawnRate && enemies.length < LIVE_CAP) {
       spawnClock = 0;
       spawn();
       if (elapsed > 100 && Math.random() < 0.45) spawn();
       if (elapsed > 160 && Math.random() < 0.25) spawn(true); // elite chance
     }
   }
+  maybeMergePacks(dt);
 
   // attack
   if (attackClock <= 0) {
@@ -5679,7 +6097,10 @@ function update(dt) {
     const pd = Math.hypot(e.x - player.x, e.y - player.y);
     if (pd < e.r + player.r && player.invuln <= 0 && !(player.stealth > 0)) {
       player._slayerTaken = slayerTakenMul(e);
-      const dmg = e.damage * dt * (1 - armorNow()) * dmgTakenNow(); // 0.8a: Reckless swings
+      let dmg = e.damage * dt * takenFrac(); // 0.8a: Reckless swings. 0.13b: 90% DR safety net
+      // After 5:00, contact keeps a small tick so standing in a pack is never literally free.
+      const minContact = (lateScale().dmg - 1) * 0.55 * dt;
+      if (minContact > 0 && dmg < minContact && e.damage > 0) dmg = minContact;
       player._slayerTaken = 0;
       player.hp -= dmg;
       sfx('hurt');
@@ -5711,19 +6132,25 @@ function update(dt) {
   }
 
   // orbs
+  // 0.13a: leftover orbs merge into bigger orbs (XP and coins stay on the map). A rare magnet pickup is the only all-map pull.
+  const magnetR = player.magnet + (player.itemMagnet || 0);
   for (const o of orbs) {
+    o.age = (o.age || 0) + dt;
     const d = dist(player, o);
-    if (d < player.magnet + (player.itemMagnet || 0)) {
-      const k = (1 - d / (player.magnet + (player.itemMagnet || 0))) * 5 + 1.2;
-      const ox = player.x - o.x, oy = player.y - o.y;
+    if (o.home) {
       const od = d || 1;
-      o.x += ox / od * 195 * k * dt;
-      o.y += oy / od * 195 * k * dt;
+      o.x += (player.x - o.x) / od * MAGNET_HOME_SPD * dt;
+      o.y += (player.y - o.y) / od * MAGNET_HOME_SPD * dt;
+    } else if (d < magnetR) {
+      const k = (1 - d / magnetR) * 5 + 1.2;
+      const od = d || 1;
+      o.x += (player.x - o.x) / od * 195 * k * dt;
+      o.y += (player.y - o.y) / od * 195 * k * dt;
     }
     if (d < player.r + o.r + 5) {
       const mult = buffs.glory > 0 ? 2 : 1; // 0.5: Amulet of glory doubles orb XP and coins
       player.xp += o.xp * mult;
-      runGold += o.gold * mult;
+      addRunGold(o.gold * mult);
       o.got = true;
       sfx('pickup');
       particles.push({
@@ -5733,6 +6160,8 @@ function update(dt) {
     }
   }
   orbs = orbs.filter(o => !o.got);
+  cleanupOrbs();
+  updateMagnets(dt);
 
   // 0.5: chests get pulled in like orbs (shorter range) and open the moment you touch one
   const chestPull = (player.magnet + (player.itemMagnet || 0)) * 0.6;
@@ -5748,6 +6177,7 @@ function update(dt) {
     if (d < player.r + 16) { c.got = true; openChest(c); }
   }
   chests = chests.filter(c => !c.got);
+  enforceChestCap();
 
   // 0.10a: walk over ground items (left from a full bag or a manual drop)
   // 0.11c: left/dropped items are not magneted, and stay ignored until you walk ~72px away.
@@ -5770,6 +6200,15 @@ function update(dt) {
   groundItems = groundItems.filter(g => !g.got);
 
   if (player.chewLock > 0) player.chewLock = Math.max(0, player.chewLock - dt);
+  // 0.13b: passive regen from a worn trinket (e.g. Manta ray). Not a consumable.
+  if (player.itemRegen > 0 && player.hp > 0 && playing) {
+    player._regenAcc = (player._regenAcc || 0) + healAmt(player.itemRegen) * dt;
+    if (player._regenAcc >= 1) {
+      const h = Math.floor(player._regenAcc);
+      player._regenAcc -= h;
+      player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + h);
+    }
+  }
   if (player.potAtk > 0) player.potAtk = Math.max(0, player.potAtk - dt);
   if (player.potPray > 0) player.potPray = Math.max(0, player.potPray - dt);
   if (player.potStam > 0) player.potStam = Math.max(0, player.potStam - dt);
@@ -5915,11 +6354,12 @@ function draw() {
   const coinOk = spriteReady(art.coin); // 0.7a
   for (const o of orbs) {
     if (coinOk) { // 0.7a: spinning coin sprite; elite/boss drops are bigger with a warm glow
-      if (o.elite) {
-        ctx.fillStyle = 'rgba(255,154,60,0.28)';
-        ctx.beginPath(); ctx.arc(o.x, o.y - 2, 13, 0, 7); ctx.fill();
+      const sz = Math.max(22, Math.min(42, (o.r || 6) * 2.8));
+      if (o.elite || (o.r || 0) > 8) {
+        ctx.fillStyle = o.elite ? 'rgba(255,154,60,0.28)' : 'rgba(241,207,98,0.22)';
+        ctx.beginPath(); ctx.arc(o.x, o.y - 2, Math.max(13, sz * 0.45), 0, 7); ctx.fill();
       }
-      drawFrame('coin', 2, 2, Math.floor(elapsed * 6 + o.x * 0.05) % 4, o.x, o.y - 2, o.elite ? 30 : 24);
+      drawFrame('coin', 2, 2, Math.floor(elapsed * 6 + o.x * 0.05) % 4, o.x, o.y - 2, sz);
       continue;
     }
     ctx.beginPath();
@@ -5929,6 +6369,7 @@ function draw() {
     ctx.fillStyle = '#fff8c8';
     ctx.fillRect(o.x - 2.2, o.y - 2.2, 4.4, 4.4);
   }
+  drawMagnets();
 
   // 0.5: chests: brown box, gold trim, gentle bob and pulsing glow
   for (const c of chests) {
@@ -6261,6 +6702,7 @@ function draw() {
   // 0.6: (now shared edgeArrow helper) + a bigger red arrow for the boss
   for (const c of chests) edgeArrow(c.x + ox, c.y + oy, '#ffd24a', '#5e3818', 0.75 + 0.25 * Math.sin(c.t * 5), 1);
   for (const g of groundItems) edgeArrow(g.x + ox, g.y + oy, '#c8e8a0', '#3a5a30', 0.7 + 0.2 * Math.sin((g.t || 0) * 5), 0.85);
+  for (const mag of magnets) edgeArrow(mag.x + ox, mag.y + oy, '#7ae0ff', '#2a6a80', 0.8 + 0.2 * Math.sin((mag.t || 0) * 6), 1.15);
   if (boss) edgeArrow(boss.x + ox, boss.y + oy, '#ff3a2a', '#3a0d0a', 0.8 + 0.2 * Math.sin(elapsed * 6), 1.35);
   if (boss) $('bossFill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%'; // 0.6
 
@@ -6269,7 +6711,7 @@ function draw() {
   $('style').textContent = player.attackName;
   $('time').textContent = fmt(elapsed);
   $('kills').textContent = kills;
-  $('gold').textContent = save.gold + runGold;
+  $('gold').textContent = toGold((save.gold || 0) + runGold);
   $('hpbar').style.width = Math.max(0, player.hp / player.maxHp * 100) + '%';
   $('xpbar').style.width = (player.xp / player.next * 100) + '%';
   if (hudPref.dps) renderDpsMeter();
@@ -6286,8 +6728,17 @@ function loop(now) {
   const dt = Math.min(0.04, (now - last) / 1000 || 0);
   last = now;
   const __t0 = performance.now();
-  update(dt);
-  draw();
+  // 0.13a: one bad frame must never stop the animation loop (the freeze that ended long runs).
+  try { update(dt); }
+  catch (err) {
+    window.__updErrs = (window.__updErrs || 0) + 1;
+    if (!window.__updLogged) { window.__updLogged = 1; console.warn('Last Stand: update error (loop kept running)', err); }
+  }
+  try { draw(); }
+  catch (err) {
+    window.__drawLoopErrs = (window.__drawLoopErrs || 0) + 1;
+    if (!window.__drawLogged) { window.__drawLogged = 1; console.warn('Last Stand: draw error (loop kept running)', err); }
+  }
   notePerf(performance.now() - __t0);
   if (playing && !paused && !bagging) rafId = requestAnimationFrame(loop);
 }
@@ -6407,6 +6858,19 @@ $('abilityBtn').addEventListener('click', () => {
   if (playing && !paused && !leveling && !bagging) doSpecial();
 });
 
+function pauseBagHtml() {
+  let h = '<div class="pausebag"><div class="pausebag-h">Backpack</div>';
+  for (let i = 0; i < BAG_SLOTS; i++) {
+    const it = bag[i], d = it && itemDef(it.id);
+    if (!d) { h += '<div class="pausebag-e">Empty slot</div>'; continue; }
+    const worn = itemIsWorn(it);
+    h += '<div class="pausebag-i"><span class="pausebag-ic">' + d.icon + '</span><div>' +
+      '<div class="pausebag-n">' + d.n + (it.qty > 1 ? ' ×' + it.qty : '') + (worn ? ' · Worn' : '') + '</div>' +
+      '<div class="pausebag-d">' + d.d + '</div></div></div>';
+  }
+  h += '</div>';
+  return h;
+}
 function togglePause() {
   if (!playing || leveling || bagging) return;
   paused = !paused;
@@ -6428,10 +6892,13 @@ function togglePause() {
         <button type="button" id="splatToggle" aria-pressed="true">💢 Numbers on</button>
         <button type="button" id="mapToggle" aria-pressed="true">🗺️ Map on</button>
       </div>
+      <div id="pauseBagMount"></div>
       <button id="resume">Resume</button>
       <button id="quit">Abandon run</button>`;
     bindSfxControls();
     bindHudControls();
+    hideBagTip();
+    if ($('pauseBagMount')) $('pauseBagMount').outerHTML = pauseBagHtml();
     $('resume').onclick = () => {
       paused = false;
       $('overlay').style.display = 'none';
@@ -6447,6 +6914,12 @@ function togglePause() {
   }
 }
 $('pauseBtn').onclick = togglePause;
+document.addEventListener('pointerdown', ev => {
+  if (bagTipIdx < 0) return;
+  const t = ev.target;
+  if (t && t.closest && (t.closest('#bagTip') || t.closest('#bagHud') || t.closest('#bagFull'))) return;
+  hideBagTip();
+}, true);
 (function bindDpsTap(){
   const el = $('dpsMeter');
   if (!el) return;
@@ -6468,7 +6941,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) autoP
 addEventListener('blur', autoPause);
 
 // initial save text
-$('saveinfo').textContent = `Saved on this device · Coins ${save.gold} · Renown ${save.renown} · Best survival ${fmt(save.best)}`;
+$('saveinfo').textContent = `Saved on this device · Coins ${toGold(save.gold)} · Renown ${save.renown} · Best survival ${fmt(save.best)}`;
 })();
 </script>
 </body>
