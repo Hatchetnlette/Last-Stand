@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.16a</title>
+<title>Last Stand — Prototype 0.17a</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -341,7 +341,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.16a</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.17a</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, and extract at the shrine after the first dragon. Death keeps half your coins.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -790,7 +790,8 @@ let capHold = 0;
 const DPS_LABEL = {
   attack: 'Attack', special: 'Special', thralls: 'Thralls', fire: 'Fire',
   dot: 'DoT', items: 'Items', traps: 'Traps', other: 'Other',
-  axes: 'Throwing axes', chins: 'Chinchompa', aura: 'Retribution aura' // 0.15a
+  bash: 'Shield bash', cannon: 'Multicannon', bind: 'Bind', harpoon: 'Harpoon', log: 'Rolling log', knives: 'Knives', // 0.17a
+  ward: 'Consecrated', trail: 'Fire trail', corpse: 'Corpse burst', darts: 'Slayer darts', snare: 'Snares', orbit: 'Rune orbit'
 };
 let hudPref = { dps: true, dpsOpen: true, splats: true, minimap: true };
 let dmgSrc = 'attack';
@@ -3121,6 +3122,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
   const M = player.m;
   if (M.ice2 && (e.slow > 0 || e.chill > 0)) d = Math.round(d * 1.12); // 0.8a Cold snap
   if (e.dizzy > 0) d = Math.round(d * 1.25); // 0.16a: a dizzy Charger takes +25%
+  if (e.bindT > elapsed && !dot) d = Math.round(d * (1 + ATK_DEFS.bind.vuln)); // 0.17a: Bind makes rooted enemies take +20%
   recordDps(src || dmgSrc || (dot ? 'dot' : 'attack'), d);
   e.hp -= d;
   e.hit = dot ? Math.max(e.hit, 0.06) : 0.14;
@@ -3167,6 +3169,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
     if (player.style === 'firemaker' && M.kindle4 && (e.burn > 0) && Math.random() < 0.40)
       spawnFire(e.x, e.y, fireRadius(22), fireLifetime(1.6), fireDpsMul(0.18));
 
+    atkNoteKill(e); // 0.17a: Necromancer corpses
     if (e.boss) {
       bossDefeated(e); // 0.6: boss has its own big reward
     } else if (e.mini) {
@@ -6442,13 +6445,30 @@ function drawNewTelegraphs() { // ground layer, under enemies
     }
   }
 }
+var miniArrowBox = null, miniArrowAt = -1;
+function miniArrowRect() { // safe box (CSS px, canvas space) clear of the top HUD/goal pill, bag column, minimap and buttons
+  if (miniArrowBox && Math.abs(elapsed - miniArrowAt) < 0.5 && miniArrowBox.W === W && miniArrowBox.H === H) return miniArrowBox;
+  const cv = document.getElementById('game'), cr = cv ? cv.getBoundingClientRect() : { left: 0, top: 0, width: W, height: H };
+  const sx = W / (cr.width || W), sy = H / (cr.height || H);
+  const box = { l: 22, r: W - 22, t: 70, b: H - 24, W, H };
+  const vis = id => { const el = document.getElementById(id); if (!el) return null; const st = getComputedStyle(el); if (st.display === 'none' || st.visibility === 'hidden') return null; const q = el.getBoundingClientRect(); return q.width && q.height ? q : null; };
+  for (const id of ['hud', 'bars', 'goalHud']) { const q = vis(id); if (q) box.t = Math.max(box.t, (q.bottom - cr.top) * sy + 18); }
+  const bag = vis('bagHud'); if (bag) box.r = Math.min(box.r, (bag.left - cr.left) * sx - 18);
+  for (const id of ['minimap', 'dashBtn', 'abilityBtn']) { const q = vis(id); if (q) box.b = Math.min(box.b, (q.top - cr.top) * sy - 18); }
+  for (const id of ['atkHud', 'dpsMeter']) { const q = vis(id); if (q) box.b = Math.min(box.b, (q.top - cr.top) * sy - 18); }
+  miniArrowBox = box; miniArrowAt = elapsed;
+  return box;
+}
 function drawMiniArrows() { // edge arrows: incoming (3s warning) and off-screen live mini bosses
   const pts = [];
   for (const q of miniQueue) if (elapsed >= q.at - MINI_WARN) pts.push({ a: q.a, col: MINI_DEFS[q.id].color, soon: true });
   for (const e of enemies) if (e.mini && e.hp > 0 && !onScreen(e.x, e.y, -e.r)) pts.push({ a: Math.atan2(e.y - player.y, e.x - player.x), col: e.color });
   for (const p of pts) {
     const c = Math.cos(p.a), s = Math.sin(p.a);
-    const k = Math.min((W / 2 - 26) / Math.max(0.001, Math.abs(c)), (H / 2 - 70) / Math.max(0.001, Math.abs(s)));
+    const R = miniArrowRect(); // 0.17a: keep arrows inside the HUD-free part of the screen
+    const kx = c > 0 ? (R.r - W / 2) / c : c < 0 ? (R.l - W / 2) / c : 1e9;
+    const ky = s > 0 ? (R.b - H / 2) / s : s < 0 ? (R.t - H / 2) / s : 1e9;
+    const k = Math.max(20, Math.min(kx, ky));
     const x = player.x + c * k, y = player.y + s * k;
     ctx.save(); ctx.translate(x, y); ctx.rotate(p.a);
     ctx.globalAlpha = p.soon ? 0.6 + 0.4 * Math.sin(elapsed * 10) : 0.9;
@@ -6458,30 +6478,60 @@ function drawMiniArrows() { // edge arrows: incoming (3s warning) and off-screen
   }
 }
 
-/* ========== 0.15a: EXTRA ATTACK SLOTS (run-only) ========== */
-// Slot 1 is always the class main attack. Extra slots open at run level 5 / 12 / 20.
-// Damage is a share of your main attack's damage per second (mainDps), so it grows with
-// Keen edge, Quick hands, skill level and weapon items, and rank 1 is about 1/3 of it.
-const ATK_SLOT_LEVELS = [5, 16]; // 0.15b: 2 slots until more attacks exist (was 5/12/20)
+/* ========== 0.17a: CLASS SIGNATURE ATTACKS (run-only) ========== */
+// One extra attack slot at run level 5; it always offers your class's own signature attack.
+// Max rank 5, rank-up gate (+4 levels per rank, from 0.15b). Damage is a share of your main attack's
+// damage per second (mainDps) via atkDmg(), so every attack scales with its own class's power.
+// Attacks are DATA rows with a shared behaviour `type`:
+//   bounce (old axe engine) · lob (old chinchompa engine) · pulse (old aura engine) · zone · line · orbit
+const ATK_SLOT_LEVELS = [5]; // 0.17a: one class-attack slot (level-16 slot removed for now)
 const ATK_MAX_RANK = 5;
-const AXE_CAP = 24, CHIN_CAP = 12, BLAST_CAP = 14;
+const AXE_CAP = 24, CHIN_CAP = 12, BLAST_CAP = 14, ZONE_CAP = 16, LINE_CAP = 8;
 const ATK_DEFS = {
-  axes: { id:'axes', n:'Rune throwing axes', icon:'🪓', col:'#cfd8e2',
-    cd:[1.6, 1.5, 1.4, 1.3, 1.15], hits:[2, 3, 3, 4, 5], mul:[0.33, 0.40, 0.50, 0.58, 0.68],
-    desc: r => 'A spinning axe hits ' + ATK_DEFS.axes.hits[r] + ' enemies, bouncing between them, every ' + ATK_DEFS.axes.cd[r] + 's.' },
-  chins: { id:'chins', n:'Chinchompa', icon:'🔴', col:'#ff6a3a',
-    cd:[3.0, 2.8, 2.6, 2.5, 2.3], count:[1, 1, 1, 2, 2], rad:[46, 52, 56, 62, 70], mul:[0.33, 0.42, 0.48, 0.42, 0.45],
-    desc: r => 'Lob ' + (ATK_DEFS.chins.count[r] > 1 ? ATK_DEFS.chins.count[r] + ' chinchompas' : 'a chinchompa') + ' at a crowd; it explodes in a ' + ATK_DEFS.chins.rad[r] + 'px blast every ' + ATK_DEFS.chins.cd[r] + 's.' },
-  aura: { id:'aura', n:'Retribution aura', icon:'✴️', col:'#ffd24a',
-    tick:[1.0, 0.95, 0.9, 0.85, 0.8], rad:[58, 66, 74, 82, 92], mul:[0.28, 0.35, 0.42, 0.50, 0.60],
-    desc: r => 'A gold ring around you burns every enemy within ' + ATK_DEFS.aura.rad[r] + 'px every ' + ATK_DEFS.aura.tick[r] + 's. Best up close: melee and tanky builds.' } // 0.16a: aura hint (text only)
+  bash: { id:'bash', cls:'melee', type:'pulse', n:'Shield bash', icon:'🛡', col:'#ffd27a',
+    cd:[2.2, 2.1, 2.0, 1.9, 1.7], rad:[80, 86, 92, 98, 106], arc:0.8, kb:[40, 44, 48, 52, 58], mul:[0.50, 0.60, 0.70, 0.80, 0.92],
+    desc: r => 'Bash a ' + ATK_DEFS.bash.rad[r] + 'px cone in front of you every ' + ATK_DEFS.bash.cd[r] + 's, knocking enemies back. Hold the line.' },
+  cannon: { id:'cannon', cls:'ranged', type:'zone', zk:'cannon', n:'Dwarf multicannon', icon:'💣', col:'#9aa4ae',
+    cd:[10, 9.5, 9, 8.5, 8], life:[6, 6.5, 7, 7.5, 8], fire:[0.6, 0.55, 0.5, 0.45, 0.4], reach:260, max:1, mul:[0.66, 0.72, 0.78, 0.84, 0.90], // 0.17a tune: was 0.55-0.75
+    desc: r => 'Set down a cannon that fires at enemies within ' + ATK_DEFS.cannon.reach + 'px for ' + ATK_DEFS.cannon.life[r] + 's (every ' + ATK_DEFS.cannon.cd[r] + 's). Kite around it.' },
+  bind: { id:'bind', cls:'magic', type:'lob', lk:'bind', n:'Bind', icon:'🌀', col:'#b77aff',
+    cd:[3.2, 3.0, 2.8, 2.7, 2.5], count:[1, 1, 1, 2, 2], rad:[50, 56, 62, 66, 72], root:[1.0, 1.0, 1.1, 1.1, 1.2], vuln:0.20, mul:[0.30, 0.36, 0.42, 0.40, 0.44],
+    desc: r => 'Root ' + (ATK_DEFS.bind.count[r] > 1 ? ATK_DEFS.bind.count[r] + ' crowds' : 'a crowd') + ' (' + ATK_DEFS.bind.rad[r] + 'px) for ' + ATK_DEFS.bind.root[r] + 's every ' + ATK_DEFS.bind.cd[r] + 's; rooted enemies take +20% damage.' },
+  harpoon: { id:'harpoon', cls:'fisher', type:'line', lk:'harpoon', n:'Harpoon line', icon:'🔱', col:'#5ec8c0',
+    cd:[1.8, 1.7, 1.6, 1.5, 1.4], count:[1, 1, 1, 1, 2], range:[300, 320, 340, 360, 380], w:14, speed:560, kb:0, aim:'nearest', mul:[0.18, 0.20, 0.22, 0.26, 0.19], // 0.17a tune (round 2 ×1.25): was 0.55-0.86, 2 harpoons from rank 4
+    desc: r => 'Throw ' + (ATK_DEFS.harpoon.count[r] > 1 ? ATK_DEFS.harpoon.count[r] + ' harpoons' : 'a harpoon') + ' that pierce every enemy in a ' + ATK_DEFS.harpoon.range[r] + 'px line, every ' + ATK_DEFS.harpoon.cd[r] + 's.' },
+  log: { id:'log', cls:'woodcutter', type:'line', lk:'log', n:'Rolling log', icon:'🪵', col:'#a0703a',
+    cd:[2.6, 2.5, 2.4, 2.3, 2.1], count:[1, 1, 1, 1, 1], range:[220, 240, 260, 280, 300], w:[26, 28, 30, 32, 34], speed:230, kb:30, aim:'move', mul:[0.39, 0.45, 0.52, 0.59, 0.65], // 0.17a tune round 2: mul ×0.65
+    desc: r => 'Roll a log the way you are moving (or at the nearest pack) every ' + ATK_DEFS.log.cd[r] + 's: it shoves and hits everything in a ' + ATK_DEFS.log.range[r] + 'px path.' },
+  knives: { id:'knives', cls:'thief', type:'bounce', bk:'knife', n:'Throwing knives', icon:'🔪', col:'#d8dde4',
+    cd:[1.2, 1.1, 1.0, 0.95, 0.85], count:[2, 2, 2, 3, 3], hits:[1, 1, 1, 1, 1], reach:150, pocket:0.35, mul:[0.14, 0.16, 0.19, 0.17, 0.20], // 0.17a tune (round 2 ×0.85): was 2-4 knives x 1-2 hits x 0.40-0.62
+    desc: r => 'Flick ' + ATK_DEFS.knives.count[r] + ' knives at enemies within ' + ATK_DEFS.knives.reach + 'px every ' + ATK_DEFS.knives.cd[r] + 's; hits can pickpocket coins.' },
+  ward: { id:'ward', cls:'priest', type:'zone', zk:'ward', n:'Consecrated ground', icon:'✨', col:'#ffe9a0',
+    cd:[5, 4.8, 4.6, 4.4, 4.2], life:[4, 4.5, 5, 5.5, 6], rad:[70, 76, 82, 88, 96], tick:0.5, heal:[0.006, 0.007, 0.008, 0.009, 0.010], max:1, mul:[0.67, 0.81, 0.94, 1.08, 1.23], // 0.17a tune (round 2 ×1.4): was cd 6-5, mul 0.30-0.55
+    desc: r => 'Bless the ground under you (' + ATK_DEFS.ward.rad[r] + 'px, ' + ATK_DEFS.ward.life[r] + 's) every ' + ATK_DEFS.ward.cd[r] + 's: it burns enemies and slowly heals you while you stand in it.' },
+  trail: { id:'trail', cls:'firemaker', type:'zone', zk:'trail', n:'Fire trail', icon:'🔥', col:'#ff8a3c',
+    cd:[0.3, 0.3, 0.3, 0.3, 0.3], life:[2.0, 2.3, 2.6, 2.9, 3.2], rad:[24, 24, 26, 26, 28], tick:0.5, max:12, mul:[0.70, 0.80, 0.90, 1.00, 1.10], // 0.17a tune: was 0.14-0.26 (did ~0% of damage)
+    desc: r => 'Walking leaves burning ground that lasts ' + ATK_DEFS.trail.life[r] + 's. Lead the horde through it.' },
+  corpse: { id:'corpse', cls:'necromancer', type:'lob', lk:'corpse', n:'Corpse explosion', icon:'💥', col:'#9be58a',
+    cd:[1.0, 0.9, 0.8, 0.75, 0.7], count:[1, 1, 2, 2, 3], rad:[50, 55, 60, 64, 70], near:120, mul:[0.25, 0.29, 0.31, 0.33, 0.36], // 0.17a tune: was 0.45-0.66
+    desc: r => 'Up to ' + ATK_DEFS.corpse.count[r] + ' fresh corpses near your thralls (or you) burst for a ' + ATK_DEFS.corpse.rad[r] + 'px blast every ' + ATK_DEFS.corpse.cd[r] + 's. Kills chain.' },
+  darts: { id:'darts', cls:'slayer', type:'bounce', bk:'dart', n:'Slayer darts', icon:'🎯', col:'#c8e070',
+    cd:[1.5, 1.4, 1.3, 1.2, 1.1], count:[1, 1, 1, 2, 2], hits:[1, 2, 2, 2, 2], prio:true, bonus:1.25, mul:[0.24, 0.18, 0.20, 0.14, 0.17], // 0.17a tune (round 2 ×0.8): was 1-3 darts x 2-3 hits x 0.40-0.64
+    desc: r => 'Homing darts (' + ATK_DEFS.darts.count[r] + ' every ' + ATK_DEFS.darts.cd[r] + 's) seek mini bosses, elites and task monsters first, +25% damage to them.' },
+  snare: { id:'snare', cls:'hunter', type:'zone', zk:'snare', n:'Bird snares', icon:'🪤', col:'#8fbc6a',
+    cd:[2.2, 2.0, 1.8, 1.7, 1.6], life:[12, 12, 12, 12, 12], rad:[26, 26, 28, 28, 30], blast:54, root:[1.2, 1.3, 1.4, 1.5, 1.6], max:[3, 4, 4, 5, 6], mul:[2.24, 2.66, 3.08, 3.50, 3.92], // 0.17a tune (round 2 ×1.4): was cd 3.0-2.2, blast 42, max 3-5, mul 1.0-1.8
+    desc: r => 'Drop a snare at your feet every ' + ATK_DEFS.snare.cd[r] + 's (up to ' + ATK_DEFS.snare.max[r] + '): the first enemy in springs it, rooting and hurting everything close. Kite over your traps.' },
+  orbit: { id:'orbit', cls:'runecrafter', type:'orbit', n:'Rune orbit', icon:'🔵', col:'#7ec8e8',
+    count:[2, 3, 3, 4, 5], rad:[78, 84, 90, 96, 104], spin:2.6, hitCd:0.5, push:18, fireMul:1.3, mul:[0.60, 0.68, 0.76, 0.84, 0.92], // 0.17a tune: was 62-80px, 0.30-0.46
+    desc: r => ATK_DEFS.orbit.count[r] + ' runes circle you at ' + ATK_DEFS.orbit.rad[r] + 'px: air runes push enemies away, fire runes hit harder. Skim the edge of the horde.' }
 };
-const ATK_ORDER = ['axes', 'chins', 'aura'];
-var atkAxes = [], atkChins = [], atkBlasts = [];
-const atkPool = { axes: [], chins: [], blasts: [] };
+const ATK_CLASS = {}; for (const id in ATK_DEFS) ATK_CLASS[ATK_DEFS[id].cls] = id;
+function atkOrder() { const id = player && ATK_CLASS[player.style]; return id ? [id] : []; }
+var atkAxes = [], atkChins = [], atkBlasts = [], atkZones = [], atkLines = [], atkCorpses = [];
+const atkPool = { axes: [], chins: [], blasts: [], zones: [], lines: [] };
 var atkHudSig = '', atkHudAt = -1;
 function resetAttacks() {
-  if (player) { player.atks = []; player.atkSlotSeen = 0; player.auraFlash = 0; }
+  if (player) { player.atks = []; player.atkSlotSeen = 0; player.auraFlash = 0; player.bashFx = null; player.orbA = 0; player.trailAt = null; }
   clearAttackFx();
   atkHudSig = '';
 }
@@ -6489,7 +6539,9 @@ function clearAttackFx() {
   for (const a of atkAxes) atkPool.axes.push(a);
   for (const c of atkChins) atkPool.chins.push(c);
   for (const b of atkBlasts) atkPool.blasts.push(b);
-  atkAxes = []; atkChins = []; atkBlasts = [];
+  for (const z of atkZones) atkPool.zones.push(z);
+  for (const l of atkLines) atkPool.lines.push(l);
+  atkAxes = []; atkChins = []; atkBlasts = []; atkZones = []; atkLines = []; atkCorpses = [];
 }
 function atkSlots() {
   const l = (player && player.level) || 1;
@@ -6525,7 +6577,7 @@ function atkCards() {
   const out = [];
   const owned = player.atks || [];
   const free = owned.length < atkSlots();
-  if (free) for (const id of ATK_ORDER) {
+  if (free) for (const id of atkOrder()) { // 0.17a: only your class's signature attack
     if (atkOwned(id)) continue;
     const d = ATK_DEFS[id];
     const c = [d.icon + ' ' + d.n, 'New attack · ' + d.desc(0), p => addAttack(id)];
@@ -6578,17 +6630,51 @@ function atkNearest(x, y, R, skip) {
   return best;
 }
 function atkRange() { return Math.max(180, Math.min(0.48 * Math.min(W, H) + 40, (player.range || 160) + 40)); }
-function castAxe(a) {
-  if (atkAxes.length >= AXE_CAP) return false;
-  const t = atkNearest(player.x, player.y, atkRange());
-  if (!t) return false;
-  const D = ATK_DEFS.axes, r = a.rank - 1;
-  const o = atkPool.axes.pop() || {};
-  o.x = player.x; o.y = player.y; o.t = t; o.hitList = []; o.hitsLeft = D.hits[r];
-  o.dmg = atkDmg(D.mul[r], D.cd[r]); o.life = 2.4; o.spin = 0; o.fade = 0;
-  atkAxes.push(o);
-  return true;
+function atkCritDmg(d) { const c = Math.random() < (player.crit || 0); return [c ? Math.round(d * (player.critMul || 2.4)) : d, c]; }
+function atkPush(e, ux, uy, d) { if (!e || e.boss || e.hp <= 0) return; if (e.mini) d *= 0.3; e.x += ux * d; e.y += uy * d; }
+function atkRoot(e, t) { if (!e || e.boss) return; e.root = Math.max(e.root || 0, e.mini ? t * 0.5 : t); }
+function atkHit(e, dmg, src) { const [d, c] = atkCritDmg(dmg); hurt(e, d, c, false, src); return c; }
+// ---- bounce (old axe engine): homing projectiles that hop to the next enemy
+function bounceTarget(D, skip, R) {
+  if (D.prio) { // Slayer darts: mini boss > boss > elite > task > nearest
+    let best = null, bs = -1;
+    for (const e of enemies) {
+      if (e.hp <= 0 || e.dead || skip.indexOf(e) >= 0) continue;
+      const d = Math.hypot(e.x - player.x, e.y - player.y); if (d > R) continue;
+      const s = (e.mini ? 4 : e.boss ? 3 : e.elite ? 2 : (typeof isTaskEnemy === 'function' && isTaskEnemy(e)) ? 1 : 0) * 1000 - d;
+      if (s > bs) { bs = s; best = e; }
+    }
+    return best;
+  }
+  return atkNearest(player.x, player.y, R, skip);
 }
+function castBounce(a, D) {
+  const r = a.rank - 1, R = D.reach || (atkRange() + (D.prio ? 60 : 0));
+  const n = (D.count ? D.count[r] : 1), dmg = atkDmg(D.mul[r], D.cd[r]);
+  const taken = []; let any = false;
+  for (let k = 0; k < n; k++) {
+    if (atkAxes.length >= AXE_CAP) break;
+    let t = bounceTarget(D, taken, R);
+    if (!t) { if (!taken.length) break; t = taken[k % taken.length]; }
+    taken.push(t);
+    const o = atkPool.axes.pop() || {};
+    o.x = player.x; o.y = player.y; o.t = t; o.hitList = []; o.hitsLeft = D.hits[r]; o.id = D.id; o.bk = D.bk;
+    o.dmg = dmg; o.life = 2.4; o.spin = 0; o.fade = 0; o.speed = D.speed || 520;
+    atkAxes.push(o); any = true;
+  }
+  return any;
+}
+function cannonShot(z) { // a cannon fires a 1-hit bounce projectile from its own spot
+  if (atkAxes.length >= AXE_CAP) return;
+  const t = atkNearest(z.x, z.y, z.reach);
+  if (!t) return;
+  const o = atkPool.axes.pop() || {};
+  o.x = z.x; o.y = z.y; o.t = t; o.hitList = []; o.hitsLeft = 1; o.id = 'cannon'; o.bk = 'ball';
+  o.dmg = z.dmg; o.life = 1.6; o.spin = 0; o.fade = 0; o.speed = 620;
+  atkAxes.push(o);
+  z.aim = Math.atan2(t.y - z.y, t.x - z.x);
+}
+// ---- lob (old chinchompa engine): arcs to a spot, then a blast (Bind roots; Corpse bursts where things died)
 function chinTargets(count, rad) {
   const pool = atkTargetsInRange(atkRange() + 40).sort((p, q) => dist(p, player) - dist(q, player)).slice(0, 16);
   const picks = [];
@@ -6605,50 +6691,199 @@ function chinTargets(count, rad) {
   }
   return picks;
 }
-function castChins(a) {
-  const D = ATK_DEFS.chins, r = a.rank - 1;
-  const targets = chinTargets(D.count[r], D.rad[r]);
+function castLob(a, D) {
+  const r = a.rank - 1;
+  let targets;
+  if (D.lk === 'corpse') {
+    atkCorpses = atkCorpses.filter(c => elapsed - c.t < 1.5);
+    targets = atkCorpses.splice(0, D.count[r]);
+  } else targets = chinTargets(D.count[r], D.rad[r]);
   if (!targets.length) return false;
   const dmg = atkDmg(D.mul[r], D.cd[r]);
   for (const t of targets) {
     if (atkChins.length >= CHIN_CAP) break;
     const o = atkPool.chins.pop() || {};
-    o.sx = player.x; o.sy = player.y; o.tx = t.x; o.ty = t.y; o.t = 0; o.T = 0.6; o.rad = D.rad[r]; o.dmg = dmg;
+    const fromHere = D.lk === 'corpse';
+    o.sx = fromHere ? t.x : player.x; o.sy = fromHere ? t.y : player.y; o.tx = t.x; o.ty = t.y; o.t = 0; o.T = fromHere ? 0.25 : 0.6;
+    o.rad = D.rad[r]; o.dmg = dmg; o.id = D.id; o.lk = D.lk; o.root = D.root ? D.root[r] : 0;
     atkChins.push(o);
   }
   return true;
 }
-function auraPulse(a) {
-  const D = ATK_DEFS.aura, r = a.rank - 1;
-  const R = D.rad[r];
-  const dmg = atkDmg(D.mul[r], D.tick[r]);
-  let n = 0;
+function atkNoteKill(e) { // Necromancer corpses: a kill near a living thrall (or near you) leaves a fresh corpse
+  if (!atkOwned('corpse') || !e || e.boss) return;
+  const D = ATK_DEFS.corpse;
+  let ok = Math.hypot(e.x - player.x, e.y - player.y) < D.near;
+  if (!ok && typeof thralls !== 'undefined') for (const th of thralls) if (th.hp > 0 && Math.hypot(e.x - th.x, e.y - th.y) < D.near) { ok = true; break; }
+  if (!ok) return;
+  if (atkCorpses.length >= 8) atkCorpses.shift();
+  atkCorpses.push({ x: e.x, y: e.y, t: elapsed });
+}
+// ---- pulse (old aura engine): Shield bash cone toward the nearest enemy, with knockback
+function castPulse(a, D) {
+  const r = a.rank - 1, R = D.rad[r];
+  const t = atkNearest(player.x, player.y, R + 20);
+  if (!t) return false;
+  const ang = Math.atan2(t.y - player.y, t.x - player.x);
+  const dmg = atkDmg(D.mul[r], D.cd[r]);
   for (const e of enemies) {
     if (e.hp <= 0 || e.dead) continue;
-    if (Math.hypot(e.x - player.x, e.y - player.y) < R + (e.r || 0) * 0.5) { hurt(e, dmg, false, true, 'aura'); n++; }
+    const dx = e.x - player.x, dy = e.y - player.y, d = Math.hypot(dx, dy) || 1;
+    if (d > R + (e.r || 0) * 0.5) continue;
+    let da = Math.atan2(dy, dx) - ang; while (da > Math.PI) da -= 6.283; while (da < -Math.PI) da += 6.283;
+    if (Math.abs(da) > D.arc && d > 24) continue;
+    atkHit(e, dmg, D.id);
+    atkPush(e, dx / d, dy / d, D.kb[r]);
   }
+  player.bashFx = { a: ang, r: R, t: 0.22, arc: D.arc };
   player.auraFlash = 0.22;
-  return n;
+  return true;
 }
-function blastAt(x, y, rad) {
+// ---- zone: ground patches with a lifetime (cannon, ward, trail, snare)
+function addZone(D, r, x, y) {
+  const mine = atkZones.filter(z => z.id === D.id);
+  const max = Array.isArray(D.max) ? D.max[r] : D.max;
+  if (mine.length >= max) { const old = mine[0]; atkZones.splice(atkZones.indexOf(old), 1); atkPool.zones.push(old); }
+  if (atkZones.length >= ZONE_CAP) atkPool.zones.push(atkZones.shift());
+  const z = atkPool.zones.pop() || {};
+  z.id = D.id; z.zk = D.zk; z.x = x; z.y = y; z.r = D.rad ? D.rad[r] : 22; z.life = z.max = D.life[r]; z.tt = 0; z.armed = true; z.aim = 0;
+  z.tick = D.tick || 0; z.reach = D.reach || 0;
+  z.dmg = D.zk === 'cannon' ? atkDmg(D.mul[r], D.fire[r]) : D.zk === 'snare' ? atkDmg(D.mul[r], D.cd[r]) : atkDmg(D.mul[r], D.tick);
+  if (D.zk === 'trail') z.dmg = Math.max(1, Math.round(z.dmg * (player.fireDpsMul || 1) * (player.itemFireDps || 1))); // 0.17a: the trail grows with Firemaker fire upgrades
+  z.fire = D.fire ? D.fire[r] : 0; z.heal = D.heal ? D.heal[r] : 0; z.root = D.root ? D.root[r] : 0; z.blast = D.blast || 0;
+  atkZones.push(z);
+  return z;
+}
+function castZone(a, D) {
+  const r = a.rank - 1;
+  if (D.zk === 'trail') { // only while moving, at least 18px from the last segment
+    const p = player.trailAt;
+    if (p && Math.hypot(player.x - p.x, player.y - p.y) < 18) return false;
+    player.trailAt = { x: player.x, y: player.y };
+    addZone(D, r, player.x, player.y); return true;
+  }
+  if (D.zk === 'cannon' && !atkNearest(player.x, player.y, D.reach + 60)) return false;
+  addZone(D, r, player.x, player.y);
+  return true;
+}
+function updateZones(dt) {
+  for (let i = atkZones.length - 1; i >= 0; i--) {
+    const z = atkZones[i];
+    z.life -= dt;
+    if (z.life <= 0) { atkPool.zones.push(z); atkZones.splice(i, 1); continue; }
+    if (z.zk === 'cannon') { z.tt -= dt; if (z.tt <= 0) { z.tt = z.fire; cannonShot(z); } continue; }
+    if (z.zk === 'snare') {
+      if (!z.armed) continue;
+      let hit = null;
+      for (const e of enemies) if (e.hp > 0 && !e.dead && !e.boss && Math.hypot(e.x - z.x, e.y - z.y) < z.r + (e.r || 0) * 0.6) { hit = e; break; }
+      if (!hit) continue;
+      z.armed = false; z.life = 0.35;
+      for (const e of enemies) if (e.hp > 0 && !e.dead && Math.hypot(e.x - z.x, e.y - z.y) < z.blast + (e.r || 0) * 0.5) { atkHit(e, z.dmg, 'snare'); atkRoot(e, z.root); }
+      blastAt(z.x, z.y, z.blast, '#8fbc6a');
+      continue;
+    }
+    z.tt -= dt;
+    if (z.tt > 0) continue;
+    z.tt = z.tick;
+    for (const e of enemies) {
+      if (e.hp <= 0 || e.dead) continue;
+      if (Math.hypot(e.x - z.x, e.y - z.y) > z.r + (e.r || 0) * 0.5) continue;
+      if (z.zk === 'trail') { if ((e.trailT || 0) > elapsed) continue; e.trailT = elapsed + z.tick - 0.01; }
+      hurt(e, z.dmg, false, true, z.id);
+    }
+    if (z.zk === 'ward' && player.hp > 0 && Math.hypot(player.x - z.x, player.y - z.y) < z.r) {
+      const h = healAmt(player.maxHp * z.heal);
+      if (player.hp < player.maxHp) { player.hp = Math.min(player.maxHp, player.hp + h); if (Math.random() < 0.3) healSplat(Math.max(1, Math.round(h)), player.x, player.y - 28); }
+    }
+  }
+}
+// ---- line: piercing travel (harpoon toward the nearest enemy, log the way you move)
+function castLine(a, D) {
+  const r = a.rank - 1;
+  let ang;
+  let mv = null;
+  if (D.aim === 'move' && joystick.active && Math.hypot(joystick.x, joystick.y) > 0.2) { // roll the way you move, if enemies are roughly that way (within ~100°)
+    const ma = Math.atan2(joystick.y, joystick.x);
+    for (const e of enemies) { if (e.hp <= 0 || e.dead) continue; const dx = e.x - player.x, dy = e.y - player.y, d = Math.hypot(dx, dy); if (d > D.range[r]) continue; let da = Math.atan2(dy, dx) - ma; while (da > Math.PI) da -= 6.283; while (da < -Math.PI) da += 6.283; if (Math.abs(da) < 0.87) { mv = ma; break; } }
+  }
+  if (mv != null) ang = mv;
+  else { const t = atkNearest(player.x, player.y, D.range[r]); if (!t) return false; ang = Math.atan2(t.y - player.y, t.x - player.x); }
+  const n = D.count[r], dmg = atkDmg(D.mul[r], D.cd[r]);
+  for (let k = 0; k < n; k++) {
+    if (atkLines.length >= LINE_CAP) break;
+    const aa = ang + (n > 1 ? (k - (n - 1) / 2) * 0.21 : 0);
+    const l = atkPool.lines.pop() || {};
+    l.id = D.id; l.lk = D.lk; l.x = player.x; l.y = player.y; l.ux = Math.cos(aa); l.uy = Math.sin(aa); l.a = aa;
+    l.v = D.speed; l.go = 0; l.max = D.range[r]; l.w = Array.isArray(D.w) ? D.w[r] : D.w; l.dmg = dmg; l.kb = D.kb || 0; l.hit = l.hit || []; l.hit.length = 0; l.fade = 0;
+    atkLines.push(l);
+  }
+  return true;
+}
+function updateLines(dt) {
+  for (let i = atkLines.length - 1; i >= 0; i--) {
+    const l = atkLines[i];
+    if (l.fade > 0) { l.fade -= dt; if (l.fade <= 0) { atkPool.lines.push(l); atkLines.splice(i, 1); } continue; }
+    const step = l.v * dt;
+    l.x += l.ux * step; l.y += l.uy * step; l.go += step;
+    for (const e of enemies) {
+      if (e.hp <= 0 || e.dead) continue;
+      const dx = e.x - l.x, dy = e.y - l.y;
+      if (Math.abs(dx) > 80 || Math.abs(dy) > 80) continue;
+      const perp = Math.abs(dx * -l.uy + dy * l.ux), along = dx * l.ux + dy * l.uy;
+      if (perp > l.w + (e.r || 0) * 0.6 || along < -step - 10 || along > 10) {
+        if (l.kb && perp < l.w + (e.r || 0) && along > -l.w && along < l.w + 6 && l.hit.indexOf(e) >= 0) atkPush(e, l.ux, l.uy, l.kb * dt * 6); // the log keeps shoving
+        continue;
+      }
+      if (l.hit.indexOf(e) >= 0) continue;
+      l.hit.push(e);
+      atkHit(e, l.dmg, l.id);
+      if (l.kb) atkPush(e, l.ux, l.uy, l.kb);
+    }
+    if (l.go >= l.max) l.fade = 0.15;
+  }
+}
+// ---- orbit: runes circling you (air pushes, fire hits harder)
+function updateOrbit(dt, a) {
+  const D = ATK_DEFS.orbit, r = a.rank - 1, n = D.count[r], R = D.rad[r];
+  player.orbA = ((player.orbA || 0) + D.spin * dt) % 6.283;
+  const dmg = atkDmg(D.mul[r], D.hitCd);
+  for (let k = 0; k < n; k++) {
+    const ang = player.orbA + k / n * 6.283, x = player.x + Math.cos(ang) * R, y = player.y + Math.sin(ang) * R;
+    const fire = k % 2 === 1;
+    for (const e of enemies) {
+      if (e.hp <= 0 || e.dead) continue;
+      const dx = e.x - x, dy = e.y - y;
+      if (Math.abs(dx) > 40 || Math.abs(dy) > 40 || Math.hypot(dx, dy) > 13 + (e.r || 0)) continue;
+      if ((e.orbT || 0) > elapsed) continue;
+      e.orbT = elapsed + D.hitCd;
+      atkHit(e, fire ? Math.round(dmg * D.fireMul) : dmg, 'orbit');
+      if (!fire) { const ex = e.x - player.x, ey = e.y - player.y, d = Math.hypot(ex, ey) || 1; atkPush(e, ex / d, ey / d, D.push); }
+    }
+  }
+}
+function blastAt(x, y, rad, col) {
   if (atkBlasts.length >= BLAST_CAP) atkPool.blasts.push(atkBlasts.shift());
   const b = atkPool.blasts.pop() || {};
-  b.x = x; b.y = y; b.r = rad; b.life = 0.28; b.max = 0.28;
+  b.x = x; b.y = y; b.r = rad; b.life = 0.28; b.max = 0.28; b.col = col || '#ffb347';
   atkBlasts.push(b);
 }
 function updateAttacks(dt) {
   if (!player || !player.atks) return;
   if (player.auraFlash > 0) player.auraFlash = Math.max(0, player.auraFlash - dt);
+  if (player.bashFx) { player.bashFx.t -= dt; if (player.bashFx.t <= 0) player.bashFx = null; }
   for (const a of player.atks) {
+    const D = ATK_DEFS[a.id]; if (!D) continue;
+    if (D.type === 'orbit') { updateOrbit(dt, a); continue; }
     a.cd -= dt;
     if (a.cd > 0) continue;
     const r = a.rank - 1;
-    if (a.id === 'axes') a.cd = castAxe(a) ? ATK_DEFS.axes.cd[r] : 0.2;
-    else if (a.id === 'chins') a.cd = castChins(a) ? ATK_DEFS.chins.cd[r] : 0.25;
-    else if (a.id === 'aura') { auraPulse(a); a.cd = ATK_DEFS.aura.tick[r]; }
-    else a.cd = 1;
+    const ok = D.type === 'bounce' ? castBounce(a, D) : D.type === 'lob' ? castLob(a, D) : D.type === 'pulse' ? castPulse(a, D)
+      : D.type === 'zone' ? castZone(a, D) : D.type === 'line' ? castLine(a, D) : false;
+    a.cd = ok ? D.cd[r] : 0.2;
   }
-  // axes: fly to target, hit, bounce to the nearest enemy not hit yet
+  updateZones(dt);
+  updateLines(dt);
+  // bounce projectiles: fly to target, hit, hop to the nearest enemy not hit yet
   for (let i = atkAxes.length - 1; i >= 0; i--) {
     const o = atkAxes[i];
     o.life -= dt; o.spin += dt * 14;
@@ -6660,13 +6895,13 @@ function updateAttacks(dt) {
     if (!o.t || o.t.hp <= 0 || o.t.dead) o.t = atkNearest(o.x, o.y, 190, o.hitList);
     if (!o.t || o.life <= 0) { o.fade = 0.12; continue; }
     const dx = o.t.x - o.x, dy = o.t.y - o.y, d = Math.hypot(dx, dy) || 1;
-    const step = 520 * dt;
+    const step = (o.speed || 520) * dt;
     if (d <= step + (o.t.r || 10) * 0.6) {
       o.x = o.t.x; o.y = o.t.y;
       let dmg = o.dmg;
-      const crit = Math.random() < (player.crit || 0);
-      if (crit) dmg = Math.round(dmg * (player.critMul || 2.4));
-      hurt(o.t, dmg, crit, false, 'axes');
+      if (o.id === 'darts' && (o.t.mini || o.t.boss || o.t.elite || (typeof isTaskEnemy === 'function' && isTaskEnemy(o.t)))) dmg = Math.round(dmg * ATK_DEFS.darts.bonus);
+      const crit = atkHit(o.t, dmg, o.id);
+      if (o.id === 'knives' && Math.random() < ATK_DEFS.knives.pocket) pickpocketCoins(crit);
       o.hitList.push(o.t);
       o.hitsLeft--;
       o.t = o.hitsLeft > 0 ? atkNearest(o.x, o.y, 170, o.hitList) : null;
@@ -6675,7 +6910,7 @@ function updateAttacks(dt) {
       o.x += dx / d * step; o.y += dy / d * step;
     }
   }
-  // chinchompas: arc to the ground, then explode
+  // lobs: arc to the ground, then burst
   for (let i = atkChins.length - 1; i >= 0; i--) {
     const c = atkChins[i];
     c.t += dt;
@@ -6683,11 +6918,11 @@ function updateAttacks(dt) {
     for (const e of enemies) {
       if (e.hp <= 0 || e.dead) continue;
       if (Math.hypot(e.x - c.tx, e.y - c.ty) < c.rad + (e.r || 0) * 0.5) {
-        const crit = Math.random() < (player.crit || 0);
-        hurt(e, crit ? Math.round(c.dmg * (player.critMul || 2.4)) : c.dmg, crit, false, 'chins');
+        atkHit(e, c.dmg, c.id);
+        if (c.root) { atkRoot(e, c.root); if (!e.boss) e.bindT = Math.max(e.bindT || 0, elapsed + (e.mini ? c.root * 0.5 : c.root)); }
       }
     }
-    blastAt(c.tx, c.ty, c.rad);
+    blastAt(c.tx, c.ty, c.rad, c.lk === 'bind' ? '#b77aff' : c.lk === 'corpse' ? '#9be58a' : '#ffb347');
     atkPool.chins.push(c); atkChins.splice(i, 1);
   }
   for (let i = atkBlasts.length - 1; i >= 0; i--) {
@@ -6696,55 +6931,94 @@ function updateAttacks(dt) {
     if (b.life <= 0) { atkPool.blasts.push(b); atkBlasts.splice(i, 1); }
   }
 }
+// ground layer (under enemies): zones, bash cone
 function drawAttackAura() {
   if (!player || !player.atks) return;
-  const a = atkOwned('aura');
-  if (!a) return;
-  const R = ATK_DEFS.aura.rad[a.rank - 1];
-  const f = player.auraFlash > 0 ? player.auraFlash / 0.22 : 0;
-  ctx.fillStyle = 'rgba(255,210,74,' + (0.05 + 0.10 * f) + ')';
-  ctx.beginPath(); ctx.arc(player.x, player.y, R, 0, 7); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,210,74,' + (0.45 + 0.45 * f) + ')';
-  ctx.lineWidth = 2 + 2 * f;
-  ctx.beginPath(); ctx.arc(player.x, player.y, R, 0, 7); ctx.stroke();
+  for (const z of atkZones) {
+    const fade = Math.min(1, z.life / 0.4);
+    if (z.zk === 'ward') {
+      ctx.fillStyle = 'rgba(255,233,160,' + (0.12 * fade) + ')'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,233,160,' + (0.75 * fade) + ')'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, 7); ctx.stroke();
+      ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(z.x - 9, z.y); ctx.lineTo(z.x + 9, z.y); ctx.moveTo(z.x, z.y - 12); ctx.lineTo(z.x, z.y + 8); ctx.stroke();
+    } else if (z.zk === 'trail') {
+      ctx.fillStyle = 'rgba(255,120,40,' + (0.32 * fade) + ')'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,210,80,' + (0.45 * fade) + ')'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r * 0.45, 0, 7); ctx.fill();
+    } else if (z.zk === 'snare') {
+      ctx.strokeStyle = z.armed ? 'rgba(143,188,106,0.95)' : 'rgba(143,188,106,0.4)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(z.x - z.r * 0.6, z.y - z.r * 0.6); ctx.lineTo(z.x + z.r * 0.6, z.y + z.r * 0.6); ctx.moveTo(z.x + z.r * 0.6, z.y - z.r * 0.6); ctx.lineTo(z.x - z.r * 0.6, z.y + z.r * 0.6); ctx.stroke();
+    } else if (z.zk === 'cannon') {
+      ctx.strokeStyle = 'rgba(154,164,174,0.35)'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.arc(z.x, z.y, z.reach, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#5a5048'; ctx.beginPath(); ctx.arc(z.x, z.y, 13, 0, 7); ctx.fill();
+      ctx.save(); ctx.translate(z.x, z.y); ctx.rotate(z.aim); ctx.fillStyle = '#9aa4ae'; ctx.fillRect(0, -5, 20, 10); ctx.restore();
+      ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(z.x, z.y, 6, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,226,160,0.9)'; ctx.fillRect(z.x - 13, z.y + 16, 26 * Math.max(0, z.life / z.max), 3);
+    }
+  }
+  const bf = player.bashFx;
+  if (bf) {
+    ctx.fillStyle = 'rgba(255,210,122,' + (0.35 * bf.t / 0.22) + ')';
+    ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.arc(player.x, player.y, bf.r, bf.a - bf.arc, bf.a + bf.arc); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,226,160,' + (0.9 * bf.t / 0.22) + ')'; ctx.lineWidth = 3; ctx.stroke();
+  }
 }
 function drawAttackFx() {
-  // chinchompa landing marks + arcing ball with ground shadow
+  // lobs: landing ring + arcing ball
   for (const c of atkChins) {
     const k = Math.min(1, c.t / c.T);
     const x = c.sx + (c.tx - c.sx) * k, y = c.sy + (c.ty - c.sy) * k;
-    const h = 70 * 4 * k * (1 - k);
-    ctx.strokeStyle = 'rgba(255,106,58,0.55)'; ctx.lineWidth = 1.5;
+    const h = (c.lk === 'corpse' ? 20 : 70) * 4 * k * (1 - k);
+    const col = c.lk === 'bind' ? '183,122,255' : c.lk === 'corpse' ? '155,229,138' : '255,106,58';
+    ctx.strokeStyle = 'rgba(' + col + ',0.65)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(c.tx, c.ty, c.rad * (0.35 + 0.65 * k), 0, 7); ctx.stroke();
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath(); ctx.ellipse(x, y + 4, 6, 2.5, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#e8402a';
-    ctx.beginPath(); ctx.arc(x, y - h, 6.5, 0, 7); ctx.fill();
-    ctx.fillStyle = '#ffd0a0';
-    ctx.beginPath(); ctx.arc(x - 2, y - h - 2, 2, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y + 4, 6, 2.5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgb(' + col + ')'; ctx.beginPath(); ctx.arc(x, y - h, 6.5, 0, 7); ctx.fill();
   }
   for (const b of atkBlasts) {
     const k = 1 - b.life / b.max;
+    ctx.globalAlpha = Math.max(0, 1 - k) * 0.55;
+    ctx.fillStyle = b.col; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.6 + 0.4 * k), 0, 7); ctx.fill();
     ctx.globalAlpha = Math.max(0, 1 - k);
-    ctx.fillStyle = 'rgba(255,140,40,0.45)';
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.6 + 0.4 * k), 0, 7); ctx.fill();
-    ctx.strokeStyle = '#ffb347'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.6 + 0.4 * k), 0, 7); ctx.stroke();
+    ctx.strokeStyle = b.col; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.6 + 0.4 * k), 0, 7); ctx.stroke();
     ctx.globalAlpha = 1;
   }
-  // spinning axes: a grey cross with a steel edge
+  // lines: harpoon shaft or rolling log
+  for (const l of atkLines) {
+    ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.a);
+    ctx.globalAlpha = l.fade > 0 ? Math.max(0, l.fade / 0.15) : 1;
+    if (l.lk === 'log') {
+      ctx.fillStyle = '#8a5a2a'; ctx.fillRect(-9, -l.w, 18, l.w * 2);
+      ctx.strokeStyle = '#d4a574'; ctx.lineWidth = 2; ctx.strokeRect(-9, -l.w, 18, l.w * 2);
+      ctx.fillStyle = '#c89a60'; ctx.beginPath(); ctx.ellipse(0, -l.w, 9, 4, 0, 0, 7); ctx.fill();
+    } else {
+      ctx.strokeStyle = '#d8f4f0'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(8, 0); ctx.stroke();
+      ctx.fillStyle = '#5ec8c0'; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(6, -6); ctx.lineTo(6, 6); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  // orbit runes
+  const oa = atkOwned('orbit');
+  if (oa) {
+    const D = ATK_DEFS.orbit, r = oa.rank - 1, n = D.count[r], R = D.rad[r];
+    ctx.strokeStyle = 'rgba(126,200,232,0.25)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(player.x, player.y, R, 0, 7); ctx.stroke();
+    for (let k = 0; k < n; k++) {
+      const ang = (player.orbA || 0) + k / n * 6.283, x = player.x + Math.cos(ang) * R, y = player.y + Math.sin(ang) * R;
+      ctx.fillStyle = k % 2 ? '#ff7a3a' : '#cfeeff'; ctx.strokeStyle = '#1a2a3a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill(); ctx.stroke();
+    }
+  }
+  // bounce projectiles: knife, dart, cannonball (simple shapes)
   for (const o of atkAxes) {
     ctx.save();
     ctx.translate(o.x, o.y);
-    ctx.rotate(o.spin);
-    ctx.scale(1.7, 1.7); // readable on a phone
     ctx.globalAlpha = o.fade > 0 ? Math.max(0, o.fade / 0.12) : 1;
-    ctx.fillStyle = 'rgba(207,216,226,0.25)';
-    ctx.beginPath(); ctx.arc(0, 0, 11, 0, 7); ctx.fill();
-    ctx.fillStyle = '#6a4a2a'; ctx.fillRect(-1.5, -9, 3, 18);
-    ctx.fillStyle = '#cfd8e2';
-    ctx.beginPath(); ctx.moveTo(1, -9); ctx.lineTo(9, -6); ctx.lineTo(9, 1); ctx.lineTo(1, -2); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#5a6a7a'; ctx.lineWidth = 1; ctx.stroke();
+    if (o.bk === 'ball') { ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(0, 0, 5.5, 0, 7); ctx.fill(); ctx.strokeStyle = '#9aa4ae'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    else {
+      const tx = o.t ? o.t.x - o.x : 1, ty = o.t ? o.t.y - o.y : 0;
+      ctx.rotate(Math.atan2(ty, tx)); ctx.scale(1.5, 1.5);
+      ctx.fillStyle = o.bk === 'dart' ? '#c8e070' : '#d8dde4'; ctx.strokeStyle = '#3a3a3a'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-5, -3.5); ctx.lineTo(-3, 0); ctx.lineTo(-5, 3.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
     ctx.restore();
   }
   ctx.globalAlpha = 1;
