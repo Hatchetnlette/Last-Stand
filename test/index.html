@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.14a</title>
+<title>Last Stand — Prototype 0.15b</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -55,6 +55,21 @@ button{width:100%;padding:13px 12px;margin-top:8px;border:1px solid #b8a56a;
 button:active{transform:scale(.98);background:#3d553c}
 button:disabled{opacity:.4;cursor:default}
 .choice{background:#243328;text-align:left}
+.choice.atkcard{background:#2e2a18;border-color:#e8c56a}
+.choice.atkcard strong{color:#ffd86a}
+#atkHud{position:fixed;left:10px;bottom:calc(150px + env(safe-area-inset-bottom));z-index:6;display:none;gap:4px;pointer-events:none}
+body.playing #atkHud{display:flex}
+#atkHud .atks{width:32px;height:38px;border-radius:8px;background:#0c1410d9;border:1px solid #4a5c48;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:16px;line-height:1}
+#atkHud .atks.own{border-color:#e8c56a}
+#atkHud .atks.open{border-style:dashed;border-color:#8a9a78;color:#c8d8b0;font-size:15px}
+#atkHud .atks.lock{opacity:0.55;font-size:10px;color:#a8b5a0}
+#atkHud .pips{display:flex;gap:1px;margin-top:3px}
+#atkHud .pip{width:4px;height:4px;border-radius:2px;background:#3a4a3a}
+#atkHud .pip.on{background:#ffd24a}
+.pauseatk .pips{display:inline-flex;gap:2px;margin-left:6px;vertical-align:middle}
+.pauseatk .pip{width:6px;height:6px;border-radius:3px;background:#3a4a3a;display:inline-block}
+.pauseatk .pip.on{background:#ffd24a}
 .choice.lock{opacity:.55;border-color:#3a4a3c}
 .choice.lock strong{color:#9aa08a}
 .choice .unlock{display:block;color:#c8b06a;margin-top:4px;font-size:12px}
@@ -307,6 +322,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="toast"></div>
 
 <div id="bagHud"></div>
+<div id="atkHud" aria-label="Attacks"></div>
 <div id="bagTip"></div>
 <div id="bagFull"><div class="sheet">
   <h2>BAG FULL</h2>
@@ -325,7 +341,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.14a</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.15b</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, and extract at the shrine after the first dragon. Death keeps half your coins.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -773,7 +789,8 @@ function minSwingDmg() {
 let capHold = 0;
 const DPS_LABEL = {
   attack: 'Attack', special: 'Special', thralls: 'Thralls', fire: 'Fire',
-  dot: 'DoT', items: 'Items', traps: 'Traps', other: 'Other'
+  dot: 'DoT', items: 'Items', traps: 'Traps', other: 'Other',
+  axes: 'Throwing axes', chins: 'Chinchompa', aura: 'Retribution aura' // 0.15a
 };
 let hudPref = { dps: true, dpsOpen: true, splats: true, minimap: true };
 let dmgSrc = 'attack';
@@ -828,6 +845,7 @@ function showRunHud() {
 }
 function hideRunHud() {
   document.body.classList.remove('playing');
+  if ($('atkHud')) { $('atkHud').innerHTML = ''; atkHudSig = ''; }
   const d = $('dpsMeter'), g = $('goalHud'), m = $('minimap');
   if (d) d.style.display = 'none';
   if (g) g.style.display = 'none';
@@ -2295,6 +2313,7 @@ function start(k) {
   if ($('bagFull')) $('bagFull').style.display = 'none';
   if ($('bagTip')) $('bagTip').style.display = 'none';
   if (typeof resetExtractState === 'function') resetExtractState();
+  if (typeof resetAttacks === 'function') resetAttacks();
   hideToast();
   buffs = { dagger:0, recoil:0, glory:0, boots:0 };
   $('lootBanner').style.opacity = '0';
@@ -4449,7 +4468,7 @@ function dmgTakenNow() {
   if (player.campfireDR > 0) m *= 0.90;
   if (player.altar && Math.hypot(player.x - player.altar.x, player.y - player.altar.y) <= player.altar.r) m *= 0.85;
   if (player.style === 'priest' && (player.pray || 0) > 0) {
-    let dr = 0.22;
+    let dr = 0.15; // 0.15b: base prayer DR 0.22 -> 0.15 (Protect nodes keep 0.28 / 0.35)
     if (player.m && player.m.prot1) dr = 0.28;
     if (player.m && player.m.protC) dr = 0.35;
     m *= (1 - dr);
@@ -5956,7 +5975,7 @@ function upgradesOverlap(a, b) {
   const A = upgradeFamilies(a), B = upgradeFamilies(b);
   return A.some(f => B.includes(f));
 }
-function pickUpgrades() {
+function pickUpgradesBase() {
   const styleUps = upgrades.filter(u => u[3] === player.style && !alreadyHasUpgrade(u));
   const generic = upgrades.filter(u => !u[3] && !alreadyHasUpgrade(u));
   const shuffle = arr => {
@@ -6011,6 +6030,345 @@ function pickUpgrades() {
     ? [u[0], u[0] === 'Fleet-footed' ? 'Speed maxed (+40%).' : u[0] === 'Sneak' ? 'Speed maxed (+40%); still +8% crit.' : 'Speed maxed (+40%); still increases loot pickup range.', u[2], u[3]] : u);
 }
 
+
+/* ========== 0.15a: EXTRA ATTACK SLOTS (run-only) ========== */
+// Slot 1 is always the class main attack. Extra slots open at run level 5 / 12 / 20.
+// Damage is a share of your main attack's damage per second (mainDps), so it grows with
+// Keen edge, Quick hands, skill level and weapon items, and rank 1 is about 1/3 of it.
+const ATK_SLOT_LEVELS = [5, 16]; // 0.15b: 2 slots until more attacks exist (was 5/12/20)
+const ATK_MAX_RANK = 5;
+const AXE_CAP = 24, CHIN_CAP = 12, BLAST_CAP = 14;
+const ATK_DEFS = {
+  axes: { id:'axes', n:'Rune throwing axes', icon:'🪓', col:'#cfd8e2',
+    cd:[1.6, 1.5, 1.4, 1.3, 1.15], hits:[2, 3, 3, 4, 5], mul:[0.33, 0.40, 0.50, 0.58, 0.68],
+    desc: r => 'A spinning axe hits ' + ATK_DEFS.axes.hits[r] + ' enemies, bouncing between them, every ' + ATK_DEFS.axes.cd[r] + 's.' },
+  chins: { id:'chins', n:'Chinchompa', icon:'🔴', col:'#ff6a3a',
+    cd:[3.0, 2.8, 2.6, 2.5, 2.3], count:[1, 1, 1, 2, 2], rad:[46, 52, 56, 62, 70], mul:[0.33, 0.42, 0.48, 0.42, 0.45],
+    desc: r => 'Lob ' + (ATK_DEFS.chins.count[r] > 1 ? ATK_DEFS.chins.count[r] + ' chinchompas' : 'a chinchompa') + ' at a crowd; it explodes in a ' + ATK_DEFS.chins.rad[r] + 'px blast every ' + ATK_DEFS.chins.cd[r] + 's.' },
+  aura: { id:'aura', n:'Retribution aura', icon:'✴️', col:'#ffd24a',
+    tick:[1.0, 0.95, 0.9, 0.85, 0.8], rad:[58, 66, 74, 82, 92], mul:[0.28, 0.35, 0.42, 0.50, 0.60],
+    desc: r => 'A gold ring around you burns every enemy within ' + ATK_DEFS.aura.rad[r] + 'px every ' + ATK_DEFS.aura.tick[r] + 's.' }
+};
+const ATK_ORDER = ['axes', 'chins', 'aura'];
+var atkAxes = [], atkChins = [], atkBlasts = [];
+const atkPool = { axes: [], chins: [], blasts: [] };
+var atkHudSig = '', atkHudAt = -1;
+function resetAttacks() {
+  if (player) { player.atks = []; player.atkSlotSeen = 0; player.auraFlash = 0; }
+  clearAttackFx();
+  atkHudSig = '';
+}
+function clearAttackFx() {
+  for (const a of atkAxes) atkPool.axes.push(a);
+  for (const c of atkChins) atkPool.chins.push(c);
+  for (const b of atkBlasts) atkPool.blasts.push(b);
+  atkAxes = []; atkChins = []; atkBlasts = [];
+}
+function atkSlots() {
+  const l = (player && player.level) || 1;
+  let n = 0;
+  for (const lv of ATK_SLOT_LEVELS) if (l >= lv) n++;
+  return n;
+}
+// 0.15b: an attack can rank up only when level >= learned level + 4 x current rank
+const ATK_RANK_GAP = 4;
+function atkRankReady(a) { return ((player && player.level) || 1) >= (a.at || 0) + ATK_RANK_GAP * a.rank; }
+function atkOwned(id) { return (player.atks || []).find(a => a.id === id) || null; }
+function mainDps() {
+  const rate = Math.max(0.15, STY[player.style].rate * (player.rm2 || 1) / (player.itemAspd || 1));
+  const v = wDmg() * (player.itemDmg || 1) / rate;
+  return isFinite(v) && v > 0 ? v : 1;
+}
+function atkDmg(mul, period) { return Math.max(1, Math.round(mainDps() * period * mul)); }
+function addAttack(id) {
+  if (!player.atks) player.atks = [];
+  if (atkOwned(id) || player.atks.length >= atkSlots() || !ATK_DEFS[id]) return false;
+  player.atks.push({ id, rank: 1, cd: 0.4, at: player.level }); // 0.15b: learned level for the rank-up gate
+  atkHudSig = '';
+  return true;
+}
+function rankAttack(id) {
+  const a = atkOwned(id);
+  if (!a || a.rank >= ATK_MAX_RANK) return false;
+  a.rank++;
+  atkHudSig = '';
+  return true;
+}
+function atkCards() {
+  const out = [];
+  const owned = player.atks || [];
+  const free = owned.length < atkSlots();
+  if (free) for (const id of ATK_ORDER) {
+    if (atkOwned(id)) continue;
+    const d = ATK_DEFS[id];
+    const c = [d.icon + ' ' + d.n, 'New attack · ' + d.desc(0), p => addAttack(id)];
+    c.atk = id; c.atkNew = true; out.push(c);
+  }
+  for (const a of owned) {
+    if (a.rank >= ATK_MAX_RANK) continue;
+    if (!atkRankReady(a)) continue; // 0.15b: rank-up gate
+    const d = ATK_DEFS[a.id];
+    const c = [d.icon + ' ' + d.n + ' → rank ' + (a.rank + 1), d.desc(a.rank), p => rankAttack(a.id)];
+    c.atk = a.id; c.atkNew = false; out.push(c);
+  }
+  return out;
+}
+function pickUpgrades() {
+  const base = pickUpgradesBase();
+  let cards = [];
+  try { cards = atkCards(); } catch (e) { cards = []; }
+  const slots = atkSlots();
+  const opened = slots > (player.atkSlotSeen || 0);
+  player.atkSlotSeen = slots;
+  if (!cards.length || !base || base.length < 3) return base;
+  const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  // ~40% of cards are attack-related when relevant: 1 per hand, sometimes 2. Never all 3.
+  let n = 1 + (Math.random() < 0.2 ? 1 : 0);
+  n = Math.min(n, cards.length, 2);
+  const news = shuffle(cards.filter(c => c.atkNew)), ranks = shuffle(cards.filter(c => !c.atkNew));
+  const chosen = [];
+  if (news.length && (opened || (player.atks || []).length < slots)) chosen.push(news.shift());
+  const rest = shuffle(news.concat(ranks));
+  while (chosen.length < n && rest.length) chosen.push(rest.shift());
+  const picks = base.slice(0, 3);
+  // replace the generic card first (index 2), then a class card (index 1); forced picks sit at index 0
+  const slotsToUse = [2, 1];
+  chosen.forEach((c, i) => { picks[slotsToUse[i]] = c; });
+  return picks;
+}
+function atkTargetsInRange(R) {
+  const out = [];
+  for (const e of enemies) if (e.hp > 0 && !e.dead && dist(e, player) < R) out.push(e);
+  return out;
+}
+function atkNearest(x, y, R, skip) {
+  let best = null, bd = R;
+  for (const e of enemies) {
+    if (e.hp <= 0 || e.dead || (skip && skip.indexOf(e) >= 0)) continue;
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (d < bd) { bd = d; best = e; }
+  }
+  return best;
+}
+function atkRange() { return Math.max(180, Math.min(0.48 * Math.min(W, H) + 40, (player.range || 160) + 40)); }
+function castAxe(a) {
+  if (atkAxes.length >= AXE_CAP) return false;
+  const t = atkNearest(player.x, player.y, atkRange());
+  if (!t) return false;
+  const D = ATK_DEFS.axes, r = a.rank - 1;
+  const o = atkPool.axes.pop() || {};
+  o.x = player.x; o.y = player.y; o.t = t; o.hitList = []; o.hitsLeft = D.hits[r];
+  o.dmg = atkDmg(D.mul[r], D.cd[r]); o.life = 2.4; o.spin = 0; o.fade = 0;
+  atkAxes.push(o);
+  return true;
+}
+function chinTargets(count, rad) {
+  const pool = atkTargetsInRange(atkRange() + 40).sort((p, q) => dist(p, player) - dist(q, player)).slice(0, 16);
+  const picks = [];
+  for (let k = 0; k < count && pool.length; k++) {
+    let best = null, bn = -1;
+    for (const e of pool) {
+      if (picks.some(p => Math.hypot(p.x - e.x, p.y - e.y) < rad)) continue;
+      let n = 0;
+      for (const o of pool) if (Math.hypot(o.x - e.x, o.y - e.y) < rad) n++;
+      if (n > bn) { bn = n; best = e; }
+    }
+    if (!best) break;
+    picks.push({ x: best.x, y: best.y });
+  }
+  return picks;
+}
+function castChins(a) {
+  const D = ATK_DEFS.chins, r = a.rank - 1;
+  const targets = chinTargets(D.count[r], D.rad[r]);
+  if (!targets.length) return false;
+  const dmg = atkDmg(D.mul[r], D.cd[r]);
+  for (const t of targets) {
+    if (atkChins.length >= CHIN_CAP) break;
+    const o = atkPool.chins.pop() || {};
+    o.sx = player.x; o.sy = player.y; o.tx = t.x; o.ty = t.y; o.t = 0; o.T = 0.6; o.rad = D.rad[r]; o.dmg = dmg;
+    atkChins.push(o);
+  }
+  return true;
+}
+function auraPulse(a) {
+  const D = ATK_DEFS.aura, r = a.rank - 1;
+  const R = D.rad[r];
+  const dmg = atkDmg(D.mul[r], D.tick[r]);
+  let n = 0;
+  for (const e of enemies) {
+    if (e.hp <= 0 || e.dead) continue;
+    if (Math.hypot(e.x - player.x, e.y - player.y) < R + (e.r || 0) * 0.5) { hurt(e, dmg, false, true, 'aura'); n++; }
+  }
+  player.auraFlash = 0.22;
+  return n;
+}
+function blastAt(x, y, rad) {
+  if (atkBlasts.length >= BLAST_CAP) atkPool.blasts.push(atkBlasts.shift());
+  const b = atkPool.blasts.pop() || {};
+  b.x = x; b.y = y; b.r = rad; b.life = 0.28; b.max = 0.28;
+  atkBlasts.push(b);
+}
+function updateAttacks(dt) {
+  if (!player || !player.atks) return;
+  if (player.auraFlash > 0) player.auraFlash = Math.max(0, player.auraFlash - dt);
+  for (const a of player.atks) {
+    a.cd -= dt;
+    if (a.cd > 0) continue;
+    const r = a.rank - 1;
+    if (a.id === 'axes') a.cd = castAxe(a) ? ATK_DEFS.axes.cd[r] : 0.2;
+    else if (a.id === 'chins') a.cd = castChins(a) ? ATK_DEFS.chins.cd[r] : 0.25;
+    else if (a.id === 'aura') { auraPulse(a); a.cd = ATK_DEFS.aura.tick[r]; }
+    else a.cd = 1;
+  }
+  // axes: fly to target, hit, bounce to the nearest enemy not hit yet
+  for (let i = atkAxes.length - 1; i >= 0; i--) {
+    const o = atkAxes[i];
+    o.life -= dt; o.spin += dt * 14;
+    if (o.fade > 0) {
+      o.fade -= dt;
+      if (o.fade <= 0) { atkPool.axes.push(o); atkAxes.splice(i, 1); }
+      continue;
+    }
+    if (!o.t || o.t.hp <= 0 || o.t.dead) o.t = atkNearest(o.x, o.y, 190, o.hitList);
+    if (!o.t || o.life <= 0) { o.fade = 0.12; continue; }
+    const dx = o.t.x - o.x, dy = o.t.y - o.y, d = Math.hypot(dx, dy) || 1;
+    const step = 520 * dt;
+    if (d <= step + (o.t.r || 10) * 0.6) {
+      o.x = o.t.x; o.y = o.t.y;
+      let dmg = o.dmg;
+      const crit = Math.random() < (player.crit || 0);
+      if (crit) dmg = Math.round(dmg * (player.critMul || 2.4));
+      hurt(o.t, dmg, crit, false, 'axes');
+      o.hitList.push(o.t);
+      o.hitsLeft--;
+      o.t = o.hitsLeft > 0 ? atkNearest(o.x, o.y, 170, o.hitList) : null;
+      if (!o.t) o.fade = 0.12;
+    } else {
+      o.x += dx / d * step; o.y += dy / d * step;
+    }
+  }
+  // chinchompas: arc to the ground, then explode
+  for (let i = atkChins.length - 1; i >= 0; i--) {
+    const c = atkChins[i];
+    c.t += dt;
+    if (c.t < c.T) continue;
+    for (const e of enemies) {
+      if (e.hp <= 0 || e.dead) continue;
+      if (Math.hypot(e.x - c.tx, e.y - c.ty) < c.rad + (e.r || 0) * 0.5) {
+        const crit = Math.random() < (player.crit || 0);
+        hurt(e, crit ? Math.round(c.dmg * (player.critMul || 2.4)) : c.dmg, crit, false, 'chins');
+      }
+    }
+    blastAt(c.tx, c.ty, c.rad);
+    atkPool.chins.push(c); atkChins.splice(i, 1);
+  }
+  for (let i = atkBlasts.length - 1; i >= 0; i--) {
+    const b = atkBlasts[i];
+    b.life -= dt;
+    if (b.life <= 0) { atkPool.blasts.push(b); atkBlasts.splice(i, 1); }
+  }
+}
+function drawAttackAura() {
+  if (!player || !player.atks) return;
+  const a = atkOwned('aura');
+  if (!a) return;
+  const R = ATK_DEFS.aura.rad[a.rank - 1];
+  const f = player.auraFlash > 0 ? player.auraFlash / 0.22 : 0;
+  ctx.fillStyle = 'rgba(255,210,74,' + (0.05 + 0.10 * f) + ')';
+  ctx.beginPath(); ctx.arc(player.x, player.y, R, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,210,74,' + (0.45 + 0.45 * f) + ')';
+  ctx.lineWidth = 2 + 2 * f;
+  ctx.beginPath(); ctx.arc(player.x, player.y, R, 0, 7); ctx.stroke();
+}
+function drawAttackFx() {
+  // chinchompa landing marks + arcing ball with ground shadow
+  for (const c of atkChins) {
+    const k = Math.min(1, c.t / c.T);
+    const x = c.sx + (c.tx - c.sx) * k, y = c.sy + (c.ty - c.sy) * k;
+    const h = 70 * 4 * k * (1 - k);
+    ctx.strokeStyle = 'rgba(255,106,58,0.55)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(c.tx, c.ty, c.rad * (0.35 + 0.65 * k), 0, 7); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(x, y + 4, 6, 2.5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e8402a';
+    ctx.beginPath(); ctx.arc(x, y - h, 6.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffd0a0';
+    ctx.beginPath(); ctx.arc(x - 2, y - h - 2, 2, 0, 7); ctx.fill();
+  }
+  for (const b of atkBlasts) {
+    const k = 1 - b.life / b.max;
+    ctx.globalAlpha = Math.max(0, 1 - k);
+    ctx.fillStyle = 'rgba(255,140,40,0.45)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.6 + 0.4 * k), 0, 7); ctx.fill();
+    ctx.strokeStyle = '#ffb347'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.6 + 0.4 * k), 0, 7); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  // spinning axes: a grey cross with a steel edge
+  for (const o of atkAxes) {
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.rotate(o.spin);
+    ctx.scale(1.7, 1.7); // readable on a phone
+    ctx.globalAlpha = o.fade > 0 ? Math.max(0, o.fade / 0.12) : 1;
+    ctx.fillStyle = 'rgba(207,216,226,0.25)';
+    ctx.beginPath(); ctx.arc(0, 0, 11, 0, 7); ctx.fill();
+    ctx.fillStyle = '#6a4a2a'; ctx.fillRect(-1.5, -9, 3, 18);
+    ctx.fillStyle = '#cfd8e2';
+    ctx.beginPath(); ctx.moveTo(1, -9); ctx.lineTo(9, -6); ctx.lineTo(9, 1); ctx.lineTo(1, -2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#5a6a7a'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+function atkHudHtml() {
+  const owned = player.atks || [];
+  const slots = atkSlots();
+  let h = '';
+  for (let i = 0; i < ATK_SLOT_LEVELS.length; i++) {
+    const a = owned[i];
+    if (a) {
+      const d = ATK_DEFS[a.id];
+      let pips = '';
+      for (let k = 0; k < ATK_MAX_RANK; k++) pips += '<span class="pip' + (k < a.rank ? ' on' : '') + '"></span>';
+      h += '<div class="atks own" title="' + d.n + ' rank ' + a.rank + '">' + d.icon + '<span class="pips">' + pips + '</span></div>';
+    } else if (i < slots) h += '<div class="atks open" title="Open attack slot">+</div>';
+    else h += '<div class="atks lock" title="Unlocks at level ' + ATK_SLOT_LEVELS[i] + '">🔒<br>Lv' + ATK_SLOT_LEVELS[i] + '</div>';
+  }
+  return h;
+}
+function renderAtkHud(force) {
+  const el = $('atkHud');
+  if (!el || !playing || !player) return;
+  const sig = atkSlots() + '|' + (player.atks || []).map(a => a.id + a.rank).join(',');
+  if (force || sig !== atkHudSig) { el.innerHTML = atkHudHtml(); atkHudSig = sig; }
+  if (force || elapsed - atkHudAt > 0.25 || atkHudAt < 0) {
+    atkHudAt = elapsed;
+    const dm = $('dpsMeter');
+    let b = 16;
+    if (dm && dm.style.display !== 'none' && dm.offsetHeight) b += dm.offsetHeight + 8;
+    el.style.bottom = 'calc(' + b + 'px + env(safe-area-inset-bottom))';
+  }
+}
+function pauseAtkHtml() {
+  let h = '<div class="pausebag pauseatk"><div class="pausebag-h">Attacks</div>';
+  h += '<div class="pausebag-i"><span class="pausebag-ic">⚔</span><div><div class="pausebag-n">' + (player.attackName || 'Main attack') + '</div><div class="pausebag-d">Class main attack (always on).</div></div></div>';
+  const owned = player.atks || [];
+  const slots = atkSlots();
+  for (let i = 0; i < ATK_SLOT_LEVELS.length; i++) {
+    const a = owned[i];
+    if (a) {
+      const d = ATK_DEFS[a.id];
+      let pips = '';
+      for (let k = 0; k < ATK_MAX_RANK; k++) pips += '<span class="pip' + (k < a.rank ? ' on' : '') + '"></span>';
+      h += '<div class="pausebag-i"><span class="pausebag-ic">' + d.icon + '</span><div><div class="pausebag-n">' + d.n + ' · rank ' + a.rank + '/' + ATK_MAX_RANK + '<span class="pips">' + pips + '</span></div><div class="pausebag-d">' + d.desc(a.rank - 1) + '</div></div></div>';
+    } else if (i < slots) h += '<div class="pausebag-e">Open attack slot · pick an attack on your next level-up</div>';
+    else h += '<div class="pausebag-e">🔒 Attack slot unlocks at level ' + ATK_SLOT_LEVELS[i] + '</div>';
+  }
+  return h + '</div>';
+}
+
 function levelUp() {
   if (leveling) return;
 
@@ -6050,7 +6408,7 @@ function levelUp() {
   // 0.4: show the choices in the regular overlay panel FIRST, before sound or anything else
   try {
     $('panel').innerHTML = '<h2>LEVEL UP!</h2><p>Choose one improvement for this run.</p>' +
-      picks.map((u, i) => '<button class="choice" type="button" data-i="' + i + '"><strong>' +
+      picks.map((u, i) => '<button class="choice' + (u.atk ? ' atkcard' : '') + '" type="button" data-i="' + i + '"><strong>' +
         u[0] + '</strong><span class="small">' + cardText(u) + '</span></button>').join(''); // 0.8a: tree-aware text
     $('overlay').style.display = 'flex';
     $('panel').querySelectorAll('button[data-i]').forEach(btn => {
@@ -6102,6 +6460,7 @@ function endRun(reason, extra) {
   hideToast();
   bannerTimer = 0; $('lootBanner').style.opacity = '0'; // 0.5: clear the loot banner
   showBossBar(false); fireballs = []; boss = null; // 0.6: hide boss bar. 0.12b: drop the boss handle
+  if (typeof clearAttackFx === 'function') clearAttackFx();
   if (!runEnded) {
     save.bossTotal = (save.bossTotal || 0) + bossesSlain;            // 0.6: lifetime boss kills
     save.bossBest = Math.max(save.bossBest || 0, bossesSlain);       // 0.6: most in one run
@@ -6385,6 +6744,7 @@ function update(dt) {
     if (player.m && player.m.essC && runeTotal() === 0) aspd *= 0.90;
     attackClock = STY[player.style].rate * player.rm2 / aspd / (player.itemAspd || 1);
   }
+  if (typeof updateAttacks === 'function') updateAttacks(dt); // 0.15a extra attack slots
 
   // enemies
   rangedBusy = bolts.length; // 0.7c: ranged attack budget (see RANGED_CAP / RANGED_GAP)
@@ -6772,6 +7132,7 @@ function draw() {
   drawBossWarnings(); // 0.6: red ground zones
 
   drawEnemyTelegraphs(false); // 0.7c: wind-up rings and slam zones go under the enemies
+  if (typeof drawAttackAura === 'function') drawAttackAura(); // 0.15a
 
   // enemies
   for (const e of enemies) {
@@ -6860,6 +7221,7 @@ function draw() {
   // shots (0.12a: class-coloured shapes instead of plain lines)
   for (const s of shots) drawShot(s);
   ctx.globalAlpha = 1;
+  if (typeof drawAttackFx === 'function') drawAttackFx(); // 0.15a
 
   // 0.9a: Penance horn invitation
   if (eventInvite) {
@@ -7092,6 +7454,7 @@ function draw() {
   if (hudPref.dps) renderDpsMeter();
   renderGoal();
   if (hudPref.minimap) drawMinimap();
+  if (typeof renderAtkHud === 'function') renderAtkHud();
 }
 
 /* ========== LOOP ========== */
@@ -7267,12 +7630,14 @@ function togglePause() {
         <button type="button" id="splatToggle" aria-pressed="true">💢 Numbers on</button>
         <button type="button" id="mapToggle" aria-pressed="true">🗺️ Map on</button>
       </div>
+      <div id="pauseAtkMount"></div>
       <div id="pauseBagMount"></div>
       <button id="resume">Resume</button>
       <button id="quit">Abandon run</button>`;
     bindSfxControls();
     bindHudControls();
     hideBagTip();
+    if ($('pauseAtkMount')) $('pauseAtkMount').outerHTML = pauseAtkHtml();
     if ($('pauseBagMount')) $('pauseBagMount').outerHTML = pauseBagHtml();
     $('resume').onclick = () => {
       paused = false;
