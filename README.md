@@ -13,6 +13,7 @@ Test link 0.12b: fixes freeze/stuck end screen after a dragon kill (death now re
 Test link 0.12c: item bonuses (crit/prayer/cleave) now come off when unequipped; chest banners always match the loot.
 Test link: 0.13b - XP orb/coin merging, rare magnet drop, late-game scaling and freeze fix (0.13a), food as wearable passive gear, bag item info on tap and in the pause menu, small late minimum-damage floor.
 Test link: 0.14a - Extraction Shrine + half-coins on death
+Test link: 0.15b - level-up attacks (axes, chinchompa, aura) + balance tweaks
 Last checked: 2026-11-06 14:08 America/Chicago
 
 Play it at https://hatchetnlette.github.io/Last-Stand/
