@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.17a</title>
+<title>Last Stand — Prototype 0.17b</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -341,7 +341,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.17a</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.17b</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, and extract at the shrine after the first dragon. Death keeps half your coins.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -534,6 +534,10 @@ const SLAM_WAVE = 0.32;   // shockwave animation length
 const RANGED_CAP = 2;     // at most 2 bones/spells winding up or in the air at once, however many throwers
 const RANGED_GAP = 0.9;   // and a new throw can start at most every 0.9s (the shots come one at a time, readable)
 let rangedBusy = 0, rangedClock = 0;
+// 0.17b: early-game pressure nudge (spawn interval multiplier between EARLY_FROM and EARLY_TO seconds; <1 = more enemies)
+const EARLY_SPAWN_MUL = 0.85, EARLY_DMG_MUL = 1.10, EARLY_FROM = 60, EARLY_TO = 600; // 0.17b: a little more early pressure (1:00-10:00)
+function earlyDmg() { return elapsed >= EARLY_FROM && elapsed < EARLY_TO ? EARLY_DMG_MUL : 1; }
+function earlyPressure() { return elapsed >= EARLY_FROM && elapsed < EARLY_TO ? EARLY_SPAWN_MUL : 1; }
 const ATK_SPAWN_MUL = 1.0; // spawn-interval multiplier (retune knob)
 const FB_COVER = 110; // 0.7b: an obstacle within this distance of a fireball's landing spot (on the dragon's side) blocks it
 const PLAYER_FOOT = 0.7, ENEMY_FOOT = 0.72; // 0.7b: collide with the feet, not the whole sprite (as in Grok's build)
@@ -2068,7 +2072,7 @@ const STY = {
   ranged: { n:'Ranged', sk:'Ranged', w:['Shortbow','Oak shortbow','Willow shortbow','Maple shortbow','Yew shortbow','Magic shortbow'],
             range:200, dmg:0.88, rate:0.68, col:'#9be58a', specialName:'Barrage' },
   magic:  { n:'Magic',  sk:'Magic',  w:['Wind Strike','Water Bolt','Earth Bolt','Fire Blast','Fire Surge','Ice Barrage'],
-            range:225, dmg:1.08, rate:0.95, col:'#7fb8ff', specialName:'Arcane Nova' },
+            range:225, dmg:0.85, rate:0.95, col:'#7fb8ff', specialName:'Arcane Nova' },
   fisher: { n:'Fisher', sk:'Fishing', w:['Small fishing net','Big fishing net','Fishing rod','Fly fishing rod','Harpoon','Dragon harpoon'],
             range:165, dmg:1.12, rate:0.72, col:'#5ec8c0', specialName:'Cast Net' }, // 0.8b; 0.9b: 0.80→0.72
   woodcutter: { n:'Woodcutter', sk:'Woodcutting', w:['Bronze axe','Iron axe','Steel axe','Mithril axe','Adamant axe','Dragon axe'],
@@ -2084,7 +2088,7 @@ const STY = {
   slayer: { n:'Slayer', sk:'Slayer', w:['Bronze sword','Iron sword','Steel sword','Mithril sword','Leaf-bladed sword','Slayer dart'],
             range:170, dmg:1.12, rate:0.68, col:'#c8b070', specialName:'Slayer Strike' },
   hunter: { n:'Hunter', sk:'Hunter', w:['Wooden spear','Iron javelin','Steel javelin','Mithril javelin','Rune dart','Hunter lance'],
-            range:160, dmg:0.92, rate:0.70, col:'#8fbc6a', specialName:'Box Trap' },
+            range:160, dmg:1.70, rate:0.58, col:'#8fbc6a', specialName:'Box Trap' },
   runecrafter: { n:'Runecrafter', sk:'Runecraft', w:['Essence staff','Air staff','Fire staff','Law staff','Death talisman','Ourania staff'],
             range:180, dmg:1.10, rate:0.70, col:'#7ec8e8', specialName:'Ourania Pulse' }
 };
@@ -3170,6 +3174,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
       spawnFire(e.x, e.y, fireRadius(22), fireLifetime(1.6), fireDpsMul(0.18));
 
     atkNoteKill(e); // 0.17a: Necromancer corpses
+    atkTrailSpread(e); // 0.17b: Fire trail burn spreads on death
     if (e.boss) {
       bossDefeated(e); // 0.6: boss has its own big reward
     } else if (e.mini) {
@@ -3411,8 +3416,8 @@ function attack() {
     // magic splash
     if (player.style === 'magic') {
       for (const o of enemies) {
-        if (o !== e && o.hp > 0 && dist(o, e) < 55 + (player.blast || 0) + (player.itemBlast || 0))
-          hurt(o, Math.round(d * (player.splashMul || 0.48)), false); // 0.8a: Fire Blast mastery 60%
+        if (o !== e && o.hp > 0 && dist(o, e) < 40 + (player.blast || 0) + (player.itemBlast || 0))
+          hurt(o, Math.round(d * (player.splashMul || 0.48)), false); // 0.17b: magic splash radius 55->40. 0.8a: Fire Blast mastery 60%
       }
     }
   });
@@ -6510,7 +6515,8 @@ const ATK_DEFS = {
     cd:[5, 4.8, 4.6, 4.4, 4.2], life:[4, 4.5, 5, 5.5, 6], rad:[70, 76, 82, 88, 96], tick:0.5, heal:[0.006, 0.007, 0.008, 0.009, 0.010], max:1, mul:[0.67, 0.81, 0.94, 1.08, 1.23], // 0.17a tune (round 2 ×1.4): was cd 6-5, mul 0.30-0.55
     desc: r => 'Bless the ground under you (' + ATK_DEFS.ward.rad[r] + 'px, ' + ATK_DEFS.ward.life[r] + 's) every ' + ATK_DEFS.ward.cd[r] + 's: it burns enemies and slowly heals you while you stand in it.' },
   trail: { id:'trail', cls:'firemaker', type:'zone', zk:'trail', n:'Fire trail', icon:'🔥', col:'#ff8a3c',
-    cd:[0.3, 0.3, 0.3, 0.3, 0.3], life:[2.0, 2.3, 2.6, 2.9, 3.2], rad:[24, 24, 26, 26, 28], tick:0.5, max:12, mul:[0.70, 0.80, 0.90, 1.00, 1.10], // 0.17a tune: was 0.14-0.26 (did ~0% of damage)
+    cd:[0.3, 0.3, 0.3, 0.3, 0.3], life:[2.0, 2.3, 2.6, 2.9, 3.2], rad:[24, 24, 26, 26, 28], tick:0.5, max:12, mul:[0.70, 0.80, 0.90, 1.00, 1.10], burn:3, burnMul:[0.25, 0.3, 0.35, 0.4, 0.45], spread:2, spreadR:80, // 0.17b: ignites (burn DoT) and the burn spreads on death
+    // 0.17a tune: was 0.14-0.26 (did ~0% of damage)
     desc: r => 'Walking leaves burning ground that lasts ' + ATK_DEFS.trail.life[r] + 's. Lead the horde through it.' },
   corpse: { id:'corpse', cls:'necromancer', type:'lob', lk:'corpse', n:'Corpse explosion', icon:'💥', col:'#9be58a',
     cd:[1.0, 0.9, 0.8, 0.75, 0.7], count:[1, 1, 2, 2, 3], rad:[50, 55, 60, 64, 70], near:120, mul:[0.25, 0.29, 0.31, 0.33, 0.36], // 0.17a tune: was 0.45-0.66
@@ -6519,7 +6525,8 @@ const ATK_DEFS = {
     cd:[1.5, 1.4, 1.3, 1.2, 1.1], count:[1, 1, 1, 2, 2], hits:[1, 2, 2, 2, 2], prio:true, bonus:1.25, mul:[0.24, 0.18, 0.20, 0.14, 0.17], // 0.17a tune (round 2 ×0.8): was 1-3 darts x 2-3 hits x 0.40-0.64
     desc: r => 'Homing darts (' + ATK_DEFS.darts.count[r] + ' every ' + ATK_DEFS.darts.cd[r] + 's) seek mini bosses, elites and task monsters first, +25% damage to them.' },
   snare: { id:'snare', cls:'hunter', type:'zone', zk:'snare', n:'Bird snares', icon:'🪤', col:'#8fbc6a',
-    cd:[2.2, 2.0, 1.8, 1.7, 1.6], life:[12, 12, 12, 12, 12], rad:[26, 26, 28, 28, 30], blast:54, root:[1.2, 1.3, 1.4, 1.5, 1.6], max:[3, 4, 4, 5, 6], mul:[2.24, 2.66, 3.08, 3.50, 3.92], // 0.17a tune (round 2 ×1.4): was cd 3.0-2.2, blast 42, max 3-5, mul 1.0-1.8
+    cd:[2.2, 2.0, 1.8, 1.7, 1.6], life:[12, 12, 12, 12, 12], rad:[26, 26, 28, 28, 30], blast:54, root:[1.2, 1.3, 1.4, 1.5, 1.6], max:[3, 4, 4, 5, 6], mul:[0.90, 1.06, 1.23, 1.40, 1.57], // 0.17b: ×0.5 (Hunter main attack buffed instead)
+    // 0.17a tune (round 2 ×1.4): was cd 3.0-2.2, blast 42, max 3-5, mul 1.0-1.8
     desc: r => 'Drop a snare at your feet every ' + ATK_DEFS.snare.cd[r] + 's (up to ' + ATK_DEFS.snare.max[r] + '): the first enemy in springs it, rooting and hurting everything close. Kite over your traps.' },
   orbit: { id:'orbit', cls:'runecrafter', type:'orbit', n:'Rune orbit', icon:'🔵', col:'#7ec8e8',
     count:[2, 3, 3, 4, 5], rad:[78, 84, 90, 96, 104], spin:2.6, hitCd:0.5, push:18, fireMul:1.3, mul:[0.60, 0.68, 0.76, 0.84, 0.92], // 0.17a tune: was 62-80px, 0.30-0.46
@@ -6749,7 +6756,7 @@ function addZone(D, r, x, y) {
   z.id = D.id; z.zk = D.zk; z.x = x; z.y = y; z.r = D.rad ? D.rad[r] : 22; z.life = z.max = D.life[r]; z.tt = 0; z.armed = true; z.aim = 0;
   z.tick = D.tick || 0; z.reach = D.reach || 0;
   z.dmg = D.zk === 'cannon' ? atkDmg(D.mul[r], D.fire[r]) : D.zk === 'snare' ? atkDmg(D.mul[r], D.cd[r]) : atkDmg(D.mul[r], D.tick);
-  if (D.zk === 'trail') z.dmg = Math.max(1, Math.round(z.dmg * (player.fireDpsMul || 1) * (player.itemFireDps || 1))); // 0.17a: the trail grows with Firemaker fire upgrades
+  if (D.zk === 'trail') { const fm = (player.fireDpsMul || 1) * (player.itemFireDps || 1); z.dmg = Math.max(1, Math.round(z.dmg * fm)); z.burnDps = mainDps() * D.burnMul[r] * fm; player._trailBurn = z.burnDps; } // 0.17a: the trail grows with Firemaker fire upgrades
   z.fire = D.fire ? D.fire[r] : 0; z.heal = D.heal ? D.heal[r] : 0; z.root = D.root ? D.root[r] : 0; z.blast = D.blast || 0;
   atkZones.push(z);
   return z;
@@ -6765,6 +6772,17 @@ function castZone(a, D) {
   if (D.zk === 'cannon' && !atkNearest(player.x, player.y, D.reach + 60)) return false;
   addZone(D, r, player.x, player.y);
   return true;
+}
+function atkIgnite(e, dps) { // 0.17b Fire trail: its own burn channel (stacks with class burns); ticks count as 'trail'
+  if (!e || e.hp <= 0 || !(dps > 0)) return;
+  e.tburnDps = Math.max((e.tburn || 0) > 0 ? (e.tburnDps || 0) : 0, dps); e.tburn = Math.max(e.tburn || 0, ATK_DEFS.trail.burn);
+  if (!(e.tburnTick > 0)) e.tburnTick = 0.5;
+}
+function atkTrailSpread(e) { // a trail-burning enemy that dies passes its burn to up to 2 neighbours
+  if (!e || !atkOwned('trail')) return;
+  const dps = (e.tburn || 0) > 0 ? e.tburnDps : ((e.burn || 0) > 0 ? (player._trailBurn || 0) : 0); if (!(dps > 0)) return; // 0.17b: your own fires feed the trail
+  const D = ATK_DEFS.trail; let n = 0;
+  for (const o of enemies) { if (n >= D.spread) break; if (o === e || o.hp <= 0 || o.dead || (o.tburn || 0) > 0) continue; if (Math.hypot(o.x - e.x, o.y - e.y) > D.spreadR) continue; atkIgnite(o, dps); n++; window.__tspreads = (window.__tspreads || 0) + 1; }
 }
 function updateZones(dt) {
   for (let i = atkZones.length - 1; i >= 0; i--) {
@@ -6788,7 +6806,7 @@ function updateZones(dt) {
     for (const e of enemies) {
       if (e.hp <= 0 || e.dead) continue;
       if (Math.hypot(e.x - z.x, e.y - z.y) > z.r + (e.r || 0) * 0.5) continue;
-      if (z.zk === 'trail') { if ((e.trailT || 0) > elapsed) continue; e.trailT = elapsed + z.tick - 0.01; }
+      if (z.zk === 'trail') { if ((e.trailT || 0) > elapsed) continue; e.trailT = elapsed + z.tick - 0.01; atkIgnite(e, z.burnDps); }
       hurt(e, z.dmg, false, true, z.id);
     }
     if (z.zk === 'ward' && player.hp > 0 && Math.hypot(player.x - z.x, player.y - z.y) < z.r) {
@@ -7426,7 +7444,7 @@ function update(dt) {
   // 0.11c: normal waves pause for the whole Penance event, then resume after waveResumeIn (no backlog).
   if (waveResumeIn > 0) waveResumeIn = Math.max(0, waveResumeIn - dt);
   if (!eventFight && waveResumeIn <= 0) {
-    const spawnRate = Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL * (miniAlive() >= 2 ? 1.25 : 1); // 0.16a: trash eases off with 2+ mini bosses
+    const spawnRate = Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL * (miniAlive() >= 2 ? 1.25 : 1) * earlyPressure(); // 0.17b: earlyPressure // 0.16a: trash eases off with 2+ mini bosses
     if (spawnClock > spawnRate && enemies.length < LIVE_CAP) {
       spawnClock = 0;
       spawn();
@@ -7490,6 +7508,12 @@ function update(dt) {
       if (e.witherTick <= 0) { e.witherTick = 0.5; hurt(e, Math.max(1, Math.round((e.witherDps || 0) * 0.5)), false, true, 'dot'); }
     }
     if ((e.slayerMark || 0) > 0) e.slayerMark -= dt;
+    if ((e.tburn || 0) > 0) { // 0.17b fire trail burn
+      e.tburn -= dt; e.tburnTick -= dt;
+      if (e.tburnTick <= 0) { e.tburnTick = 0.5; hurt(e, Math.max(1, Math.round(e.tburnDps * 0.5)), false, true, 'trail'); }
+      if (!(e.burn > 0) && Math.random() < dt * 6) particles.push({ x: e.x + rand(-6, 6), y: e.y - e.r * 0.5, vx: rand(-10, 10), vy: -40, life: 0.35, color: '#ff9a3a', size: 3 });
+      if (e.hp <= 0) continue;
+    }
     if (e.burn > 0) {
       e.burn -= dt; e.burnTick -= dt;
       if (e.burnTick <= 0) { e.burnTick = 0.5; hurt(e, Math.max(1, Math.round(e.burnDps * 0.5)), false, true, 'fire'); }
@@ -7534,7 +7558,7 @@ function update(dt) {
     const pd = Math.hypot(e.x - player.x, e.y - player.y);
     if (pd < e.r + player.r && player.invuln <= 0 && !(player.stealth > 0)) {
       player._slayerTaken = slayerTakenMul(e);
-      let dmg = e.damage * dt * takenFrac(); // 0.8a: Reckless swings. 0.13b: 90% DR safety net
+      let dmg = e.damage * dt * takenFrac() * earlyDmg(); // 0.17b: earlyDmg // 0.8a: Reckless swings. 0.13b: 90% DR safety net
       // After 5:00, contact keeps a small tick so standing in a pack is never literally free.
       const minContact = (lateScale().dmg - 1) * 0.55 * dt;
       if (minContact > 0 && dmg < minContact && e.damage > 0) dmg = minContact;

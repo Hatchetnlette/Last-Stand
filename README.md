@@ -16,6 +16,7 @@ Test link: 0.14a - Extraction Shrine + half-coins on death
 Test link: 0.15b - level-up attacks (axes, chinchompa, aura) + balance tweaks
 Test link: Prototype 0.16a (Hobgoblin Charger, Dark Wizard, Obor mini boss packs, aura hint, damage buffs)
 Test link: Prototype 0.17a (one signature attack per class at level 5, shared pool removed, boss arrow fix)
+0.17b (test): Hunter main attack buff, Magic trim, Firemaker burn trail, slightly harder early game.
 Last checked: 2026-11-06 14:08 America/Chicago
 
 Play it at https://hatchetnlette.github.io/Last-Stand/
