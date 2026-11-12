@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.15b</title>
+<title>Last Stand — Prototype 0.16a</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -341,7 +341,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.15b</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.16a</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, and extract at the shrine after the first dragon. Death keeps half your coins.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -925,15 +925,20 @@ function nextGoal() {
   if (boss) return '🐉 King Black Dragon · 👑 royal chest on kill';
   if (extractShrine && extractChannel > 0)
     return '⛩ Stand still to extract · ' + Math.max(0, EXTRACT_CHANNEL - extractChannel).toFixed(1) + 's';
+  if (extractShrine && onExtractShrine() && miniNear(MINI_EXTRACT_BLOCK)) return '⛩ Mini boss too close to extract - kill it or drag it away'; // 0.16a
+  if (miniAlive() || miniQueue.length) return miniGoalText(); // 0.16a
   if (extractShrine) {
     const dragonAtSoon = bossWarned ? Math.max(bossNext, (bossWarnAt || 0) + (typeof BOSS_WARN === 'number' ? BOSS_WARN : 3)) : bossNext;
-    if (dragonAtSoon - elapsed > 30)
+    if (dragonAtSoon - elapsed > 30) {
+      if (miniNextAt - elapsed <= 60) return miniGoalText() + ' · extract or push deeper'; // 0.16a
       return 'Extraction Shrine open - extract or push deeper';
+    }
   }
   const items = [];
   const dragonAt = bossWarned ? Math.max(bossNext, (bossWarnAt || 0) + (typeof BOSS_WARN === 'number' ? BOSS_WARN : 3)) : bossNext;
   if (!boss) items.push({ t: dragonAt, k: 'dragon' });
   items.push({ t: nextChestAt, k: 'chest' });
+  items.push({ t: miniNextAt, k: 'mini' }); // 0.16a
   if (!eventInvite && !eventFight && elapsed < bossNext - 30)
     items.push({ t: Math.max(nextEventAt, elapsed), k: 'penance' });
   items.sort((a, b) => a.t - b.t);
@@ -941,6 +946,8 @@ function nextGoal() {
   const dragon = items.find(x => x.k === 'dragon');
   let pick = items[0];
   if (dragon && dragon.t - elapsed <= 30) pick = dragon;
+  const mini = items.find(x => x.k === 'mini'); // 0.16a: a mini boss within 30s beats a chest
+  if (pick && pick.k !== 'dragon' && mini && mini.t - elapsed <= 30) pick = mini;
   if (!pick) return 'Survive the frontier';
   const remain = Math.max(0, pick.t - elapsed);
   if (pick.k === 'dragon') {
@@ -948,6 +955,7 @@ function nextGoal() {
     if (remain <= 15) return '🐉 Dragon in ' + fmt(remain);
     return '🐉 Dragon arrives at ' + fmt(pick.t);
   }
+  if (pick.k === 'mini') return miniGoalText();
   if (pick.k === 'chest') {
     if (remain <= 20) return '🎁 Chest in ' + fmt(remain);
     return '🎁 Chest at ' + fmt(pick.t);
@@ -2073,11 +2081,11 @@ const STY = {
   necromancer: { n:'Necromancer', sk:'Necromancy', w:['Ghostly staff','Bone staff','Blood staff','Death staff','Ancient necrostaff','Sanguinesti staff'],
             range:190, dmg:0.88, rate:0.82, col:'#b89ae8', specialName:'Thrall Summon' },
   slayer: { n:'Slayer', sk:'Slayer', w:['Bronze sword','Iron sword','Steel sword','Mithril sword','Leaf-bladed sword','Slayer dart'],
-            range:170, dmg:1.05, rate:0.68, col:'#c8b070', specialName:'Slayer Strike' },
+            range:170, dmg:1.12, rate:0.68, col:'#c8b070', specialName:'Slayer Strike' },
   hunter: { n:'Hunter', sk:'Hunter', w:['Wooden spear','Iron javelin','Steel javelin','Mithril javelin','Rune dart','Hunter lance'],
-            range:160, dmg:0.82, rate:0.70, col:'#8fbc6a', specialName:'Box Trap' },
+            range:160, dmg:0.92, rate:0.70, col:'#8fbc6a', specialName:'Box Trap' },
   runecrafter: { n:'Runecrafter', sk:'Runecraft', w:['Essence staff','Air staff','Fire staff','Law staff','Death talisman','Ourania staff'],
-            range:180, dmg:0.98, rate:0.70, col:'#7ec8e8', specialName:'Ourania Pulse' }
+            range:180, dmg:1.10, rate:0.70, col:'#7ec8e8', specialName:'Ourania Pulse' }
 };
 const ORDER = ['melee','ranged','magic','fisher','woodcutter','thief','priest','firemaker','necromancer','slayer','hunter','runecrafter'];
 function maxSkillLevel() { // 0.11a: highest saved class skill (old and new classes)
@@ -2314,6 +2322,7 @@ function start(k) {
   if ($('bagTip')) $('bagTip').style.display = 'none';
   if (typeof resetExtractState === 'function') resetExtractState();
   if (typeof resetAttacks === 'function') resetAttacks();
+  resetMinis(); // 0.16a
   hideToast();
   buffs = { dagger:0, recoil:0, glory:0, boots:0 };
   $('lootBanner').style.opacity = '0';
@@ -3058,7 +3067,7 @@ function mergeTrashPack() {
   return true;
 }
 function maybeMergePacks(dt) {
-  if (elapsed < LATE_START || eventFight) { capHold = 0; return; }
+  if (elapsed < LATE_START || eventFight || miniAlive() >= 2) { capHold = 0; return; } // 0.16a: no merges with 2+ mini bosses
   let n = 0;
   for (const e of enemies) if (e.hp > 0 && !e.dead) n++;
   if (n < LIVE_CAP) { capHold = Math.max(0, capHold - dt * 2); return; }
@@ -3077,6 +3086,7 @@ function spawn(forceElite = false) {
   else if (elapsed > 110) t = Math.random() < 0.28 ? 2 : (Math.random() < 0.4 ? 1 : 0);
   else if (elapsed > 50) t = Math.random() < 0.32 ? 1 : 0;
   if (elapsed > 110 && t !== 3 && Math.random() < 0.13) t = 4; // 0.7c: cultists join from 1:50
+  t = newSpawnKind(t); // 0.16a: Charger from 6:00, Dark Wizard from 9:00 (no extra random calls before 6:00)
 
   if (forceElite) t = 3;
   if (window.__forceT !== undefined) t = window.__forceT;
@@ -3098,6 +3108,10 @@ function spawn(forceElite = false) {
     cd: rand(0.6, 1.6), windup: 0, windT: 0, slamT: 0, losT: 0, los: false, // 0.7c: attack state
     dead: false
   });
+  if (t === 5 && elapsed >= 2700 && enemies.length < LIVE_CAP) { // 0.16a: 45:00+ chargers come in pairs
+    const last = enemies[enemies.length - 1];
+    enemies.push(Object.assign({}, last, { x: last.x + rand(-70, 70), y: last.y + rand(-70, 70), cs: 0, cd: last.cd + 0.4 }));
+  }
 }
 
 /* ========== COMBAT ========== */
@@ -3106,6 +3120,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
   if (buffs.dagger > 0) d = Math.round(d * 2); // 0.5: Dragon dagger = double damage
   const M = player.m;
   if (M.ice2 && (e.slow > 0 || e.chill > 0)) d = Math.round(d * 1.12); // 0.8a Cold snap
+  if (e.dizzy > 0) d = Math.round(d * 1.25); // 0.16a: a dizzy Charger takes +25%
   recordDps(src || dmgSrc || (dot ? 'dot' : 'attack'), d);
   e.hp -= d;
   e.hit = dot ? Math.max(e.hit, 0.06) : 0.14;
@@ -3154,6 +3169,8 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
 
     if (e.boss) {
       bossDefeated(e); // 0.6: boss has its own big reward
+    } else if (e.mini) {
+      miniDefeated(e); // 0.16a: coins, XP, boss cache, luck roll, trophy
     } else if (e.penance || e.penanceFlee) {
       // 0.9a: Penance are a win/lose gamble — no XP orbs, coins, or chests on kill.
       // Survive/clear payout is the only reward. On-kill heals/effects above still run.
@@ -5099,6 +5116,7 @@ function updateExtract(dt) {
     cancelExtractChannel();
     return;
   }
+  if (miniNear(MINI_EXTRACT_BLOCK)) { cancelExtractChannel(); return; } // 0.16a: no extracting with a mini boss within 260px
   if (extractChannel <= 0 && !extractSurged) {
     extractSurged = true;
     if (!eventFight && (typeof waveResumeIn === 'number' ? waveResumeIn <= 0 : true) && enemies.length < LIVE_CAP) {
@@ -5196,7 +5214,7 @@ function openChest(c, force, extraRoll) {
   if (kind === 'phoenix' && phoenix) kind = 'spike'; // already holding one: give a spike instead
 
   if (kind === 'item') {
-    bagPending.push(rollItem(false));
+    bagPending.push(c && c.mini ? rollItemAtLeast('uncommon') : rollItem(false)); // 0.16a: boss cache is uncommon+
   }
   if (kind === 'royal') {
     // 0.6: King Black Dragon's chest: free upgrade AND a 30s power spike
@@ -5486,6 +5504,7 @@ function onScreen(x, y, m) { return Math.abs(x - player.x) < W / 2 + m && Math.a
 function atkZone(e) { return e.ak === 'slam' ? e.reach : e.r + e.reach; }
 // runs every frame for each normal enemy. Returns how it moves: 1 walk in, 0 hold, -0.6 back off.
 function enemyAttack(e, ed, dt) {
+  if (e.ak === 'charge' || e.ak === 'marks' || e.ak === 'obor') return newEnemyAttack(e, ed, dt); // 0.16a
   if (player.stealth > 0 && !e.boss) { // 0.11a: lost sight during Shadow Step
     if (e.windup > 0) e.windup = 0;
     e.cd = Math.max(e.cd, 0.2);
@@ -6031,6 +6050,414 @@ function pickUpgradesBase() {
 }
 
 
+/* ========== 0.16a: NEW ENEMY BEHAVIOURS + MINI BOSSES (Obor) ========== */
+// Data first: new trash kinds are appended to ENEMY_KINDS (ids 5, 6). Mix only changes after 6:00,
+// so 0:00-5:59 spawns are identical to 0.15b (same random calls).
+ENEMY_KINDS.push(
+  { name:'Hobgoblin charger', hp:60, speed:44, damage:4, r:12, xp:16, gold:2, color:'#e0502a', weak:'ranged',
+    ak:'charge', dmg:9, reach:240, wind:0.8, rate:4.2, shape:'tri' },
+  { name:'Dark wizard', hp:45, speed:34, damage:2, r:12, xp:18, gold:3, color:'#9a4ae0', weak:'melee',
+    ak:'marks', dmg:12, reach:300, wind:1.0, rate:4.6, keep:220, shape:'diamond' }
+);
+// time-banded share of normal spawns taken by each new kind: [fromSec, chance]
+const NEW_SPAWNS = [
+  { kind: 5, bands: [[360, 0.06], [600, 0.10], [1200, 0.12]] },  // Charger from 6:00
+  { kind: 6, bands: [[540, 0.05], [600, 0.08], [1200, 0.10]] }   // Dark Wizard from 9:00
+];
+function newSpawnKind(t) {
+  if (elapsed < 360 || t === 3) return t;          // before 6:00 or an elite roll: unchanged
+  const r = Math.random();
+  let acc = 0;
+  for (const s of NEW_SPAWNS) {
+    let w = 0;
+    for (const b of s.bands) if (elapsed >= b[0]) w = b[1];
+    acc += w;
+    if (r < acc) return s.kind;
+  }
+  return t;
+}
+const CHARGE = { lane: 260, width: 26, wind: 0.8, wind2: 0.6, speed: 600, dizzy: 1.2, mul: 2.2, maxActive: 6 };
+const MARKS = { r: 34, fill: 1.0, maxSets: 4, maxSetsLate: 6, blinkAt: 90, blink: 120 };
+var wizMarks = [], miniFx = [], miniQueue = [], miniSeen = {}, miniTrophies = 0, miniKills = 0;
+var miniNextAt = 450, miniSlot = 0, miniWaveN = 1, miniBusy = 0, miniHintSeen = {};
+function lateTier() { return elapsed >= 2700 ? 2 : elapsed >= 1800 ? 1 : 0; } // 0: <30:00, 1: 30-45, 2: 45:00+
+function chargersActive() { let n = 0; for (const e of enemies) if (e.hp > 0 && (e.cs === 1 || e.cs === 2)) n++; return n; }
+function markSets() { let n = 0; for (const m of wizMarks) if (m.lead) n++; return n; }
+function newEnemyAttack(e, ed, dt) {
+  if (player.stealth > 0) { if (e.cs === 1) e.cs = 0; if (e.ms === 1) e.ms = 0; e.cd = Math.max(e.cd, 0.4); return 1; }
+  if (e.ak === 'charge') return chargerAct(e, ed, dt);
+  if (e.ak === 'marks') return wizardAct(e, ed, dt);
+  if (e.ak === 'obor') return oborAct(e, ed, dt);
+  return 1;
+}
+// ---- Hobgoblin Charger: stops, red lane fills 0.8s, dashes 3x speed down it, then dizzy (+25% damage taken)
+function chargerAct(e, ed, dt) {
+  e.cs = e.cs || 0;
+  if (e.dizzy > 0) { e.dizzy -= dt; return 0; }
+  if (e.cs === 1) { // telegraph
+    e.ct -= dt;
+    if (e.ct <= 0) { e.cs = 2; e.dashLeft = e.laneL; e.dashHit = false; }
+    return 0;
+  }
+  if (e.cs === 2) { // dash
+    if (e.freezeT > 0 || e.root > 0) { e.cs = 0; e.dizzy = CHARGE.dizzy; e.cd = e.rate; return 0; }
+    const step = Math.min(e.dashLeft, CHARGE.speed * dt);
+    const nx = e.x + e.lx2 * step, ny = e.y + e.ly2 * step;
+    if (hitsSolid(nx, ny, e.r * 0.6)) e.dashLeft = 0; else { e.x = nx; e.y = ny; e.dashLeft -= step; }
+    if (!e.dashHit && Math.hypot(player.x - e.x, player.y - e.y) < e.r + player.r) {
+      e.dashHit = true;
+      if (!enemyHitPlayer(Math.round(e.dmg * CHARGE.mul), e) && player.invuln > HIT_MERCY) dodged();
+    }
+    if (e.dashLeft <= 0) {
+      if (lateTier() >= 1 && !e.chained) { // 30:00+: chains a second, re-aimed dash
+        e.chained = true; startCharge(e, CHARGE.wind2);
+      } else { e.cs = 0; e.chained = false; e.dizzy = CHARGE.dizzy; e.cd = e.rate * rand(0.85, 1.15); }
+    }
+    return 0;
+  }
+  e.cd -= dt;
+  if (e.cd <= 0 && ed > 110 && ed < e.reach && onScreen(e.x, e.y, -10) && chargersActive() < CHARGE.maxActive) { startCharge(e, CHARGE.wind); return 0; }
+  return 1;
+}
+function startCharge(e, wind) {
+  const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy) || 1;
+  e.lx2 = dx / d; e.ly2 = dy / d;
+  e.laneL = CHARGE.lane * (1 + 0.10 * Math.max(0, Math.floor((elapsed - 1800) / 900) + (elapsed >= 1800 ? 1 : 0)));
+  e.cs = 1; e.ct = e.cT = wind; e.dashHit = false;
+}
+// ---- Dark Wizard: holds ~220px, drops purple ground marks on/around you that burst after 1.0s; blinks away if rushed
+function wizardAct(e, ed, dt) {
+  e.cd -= dt; e.blinkCd = (e.blinkCd || 0) - dt;
+  if (ed < MARKS.blinkAt && e.blinkCd <= 0) { // blink 120px away from you
+    const dx = e.x - player.x, dy = e.y - player.y, d = Math.hypot(dx, dy) || 1;
+    for (let k = 0; k < 6; k++) {
+      const a = Math.atan2(dy, dx) + (k ? rand(-1.2, 1.2) : 0);
+      const nx = e.x + Math.cos(a) * MARKS.blink, ny = e.y + Math.sin(a) * MARKS.blink;
+      if (!hitsSolid(nx, ny, e.r)) {
+        for (let i = 0; i < 8; i++) particles.push({ x: e.x, y: e.y, vx: rand(-80, 80), vy: rand(-80, 80), life: 0.3, color: '#b77aff', size: 3 });
+        e.x = nx; e.y = ny; break;
+      }
+    }
+    e.blinkCd = 3.5;
+  }
+  const cap = lateTier() >= 2 ? MARKS.maxSetsLate : MARKS.maxSets;
+  if (e.cd <= 0 && ed < e.reach && onScreen(e.x, e.y, -10) && markSets() < cap) castMarks(e);
+  if (ed < e.keep * 0.65) return -0.6;
+  if (ed < e.keep) return 0;
+  return 1;
+}
+function castMarks(e) {
+  e.cd = e.rate * rand(0.85, 1.15);
+  const n = 3 + lateTier();              // 3 / 4 (30:00+) / 5 (45:00+)
+  const mvx = joystick.active ? joystick.x : 0, mvy = joystick.active ? joystick.y : 0;
+  const mm = Math.hypot(mvx, mvy);
+  const dmg = Math.max(1, Math.round(e.dmg));
+  for (let i = 0; i < n; i++) {
+    let x = player.x, y = player.y;
+    if (lateTier() >= 1 && mm > 0.2) { // 30:00+: a short line laid ahead of where you are walking
+      x += mvx / mm * (i * 52); y += mvy / mm * (i * 52);
+    } else if (i > 0) {
+      const a = (i / (n - 1)) * 6.283 + rand(-0.3, 0.3), r = rand(55, 75);
+      x += Math.cos(a) * r; y += Math.sin(a) * r;
+    }
+    wizMarks.push({ x, y, r: MARKS.r, t: MARKS.fill + i * 0.12, T: MARKS.fill + i * 0.12, dmg, lead: i === 0 });
+  }
+  for (let i = 0; i < 6; i++) particles.push({ x: e.x, y: e.y - e.r, vx: rand(-40, 40), vy: rand(-90, -30), life: 0.35, color: '#b77aff', size: 3 });
+}
+function updateMarks(dt) {
+  let w = 0;
+  for (let i = 0; i < wizMarks.length; i++) {
+    const m = wizMarks[i];
+    m.t -= dt;
+    if (m.t <= 0) {
+      if (playing && Math.hypot(player.x - m.x, player.y - m.y) < m.r + player.r * 0.5) {
+        if (!enemyHitPlayer(m.dmg) && player.invuln > HIT_MERCY) dodged();
+      }
+      for (let k = 0; k < 6; k++) particles.push({ x: m.x, y: m.y, vx: rand(-90, 90), vy: rand(-90, 90), life: 0.3, color: '#c58cff', size: 3 });
+      continue;
+    }
+    wizMarks[w++] = m;
+  }
+  wizMarks.length = w;
+}
+
+// ---- Mini bosses. Data-driven so 0.16b/c can add Bryophyta, Chaos Fanatic, Giant Mole.
+const MINI_DEFS = {
+  obor: { id: 'obor', name: 'Obor', hint: 'Step out of the club cone and the cracking ground.', color: '#8a5a3a', r: 34, speed: 30,
+    hpBase: 1500, k: 20, touch: 10, slam: 26, crack: 22, coneR: 135, coneHalf: 1.05, coneWind: 0.9, crackWind: 0.8, rate: 2.6 }
+};
+const MINI_SLOTS = [450, 750, 1050, 1350];          // 7:30 / 12:30 / 17:30 / 22:30 (solo); empty debut slots reuse a known type
+const MINI_DEBUT_ORDER = ['obor'];                   // 0.16a: Obor only
+const MINI_WAVES = [ // from 25:00: how many per wave and how often
+  { from: 1500, n: 2, every: 210 }, { from: 2100, n: 3, every: 180 }, { from: 2700, n: 4, every: 150 }, { from: 3300, n: 5, every: 120 }
+];
+const MINI_FIRST_WAVE = 1560, MINI_MAX = 5, MINI_STAGGER = 3, MINI_WARN = 3, MINI_EXTRACT_BLOCK = 260;
+const MINI_GROUP_MUL = [1, 1, 0.8, 0.7, 0.65, 0.6];
+function miniBand(t) { let b = null; for (const w of MINI_WAVES) if (t >= w.from) b = w; return b; }
+function miniAlive() { let n = 0; for (const e of enemies) if (e.mini && e.hp > 0 && !e.dead) n++; return n; }
+function miniNear(r) { for (const e of enemies) if (e.mini && e.hp > 0 && !e.dead && Math.hypot(e.x - player.x, e.y - player.y) < r) return true; return false; }
+function miniBudget() { return elapsed >= 2700 ? 3 : 2; }
+function avoidDragon(t) { // never within 45s of a dragon spawn; if close, come 60s after that dragon
+  const near = Math.round(t / BOSS_EVERY) * BOSS_EVERY;
+  return (near > 0 && Math.abs(t - near) < 45) ? near + 60 : t;
+}
+function resetMinis() {
+  wizMarks = []; miniFx = []; miniQueue = []; miniSeen = {}; miniTrophies = 0; miniKills = 0; miniBusy = 0;
+  miniSlot = 0; miniNextAt = MINI_SLOTS[0]; miniWaveN = 1; miniHintSeen = miniHintSeen || {};
+}
+function miniPlanNext() { // after a slot/wave fires, decide the next time and size
+  miniSlot++;
+  if (miniSlot < MINI_SLOTS.length) { miniNextAt = MINI_SLOTS[miniSlot]; miniWaveN = 1; return; }
+  if (miniNextAt < MINI_FIRST_WAVE) { miniNextAt = avoidDragon(MINI_FIRST_WAVE); }
+  else { const b = miniBand(miniNextAt); miniNextAt = avoidDragon(miniNextAt + (b ? b.every : 210)); }
+  const b2 = miniBand(miniNextAt); miniWaveN = b2 ? b2.n : 1;
+}
+function miniTypeFor(i) {
+  if (miniSlot < MINI_DEBUT_ORDER.length && MINI_SLOTS[miniSlot] === miniNextAt) return MINI_DEBUT_ORDER[miniSlot];
+  const known = Object.keys(MINI_DEFS);
+  return known[i % known.length];
+}
+function updateMinis(dt) {
+  if (!playing) return;
+  // fire the scheduled slot/wave (waits while a dragon is alive or a Penance swarm runs; at most one queued)
+  if (elapsed >= miniNextAt && !boss && !eventFight && !miniQueue.length) {
+    const room = Math.max(0, MINI_MAX - miniAlive());
+    const n = Math.min(miniWaveN, room);
+    const base = rand(0, 6.283);
+    for (let i = 0; i < n; i++) {
+      miniQueue.push({ id: miniTypeFor(i), at: elapsed + MINI_WARN + i * MINI_STAGGER, a: base + i * 6.283 / Math.max(1, n), group: miniWaveN });
+    }
+    if (n > 0) {
+      const id = miniQueue[0].id, d = MINI_DEFS[id];
+      const first = !miniHintSeen[id];
+      banner('⚔ ' + (n > 1 ? 'Mini boss wave ×' + n : d.name + (miniSeen[id] ? ' returns!' : '!')), first ? d.hint : 'Watch the edge arrows.', 2.6, true);
+      miniHintSeen[id] = true;
+    }
+    miniPlanNext();
+  }
+  for (let i = 0; i < miniQueue.length; i++) {
+    const q = miniQueue[i];
+    if (elapsed >= q.at) { spawnMini(q.id, q.a, q.group); miniQueue.splice(i, 1); i--; }
+  }
+  // wind-up budget: count bosses currently winding up a big attack
+  miniBusy = 0;
+  for (const e of enemies) if (e.mini && e.hp > 0 && e.ms === 1) miniBusy++;
+  // crack / shockwave effects
+  let w = 0;
+  for (let i = 0; i < miniFx.length; i++) {
+    const f = miniFx[i];
+    f.t -= dt;
+    if (f.k === 'crack') {
+      if (f.t <= 0) {
+        if (Math.hypot(player.x - f.x, player.y - f.y) < f.r + player.r * 0.5) { if (!enemyHitPlayer(f.dmg) && player.invuln > HIT_MERCY) dodged(); }
+        for (let k = 0; k < 5; k++) particles.push({ x: f.x, y: f.y, vx: rand(-80, 80), vy: rand(-80, 80), life: 0.3, color: '#c49a6a', size: 4 });
+        continue;
+      }
+    } else if (f.k === 'wave') {
+      f.rad += f.v * dt;
+      const pd = Math.hypot(player.x - f.x, player.y - f.y);
+      if (!f.hit && Math.abs(pd - f.rad) < 12 + player.r * 0.5) { f.hit = true; if (!enemyHitPlayer(f.dmg) && player.invuln > HIT_MERCY) dodged(); }
+      if (f.rad >= f.max) continue;
+    }
+    miniFx[w++] = f;
+  }
+  miniFx.length = w;
+}
+function spawnMini(id, a, group) {
+  const d = MINI_DEFS[id];
+  const seen = miniSeen[id] || 0;
+  miniSeen[id] = seen + 1;
+  const sc = lateScale();
+  const gm = MINI_GROUP_MUL[Math.min(MINI_GROUP_MUL.length - 1, group || 1)];
+  const hp = Math.round(Math.max(d.hpBase * (1 + 0.5 * seen), estDps() * d.k * (1 + 0.15 * seen)) * gm);
+  const dm = sc.dmg * Math.min(1.5, 1 + 0.05 * seen);
+  const dist0 = Math.max(W, H) * 0.58 + 60;
+  let x = player.x + Math.cos(a) * dist0, y = player.y + Math.sin(a) * dist0;
+  for (let r = 0; r < 400 && hitsSolid(x, y, d.r); r += 30) { x += Math.cos(a) * 30; y += Math.sin(a) * 30; }
+  enemies.push({
+    x, y, name: d.name, mini: id, elite: true, kind: 2, shape: id, ak: 'obor', color: d.color, weak: 'melee',
+    r: d.r, speed: d.speed, hp, maxHp: hp, damage: d.touch * dm, dmg: Math.round(d.slam * dm), crackDmg: Math.round(d.crack * dm),
+    xp: 0, gold: 0, side: Math.random() < 0.5 ? -1 : 1, hit: 0, slow: 0, cd: 1.2, windup: 0, windT: 0, slamT: 0, losT: 0, los: false,
+    ms: 0, mt: 0, swings: 0, tier: (seen >= 2 || elapsed >= 1800) ? (elapsed >= 2700 ? 3 : 2) : 1, dead: false
+  });
+}
+// Obor: club slam (120° cone fills 0.9s); every 3rd attack a ground crack line (3 circles, 0.8s each, rippling out).
+// Tier II (3rd appearance or 30:00): cracks in 2 lines. Tier III (45:00): slam also sends a shockwave ring (dash through it).
+function oborAct(e, ed, dt) {
+  const d = MINI_DEFS[e.mini];
+  if (e.ms === 1) {
+    e.mt -= dt;
+    if (e.mt <= 0) {
+      e.ms = 0; e.cd = d.rate * rand(0.9, 1.1);
+      const dx = player.x - e.x, dy = player.y - e.y, pd = Math.hypot(dx, dy);
+      let da = Math.atan2(dy, dx) - e.ca; while (da > Math.PI) da -= 6.283; while (da < -Math.PI) da += 6.283;
+      if (pd < d.coneR + player.r * 0.5 && Math.abs(da) < d.coneHalf) { if (!enemyHitPlayer(e.dmg, e) && player.invuln > HIT_MERCY) dodged(); }
+      shake = Math.max(shake, onScreen(e.x, e.y, 0) ? 0.3 : 0);
+      if (e.tier >= 3 && miniFx.length < 16) miniFx.push({ k: 'wave', x: e.x, y: e.y, rad: d.coneR * 0.6, max: 260, v: 210, t: 9, dmg: Math.round(e.dmg * 0.6), hit: false });
+    }
+    return 0;
+  }
+  e.cd -= dt;
+  if (e.cd <= 0 && ed < 170 && miniBusy < miniBudget()) {
+    e.swings++;
+    const ang = Math.atan2(player.y - e.y, player.x - e.x);
+    if (e.swings % 3 === 0) { // ground crack line(s)
+      const lines = e.tier >= 2 ? [-0.42, 0.42] : [0];
+      for (const off of lines) for (let i = 0; i < 3; i++) {
+        if (miniFx.length >= 24) break;
+        const r = 70 + i * 68;
+        miniFx.push({ k: 'crack', x: e.x + Math.cos(ang + off) * r, y: e.y + Math.sin(ang + off) * r, r: 40, t: d.crackWind + i * 0.3, T: d.crackWind + i * 0.3, dmg: e.crackDmg });
+      }
+      e.cd = d.rate * 0.8;
+      return 0;
+    }
+    e.ms = 1; e.mt = e.mT = d.coneWind; e.ca = ang; miniBusy++;
+    return 0;
+  }
+  if (e.cd <= 0 && ed < 170) e.cd = 0.5; // budget full: wait half a second
+  return ed > 105 ? 1 : 0;
+}
+function miniDefeated(e) {
+  miniKills++; miniTrophies++;
+  const coins = Math.round((40 + elapsed / 6) * coinMul());
+  const xp = Math.round(player.next * 0.35);
+  const N = 6;
+  let leftG = coins;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * 6.283, r = rand(16, 40);
+    const g = i === N - 1 ? leftG : Math.round(coins / N);
+    leftG -= g;
+    orbs.push({ x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r, xp: xp / N, gold: toGold(g), r: 9, elite: true, age: 0 });
+  }
+  if (dropChest(e.x, e.y, false)) { const c = chests[chests.length - 1]; c.rolls = 1; c.mini = true; }
+  const r = Math.random(); // small luck roll on top of the cache (never the magnet)
+  const tier = r < 0.015 ? 'unique' : r < 0.075 ? 'rare' : null;
+  if (tier && ITEM_POOL[tier] && ITEM_POOL[tier].length) {
+    const pool = ITEM_POOL[tier], id = pool[Math.floor(Math.random() * pool.length)];
+    groundItems.push({ x: e.x + rand(-30, 30), y: e.y + rand(-30, 30), id, qty: 1, t: 0 });
+    toast((tier === 'unique' ? '🌟 Unique' : '💎 Rare') + ' drop from ' + e.name + '!');
+  }
+  for (let i = 0; i < 30; i++) {
+    const a = Math.random() * 6.283, v = rand(60, 220);
+    particles.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5 + Math.random() * 0.4, color: i % 2 ? '#ffd24a' : e.color, size: 4 });
+  }
+  shake = Math.max(shake, 0.5);
+  banner('⚔ ' + e.name + ' defeated!', '+' + coins + ' coins · boss cache · 🏆 +1 trophy (renown if you extract)', 2.6);
+}
+function rollItemAtLeast(minTier) {
+  let tier = rollItemTier(false);
+  if (minTier === 'uncommon' && tier === 'common') tier = 'uncommon';
+  const pool = ITEM_POOL[tier];
+  return itemClone(pool[Math.floor(Math.random() * pool.length)], 1);
+}
+function miniGoalText() { // null when there is nothing mini-boss related to show
+  const alive = miniAlive();
+  if (alive) return '⚔ ' + (alive > 1 ? alive + ' mini bosses' : 'Obor') + ' · kill or kite them';
+  if (miniQueue.length) return '⚔ Mini boss incoming!';
+  const remain = miniNextAt - elapsed;
+  const debutId = (miniSlot < MINI_DEBUT_ORDER.length && MINI_SLOTS[miniSlot] === miniNextAt) ? MINI_DEBUT_ORDER[miniSlot] : null;
+  if (miniWaveN <= 1) {
+    const nm = debutId ? MINI_DEFS[debutId].name : 'Obor';
+    return remain <= 30 ? '⚔ ' + nm + ' in ' + fmt(Math.max(0, remain)) : '⚔ ' + nm + ' arrives at ' + fmt(miniNextAt);
+  }
+  return remain <= 60 ? '⚔ Mini boss wave ×' + miniWaveN + ' in ' + fmt(Math.max(0, remain)) : '⚔ Mini boss wave ×' + miniWaveN + ' at ' + fmt(miniNextAt);
+}
+
+// ---- drawing (simple shapes; art parked)
+function drawShapeEnemy(e) {
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath(); ctx.ellipse(e.x, e.y + e.r * 0.9, e.r * 1.2, e.r * 0.4, 0, 0, 7); ctx.fill();
+  const col = e.hit > 0 ? '#fff' : e.color;
+  ctx.fillStyle = col; ctx.strokeStyle = '#1a1410'; ctx.lineWidth = 2;
+  if (e.shape === 'tri') { // points the way it will dash
+    const a = (e.cs === 1 || e.cs === 2) ? Math.atan2(e.ly2, e.lx2) : Math.atan2(player.y - e.y, player.x - e.x);
+    const r = e.r * 1.25;
+    ctx.beginPath();
+    ctx.moveTo(e.x + Math.cos(a) * r, e.y + Math.sin(a) * r);
+    ctx.lineTo(e.x + Math.cos(a + 2.4) * r, e.y + Math.sin(a + 2.4) * r);
+    ctx.lineTo(e.x + Math.cos(a - 2.4) * r, e.y + Math.sin(a - 2.4) * r);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (e.dizzy > 0) { ctx.fillStyle = '#ffe07a'; for (let i = 0; i < 3; i++) { const q = elapsed * 6 + i * 2.1; ctx.fillRect(e.x + Math.cos(q) * 12 - 2, e.y - e.r - 8 + Math.sin(q) * 3, 4, 4); } }
+  } else if (e.shape === 'diamond') {
+    const r = e.r * 1.3, bob = Math.sin(elapsed * 3 + e.x * 0.01) * 2;
+    ctx.beginPath(); ctx.moveTo(e.x, e.y - r + bob); ctx.lineTo(e.x + r * 0.75, e.y + bob); ctx.lineTo(e.x, e.y + r + bob); ctx.lineTo(e.x - r * 0.75, e.y + bob); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e8d0ff'; ctx.beginPath(); ctx.arc(e.x, e.y - 3 + bob, 3, 0, 7); ctx.fill();
+  } else { // mini boss: big circle + club line + name tag
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill(); ctx.stroke();
+    const a = e.ms === 1 ? e.ca : Math.atan2(player.y - e.y, player.x - e.x);
+    ctx.strokeStyle = '#3a2414'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(e.x + Math.cos(a) * e.r * 0.6, e.y + Math.sin(a) * e.r * 0.6); ctx.lineTo(e.x + Math.cos(a) * e.r * 1.6, e.y + Math.sin(a) * e.r * 1.6); ctx.stroke();
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = 'rgba(255,200,90,' + (0.55 + 0.3 * Math.sin(elapsed * 5)) + ')'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5, 0, 7); ctx.stroke();
+    const ta = ctx.textAlign;
+    ctx.fillStyle = '#ffe2a0'; ctx.font = 'bold 11px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(e.name, e.x, e.y - e.r - 16);
+    ctx.textAlign = ta;
+    const bw = e.r * 2.4;
+    ctx.fillStyle = '#2a2218'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 12, bw, 5);
+    ctx.fillStyle = '#e8a03a'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 12, bw * Math.max(0, e.hp / e.maxHp), 5);
+    return;
+  }
+  const bw = e.r * 2;
+  ctx.fillStyle = '#2a2218'; ctx.fillRect(e.x - e.r, e.y - e.r * 1.4 - 8, bw, 4);
+  ctx.fillStyle = '#c94e43'; ctx.fillRect(e.x - e.r, e.y - e.r * 1.4 - 8, bw * Math.max(0, e.hp / e.maxHp), 4);
+}
+function drawNewTelegraphs() { // ground layer, under enemies
+  for (const e of enemies) {
+    if (e.hp <= 0) continue;
+    if (e.ak === 'charge' && e.cs === 1) { // red lane that fills toward the end before the dash
+      const p = clamp01(1 - e.ct / (e.cT || 1)), a = Math.atan2(e.ly2, e.lx2), L = e.laneL, Wd = CHARGE.width;
+      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(a);
+      ctx.fillStyle = 'rgba(255,50,40,0.16)'; ctx.fillRect(0, -Wd / 2, L, Wd);
+      ctx.fillStyle = 'rgba(255,40,30,0.42)'; ctx.fillRect(0, -Wd / 2, L * p, Wd);
+      ctx.strokeStyle = 'rgba(255,80,60,0.9)'; ctx.lineWidth = 2; ctx.strokeRect(0, -Wd / 2, L, Wd);
+      ctx.restore();
+    } else if (e.ak === 'obor' && e.ms === 1) { // club cone
+      const d = MINI_DEFS[e.mini], p = clamp01(1 - e.mt / (e.mT || 1));
+      ctx.fillStyle = 'rgba(255,120,40,0.16)';
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, d.coneR, e.ca - d.coneHalf, e.ca + d.coneHalf); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,90,30,0.38)';
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, d.coneR * p, e.ca - d.coneHalf, e.ca + d.coneHalf); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,150,60,0.9)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, d.coneR, e.ca - d.coneHalf, e.ca + d.coneHalf); ctx.closePath(); ctx.stroke();
+    }
+  }
+  for (const m of wizMarks) { // purple circles that fill, then burst
+    const p = clamp01(1 - m.t / (m.T || 1));
+    ctx.fillStyle = 'rgba(160,80,255,0.16)'; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(170,90,255,0.40)'; ctx.beginPath(); ctx.arc(m.x, m.y, m.r * p, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(200,140,255,0.95)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 7); ctx.stroke();
+  }
+  for (const f of miniFx) {
+    if (f.k === 'crack') {
+      const p = clamp01(1 - f.t / (f.T || 1));
+      ctx.fillStyle = 'rgba(196,140,80,0.18)'; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(210,130,60,0.42)'; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * p, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(240,170,90,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, 7); ctx.stroke();
+    } else if (f.k === 'wave') {
+      ctx.strokeStyle = 'rgba(255,200,120,0.85)'; ctx.lineWidth = 10;
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.rad, 0, 7); ctx.stroke();
+    }
+  }
+}
+function drawMiniArrows() { // edge arrows: incoming (3s warning) and off-screen live mini bosses
+  const pts = [];
+  for (const q of miniQueue) if (elapsed >= q.at - MINI_WARN) pts.push({ a: q.a, col: MINI_DEFS[q.id].color, soon: true });
+  for (const e of enemies) if (e.mini && e.hp > 0 && !onScreen(e.x, e.y, -e.r)) pts.push({ a: Math.atan2(e.y - player.y, e.x - player.x), col: e.color });
+  for (const p of pts) {
+    const c = Math.cos(p.a), s = Math.sin(p.a);
+    const k = Math.min((W / 2 - 26) / Math.max(0.001, Math.abs(c)), (H / 2 - 70) / Math.max(0.001, Math.abs(s)));
+    const x = player.x + c * k, y = player.y + s * k;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(p.a);
+    ctx.globalAlpha = p.soon ? 0.6 + 0.4 * Math.sin(elapsed * 10) : 0.9;
+    ctx.fillStyle = p.col; ctx.strokeStyle = '#ffe2a0'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-8, -11); ctx.lineTo(-3, 0); ctx.lineTo(-8, 11); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.restore();
+  }
+}
+
 /* ========== 0.15a: EXTRA ATTACK SLOTS (run-only) ========== */
 // Slot 1 is always the class main attack. Extra slots open at run level 5 / 12 / 20.
 // Damage is a share of your main attack's damage per second (mainDps), so it grows with
@@ -6047,7 +6474,7 @@ const ATK_DEFS = {
     desc: r => 'Lob ' + (ATK_DEFS.chins.count[r] > 1 ? ATK_DEFS.chins.count[r] + ' chinchompas' : 'a chinchompa') + ' at a crowd; it explodes in a ' + ATK_DEFS.chins.rad[r] + 'px blast every ' + ATK_DEFS.chins.cd[r] + 's.' },
   aura: { id:'aura', n:'Retribution aura', icon:'✴️', col:'#ffd24a',
     tick:[1.0, 0.95, 0.9, 0.85, 0.8], rad:[58, 66, 74, 82, 92], mul:[0.28, 0.35, 0.42, 0.50, 0.60],
-    desc: r => 'A gold ring around you burns every enemy within ' + ATK_DEFS.aura.rad[r] + 'px every ' + ATK_DEFS.aura.tick[r] + 's.' }
+    desc: r => 'A gold ring around you burns every enemy within ' + ATK_DEFS.aura.rad[r] + 'px every ' + ATK_DEFS.aura.tick[r] + 's. Best up close: melee and tanky builds.' } // 0.16a: aura hint (text only)
 };
 const ATK_ORDER = ['axes', 'chins', 'aura'];
 var atkAxes = [], atkChins = [], atkBlasts = [];
@@ -6485,6 +6912,8 @@ function endRun(reason, extra) {
     let renownRun = Math.max(1, Math.floor(elapsed / 28) + Math.floor(kills / 22)) + 8 * bossesSlain; // 0.8a: +8 per boss
     const extractRenown = reason === 'extract' ? EXTRACT_RENOWN_PER * bossesSlain : 0;
     renownRun += extractRenown;
+    const trophyRenown = reason === 'extract' ? miniTrophies : 0; // 0.16a: mini boss trophies pay only on extract
+    renownRun += trophyRenown;
     // 0.9a: event renown was already added during the run; still show it. Base run renown is separate.
     save.renown += renownRun;
     save.best = Math.max(save.best, Math.floor(elapsed));
@@ -6492,7 +6921,7 @@ function endRun(reason, extra) {
     const kept = extra.kept || null;
     const keptName = kept && itemDef(kept.id) ? (itemDef(kept.id).icon + ' ' + itemDef(kept.id).n) : '';
     persist();
-    lastRunSummary = { earned, paid, mul, bagBonus, coinLine, reason, extractRenown, keptName,
+    lastRunSummary = { earned, paid, mul, bagBonus, coinLine, reason, extractRenown, keptName, trophyRenown, miniKills, miniTrophies,
       renownRun, renownEvent, elapsed, kills, chestsOpened, bossesSlain,
       gold: save.gold, renown: save.renown, bossTotal: save.bossTotal, bossBest: save.bossBest };
     runEnded = true;
@@ -6508,14 +6937,14 @@ function endRun(reason, extra) {
     gold: save.gold, renown: save.renown, bossTotal: save.bossTotal || 0, bossBest: save.bossBest || 0 };
   const title = sum.reason === 'extract' ? 'YOU MADE IT OUT' : 'THE FRONTIER CLAIMS YOU';
   const keptLine = sum.keptName ? ('<br>Kept in stash: <b>' + sum.keptName + '</b>') : '';
-  const extractRenownBit = sum.extractRenown ? (` · extract +${sum.extractRenown}`) : '';
+  const extractRenownBit = (sum.extractRenown ? (` · extract +${sum.extractRenown}`) : '') + (sum.trophyRenown ? (` · trophies +${sum.trophyRenown}`) : (sum.reason !== 'extract' && sum.miniTrophies ? ` · ${sum.miniTrophies} trophies lost` : ''));
   $('overlay').style.display = 'flex';
   $('panel').innerHTML = `
     <h2>${title}</h2>
     <p class="coinmath">${sum.coinLine || ''}</p>
     <p>You survived <b>${fmt(sum.elapsed)}</b> and defeated <b>${sum.kills}</b> enemies.<br>
        Chests opened: <b>${sum.chestsOpened}</b><br><!-- 0.5 -->
-       Bosses slain: <b>${sum.bossesSlain}</b>${keptLine}</p><!-- 0.6 -->
+       Bosses slain: <b>${sum.bossesSlain}</b>${sum.miniKills ? ' · mini bosses <b>' + sum.miniKills + '</b>' : ''}${keptLine}</p><!-- 0.6 / 0.16a -->
     <p>Run coins (full): <b>${sum.earned}</b>${sum.reason === 'extract' ? ' · multiplier <b>×' + (sum.mul != null ? Number(sum.mul).toFixed(2) : '1.00') + '</b>' : ''}<br>
        Coins banked this run: <b>${sum.paid != null ? sum.paid : sum.earned}</b><br>
        Permanent coin purse: <b>${sum.gold}</b><br>
@@ -6723,7 +7152,7 @@ function update(dt) {
   // 0.11c: normal waves pause for the whole Penance event, then resume after waveResumeIn (no backlog).
   if (waveResumeIn > 0) waveResumeIn = Math.max(0, waveResumeIn - dt);
   if (!eventFight && waveResumeIn <= 0) {
-    const spawnRate = Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL;
+    const spawnRate = Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL * (miniAlive() >= 2 ? 1.25 : 1); // 0.16a: trash eases off with 2+ mini bosses
     if (spawnClock > spawnRate && enemies.length < LIVE_CAP) {
       spawnClock = 0;
       spawn();
@@ -6745,6 +7174,7 @@ function update(dt) {
     attackClock = STY[player.style].rate * player.rm2 / aspd / (player.itemAspd || 1);
   }
   if (typeof updateAttacks === 'function') updateAttacks(dt); // 0.15a extra attack slots
+  updateMinis(dt); updateMarks(dt); // 0.16a
 
   // enemies
   rangedBusy = bolts.length; // 0.7c: ranged attack budget (see RANGED_CAP / RANGED_GAP)
@@ -7132,11 +7562,13 @@ function draw() {
   drawBossWarnings(); // 0.6: red ground zones
 
   drawEnemyTelegraphs(false); // 0.7c: wind-up rings and slam zones go under the enemies
+  drawNewTelegraphs(); // 0.16a: charger lanes, wizard marks, Obor cone/cracks
   if (typeof drawAttackAura === 'function') drawAttackAura(); // 0.15a
 
   // enemies
   for (const e of enemies) {
     if (e.boss) { drawBoss(e); continue; } // 0.6
+    if (e.shape) { drawShapeEnemy(e); continue; } // 0.16a: simple shapes for the new enemies
     // 0.7a: sprite enemies (goblin, skeleton, giant, ogre) with Grok's white hit flash
     const sheet = ENEMY_SHEET[e.kind];
     const img = sheet && art[sheet];
@@ -7213,6 +7645,7 @@ function draw() {
     ctx.fillRect(e.x - e.r, e.y - e.r - 9, bw * Math.max(0, e.hp / e.maxHp), 4);
   }
   drawWavePoofs();
+  drawMiniArrows(); // 0.16a
 
   drawFireballs(); // 0.6
   drawEnemyTelegraphs(true); // 0.7c: marks over heads, aim lines, shockwaves
