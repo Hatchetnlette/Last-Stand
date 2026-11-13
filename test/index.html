@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.17b</title>
+<title>Last Stand — Prototype 0.18a</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -341,7 +341,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.17b</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.18a</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, and extract at the shrine after the first dragon. Death keeps half your coins.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -389,6 +389,79 @@ body.bagging #dpsMeter{pointer-events:none}
 /* ========== CORE SETUP ========== */
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+/* ========== 0.18a: DEBUG FLAGS, ERROR LOG, RUN SEEDS ========== */
+// Developer-only tools. Nothing new is visible unless the page URL has ?debug=1.
+// Error counters and run seeds run silently for everyone (no gameplay or balance change).
+const LS_Q = (() => { try { return new URLSearchParams(location.search || ''); } catch (e) { return new URLSearchParams(''); } })();
+const DEBUG = LS_Q.get('debug') === '1';
+const DEBUG_DPS = DEBUG && LS_Q.get('dps') === '1';
+// 0.18a save versioning (declared here because the save is loaded before the SAVE section runs)
+const SAVE_VERSION = 4; // first versioned save; 0.17b and older saves have no saveV and migrate losslessly
+const SAVE_CORRUPT_KEY = 'laststand_save_corrupt_backup';
+let saveLoadInfo = { source: 'defaults', corrupt: [], from: null };
+let LS_SANDBOX = false; // 0.18a: true only while the DPS lab runs; persist() never writes then
+const LS_ERR = {};
+['update', 'draw', 'save', 'asset', 'state', 'other'].forEach(k => { LS_ERR[k] = { n: 0, last: '', at: 0 }; });
+function noteErr(cat, err, where) {
+  let t = 0;
+  try { t = elapsed; } catch (e) { t = 0; } // elapsed may not exist yet during boot
+  try {
+    const r = LS_ERR[cat] || LS_ERR.other;
+    r.n++;
+    const msg = err == null ? 'unknown' : (err.message || String(err));
+    r.last = ((where ? where + ': ' : '') + msg).slice(0, 180);
+    r.at = +t || 0;
+    if (DEBUG && (r.n <= 20 || r.n % 100 === 0)) console.error('[Last Stand ' + cat + ' #' + r.n + '] ' + r.last + (err && err.stack ? '\n' + err.stack : ''));
+  } catch (e) { /* the error log must never throw */ }
+}
+addEventListener('error', ev => {
+  const tg = ev && ev.target;
+  if (tg && tg !== window && tg.tagName) noteErr('asset', (tg.tagName || '') + ' failed to load', 'asset');
+  else noteErr('other', (ev && (ev.error || ev.message)) || 'error', 'window');
+}, true);
+addEventListener('unhandledrejection', ev => noteErr('other', ev && ev.reason, 'promise'));
+
+// Run seeds: one 6-digit seed per run drives separate mulberry32 streams, so a run can be replayed.
+// world = combat/AI rolls, spawn = what/where spawns, loot = chests/items/magnets, up = level-up offers,
+// event = Penance horn and Slayer tasks, map = obstacle layout. Cosmetic particles keep Math.random.
+let runSeed = 0, nextSeedOverride = null;
+const RNG_STREAMS = ['world', 'spawn', 'loot', 'up', 'event', 'map'];
+const rngState = { world: 1, spawn: 2, loot: 3, up: 4, event: 5, map: 6 };
+function mix32(a) {
+  a = (a + 0x6D2B79F5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return (t ^ (t >>> 14)) >>> 0;
+}
+function seedStreams(seed) {
+  seed = Math.abs(Math.floor(+seed || 0)) % 1000000;
+  runSeed = seed;
+  RNG_STREAMS.forEach((k, i) => { rngState[k] = mix32(Math.imul(seed + 1, 0x9E3779B1) ^ mix32(i * 7919 + 13)) | 0; });
+  return seed;
+}
+function rngNext(k) { // mulberry32 step on one named stream
+  const a = rngState[k] = (rngState[k] + 0x6D2B79F5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function rng() { return rngNext('world'); }
+function randIn(k, a, b) { return a + rngNext(k) * (b - a); }
+function frand(a, b) { return a + Math.random() * (b - a); } // cosmetic only (particles, screen shake, number jitter)
+function urlSeed() {
+  const s = LS_Q.get('seed');
+  if (s == null || !/^\d{1,9}$/.test(s)) return null;
+  return (+s) % 1000000;
+}
+function pickRunSeed() {
+  if (nextSeedOverride != null) { const s = nextSeedOverride; nextSeedOverride = null; return s; }
+  const u = urlSeed();
+  if (u != null) return u;
+  return 100000 + Math.floor(Math.random() * 900000);
+}
+function seedText(s) { return String(Math.abs(Math.floor(+s || 0)) % 1000000).padStart(6, '0'); }
+seedStreams(1);
+
 // 0.13a: clamp every arc/ellipse radius so a negative value can never throw IndexSizeError and freeze the loop.
 (function () {
   const proto = CanvasRenderingContext2D.prototype;
@@ -433,7 +506,7 @@ for (const k in ART_SRC) {
       g.fillStyle = '#fff';
       g.fillRect(0, 0, c.width, c.height);
       artFlash[k] = c;
-    } catch (err) { /* no flash sheet, the sprite still draws */ }
+    } catch (err) { noteErr('asset', err, 'flash sheet ' + k); /* no flash sheet, the sprite still draws */ }
     if (k === 'skeleton') try { // 0.7c: the cultist is the skeleton sheet dyed blue-violet (its own look, no extra download)
       const c2 = document.createElement('canvas');
       c2.width = img.naturalWidth; c2.height = img.naturalHeight;
@@ -445,7 +518,7 @@ for (const k in ART_SRC) {
       art.cultist = c2; artFlash.cultist = artFlash.skeleton; // same white silhouette for the hit flash
     } catch (err) { /* no cultist sheet: it draws as a blue circle */ }
   };
-  img.onerror = () => { img.failed = true; }; // 0.7a: fall back to shapes
+  img.onerror = () => { img.failed = true; noteErr('asset', 'sprite sheet ' + k + ' failed to load', 'sprites'); }; // 0.7a: fall back to shapes. 0.18a: counted
   img.src = ART_SRC[k];
   art[k] = img;
 }
@@ -1719,7 +1792,15 @@ for (const cls in TREES) TREES[cls].branches.forEach(br => br.nodes.forEach((n, 
   NODE[n[0]] = { id: n[0], name: n[1], icon: n[2], desc: n[3], apply: n[4] || null, bad: n[5] || '',
     cls, br, tier, cap: tier === 4, cost: TIER_COST[tier], gate: TIER_GATE[tier] };
 }));
-let save = migrateSave(loadSave()); // 0.8a: migration
+let save = (() => { // 0.8a: migration. 0.18a: a save that breaks migration is backed up and replaced, never fatal
+  try { return migrateSave(loadSave()); }
+  catch (e) {
+    noteErr('save', e, 'migrate');
+    try { const raw = localStorage.getItem('laststand_save_v3_test'); if (raw) backupCorruptSave('laststand_save_v3_test', raw); } catch (e2) {}
+    saveLoadInfo.corrupt.push('migrate');
+    return migrateSave(saveDefaults());
+  }
+})();
 
 /* Audio */
 /* 0.11b SFX: tiny Web Audio synth (no files, no libs). Retro / RuneScape-ish, soft on phone speakers. */
@@ -1931,29 +2012,66 @@ document.addEventListener('pointerdown', ev => {
 }, true);
 
 /* ========== SAVE ========== */
-function loadSave() {
+// 0.18a: versioned, validated save. Same localStorage keys as before ('laststand_save_v3_test' on the
+// test link, falling back to the main link's 'laststand_save_v3'). A save that will not parse is copied
+// to SAVE_CORRUPT_KEY (never deleted) and the game starts from the next good save or fresh defaults.
+// (SAVE_VERSION, SAVE_CORRUPT_KEY and saveLoadInfo live in the 0.18a core block: the save loads before this section runs)
+function saveDefaults() {
+  return { gold: 0, renown: 0, best: 0, bossTotal: 0, bossBest: 0, sk: { melee: 0, ranged: 0, magic: 0 },
+    shop: { hp: 0, arm: 0, boots: 0, mag: 0, coin: 0, dash: 0 }, tal: { might: 0, haste: 0, wis: 0, vit: 0 } };
+}
+function readSaveKey(key) {
+  let raw = null;
+  try { raw = localStorage.getItem(key); } catch (e) { noteErr('save', e, 'read ' + key); return { ok: false, missing: true }; }
+  if (raw == null || raw === '') return { ok: false, missing: true };
   try {
-    return Object.assign({
-      gold: 0, renown: 0, best: 0,
-      bossTotal: 0, bossBest: 0, // 0.6: King Black Dragon kills (old saves get 0)
-      sk: { melee: 0, ranged: 0, magic: 0 },
-      shop: { hp: 0, arm: 0, boots: 0, mag: 0, coin: 0, dash: 0 },
-      tal: { might: 0, haste: 0, wis: 0, vit: 0 }
-    }, JSON.parse(localStorage.getItem('laststand_save_v3_test') || localStorage.getItem('laststand_save_v3') || '{}'));
-  } catch (e) {
-    return { gold:0, renown:0, best:0, bossTotal:0, bossBest:0, sk:{melee:0,ranged:0,magic:0},
-      shop:{hp:0,arm:0,boots:0,mag:0,coin:0,dash:0}, tal:{might:0,haste:0,wis:0,vit:0} };
+    const o = JSON.parse(raw);
+    if (o && typeof o === 'object' && !Array.isArray(o)) return { ok: true, obj: o, raw };
+    noteErr('save', 'not an object (' + (Array.isArray(o) ? 'array' : typeof o) + ')', 'load ' + key);
+  } catch (e) { noteErr('save', e, 'parse ' + key); }
+  return { ok: false, corrupt: true, raw };
+}
+function backupCorruptSave(key, raw) {
+  try {
+    const prev = localStorage.getItem(SAVE_CORRUPT_KEY);
+    const rec = JSON.stringify({ key, at: new Date().toISOString(), raw: String(raw) });
+    if (prev && prev !== rec) {
+      let same = false;
+      try { same = JSON.parse(prev).raw === String(raw); } catch (e) {}
+      if (same) return;
+      localStorage.setItem(SAVE_CORRUPT_KEY + '_prev', prev);
+    }
+    localStorage.setItem(SAVE_CORRUPT_KEY, rec);
+  } catch (e) { noteErr('save', e, 'corrupt backup'); }
+}
+function loadSave() {
+  for (const key of ['laststand_save_v3_test', 'laststand_save_v3']) {
+    const r = readSaveKey(key);
+    if (r.ok) {
+      saveLoadInfo.source = key;
+      saveLoadInfo.from = (typeof r.obj.saveV === 'number') ? r.obj.saveV : 'pre-0.18a';
+      return Object.assign(saveDefaults(), r.obj);
+    }
+    if (r.corrupt) { saveLoadInfo.corrupt.push(key); backupCorruptSave(key, r.raw); }
   }
+  saveLoadInfo.source = 'defaults';
+  return saveDefaults();
 }
 // 0.8a: the merge above is shallow, so fill defaults per key (a new class like Fisher appears in old saves
 // automatically) and add the Mastery trees. Old saves keep all their banked renown. Unknown node ids are dropped.
 function migrateSave(s) {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) s = saveDefaults(); // 0.18a
   const num = v => (typeof v === 'number' && isFinite(v) && v >= 0) ? v : 0;
+  const cnt = (v, hi) => Math.min(hi, Math.floor(num(v))); // 0.18a: whole numbers in range
   s.gold = Math.round(num(s.gold)); s.renown = Math.floor(num(s.renown)); s.best = num(s.best);
-  const fill = (o, keys) => { o = (o && typeof o === 'object') ? o : {}; for (const k of keys) o[k] = num(o[k]); return o; };
+  s.bossTotal = cnt(s.bossTotal, 1e9); s.bossBest = cnt(s.bossBest, 1e6); // 0.18a: were unchecked
+  const fill = (o, keys) => { o = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; for (const k of keys) o[k] = num(o[k]); return o; };
   s.sk = fill(s.sk, Object.keys(TREES));
   s.shop = fill(s.shop, ['hp', 'arm', 'boots', 'mag', 'coin', 'dash']);
   s.tal = fill(s.tal, ['might', 'haste', 'wis', 'vit']);
+  const SHOP_MAX = { hp: 12, arm: 12, boots: 10, mag: 8, coin: 10, dash: 8 }; // 0.18a: same caps as the SHOP table
+  for (const k in SHOP_MAX) s.shop[k] = cnt(s.shop[k], SHOP_MAX[k]);
+  for (const k of ['might', 'haste', 'wis', 'vit']) s.tal[k] = cnt(s.tal[k], 12);
   const old = (s.tree && typeof s.tree === 'object') ? s.tree : {};
   const bump = s.treeV !== undefined && s.treeV !== TREE_V && Object.keys(old).length > 0; // tree layout changed
   s.tree = {};
@@ -1966,8 +2084,9 @@ function migrateSave(s) {
   }
   if (bump) { s.renown += refund; s.treeRefund = refund; } // a toast tells the player once the menu is up
   s.treeV = TREE_V;
-  s.chestsTotal = num(s.chestsTotal);
+  s.chestsTotal = cnt(s.chestsTotal, 1e9);
   s.shopSpent = num(s.shopSpent);
+  if (s.treeRefund !== undefined) s.treeRefund = num(s.treeRefund); // 0.18a
   s.hunterQuest = !!s.hunterQuest;
   // 0.14a: stash is a persistent 2-slot trunk. Sanitize without touching ITEMS (it is declared later).
   if (!Array.isArray(s.stash)) s.stash = [];
@@ -1978,12 +2097,21 @@ function migrateSave(s) {
   });
   if (!Array.isArray(s.stashWear)) s.stashWear = [];
   s.stashWear = s.stashWear.filter(slot => typeof slot === 'string').slice(0, STASH_SLOTS);
+  s.saveV = SAVE_VERSION; // 0.18a: unknown keys are kept as-is (lossless for older saves)
   return s;
 }
 function persist() {
-  if (typeof sanitizeStash === 'function') sanitizeStash();
-  if (save) save.gold = toGold(save.gold);
-  localStorage.setItem('laststand_save_v3_test', JSON.stringify(save));
+  if (LS_SANDBOX) return; // 0.18a: the developer DPS lab never writes the real save
+  try {
+    if (typeof sanitizeStash === 'function') sanitizeStash();
+    if (save) {
+      save.gold = toGold(save.gold);
+      for (const k of ['renown', 'best', 'bossTotal', 'bossBest', 'chestsTotal', 'shopSpent'])
+        if (save[k] !== undefined && !(typeof save[k] === 'number' && isFinite(save[k]))) { noteErr('save', k + ' was ' + save[k], 'persist'); save[k] = 0; }
+      save.saveV = SAVE_VERSION;
+    }
+    localStorage.setItem('laststand_save_v3_test', JSON.stringify(save));
+  } catch (err) { noteErr('save', err, 'persist'); } // 0.18a: full storage / private mode must not end the run
 }
 
 /* ========== RESIZE ========== */
@@ -2219,7 +2347,7 @@ function start(k) {
   ensureAudio();
   player = newPlayer();
   // 0.7b: new obstacle layout every run, with a clear area around the start
-  propSeed = (Math.random() * 2147483647) | 0; campX = player.x; campY = player.y; propCache.clear();
+  seedStreams(pickRunSeed()); propSeed = (rngNext('map') * 2147483647) | 0; // 0.18a: run seed campX = player.x; campY = player.y; propCache.clear();
   k = k || 'melee';
   applyStyle(k);
 
@@ -2338,7 +2466,7 @@ function start(k) {
   decoys = []; firePools = []; woodLogs = []; fires = []; thralls = []; traps = []; // 0.8b / 0.11a
   eventInvite = null; eventFight = null; renownEvent = 0; penanceBuff = 0; penanceDmg = 1;
   waveResumeIn = 0; wavePoofs = [];
-  nextEventAt = 75 + Math.random() * 15; // 0.9a: first horn ~75–90s
+  nextEventAt = 75 + rngNext('event') * 15; // 0.9a: first horn ~75–90s
   bossNext = BOSS_EVERY; bossWarned = false; bossWarnAt = 0;
   showBossBar(false);
   runId++; // 0.4: new run id (old Barrage timers will see a mismatch and do nothing)
@@ -2735,7 +2863,7 @@ function toast(s) {
   clearTimeout(toast.t);
   toast.t = setTimeout(() => $('toast').style.display = 'none', 1400);
 }
-function rand(a, b) { return a + Math.random() * (b - a); }
+function rand(a, b) { return a + rng() * (b - a); } // 0.18a: seeded 'world' stream (frand = cosmetic)
 function fmt(s) { return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'); }
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
@@ -2761,7 +2889,7 @@ function eventParams(tier) {
   return { cap: 20, burst: 10, gap: 1.0, refill: 17, mix: [0.50, 0.15, 0.18, 0.12, 0.05] }; // 0.9a tune: fewer rangers late
 }
 function pickPenanceKind(mix) {
-  let r = Math.random(), a = 0;
+  let r = rngNext('event'), a = 0;
   const kinds = [0, 0, 1, 2, 3]; // fighter=goblin, runner=goblin, ranger=skel, brute=giant, elite=ogre
   for (let i = 0; i < mix.length; i++) { a += mix[i]; if (r < a) return { role: i, kind: kinds[i] }; }
   return { role: 0, kind: 0 };
@@ -2781,7 +2909,7 @@ function poofWaveEnemy(e) {
       life: 0.32 + Math.random() * 0.12, color: e.color || '#c8b8a0', size: 4 });
   }
   for (let i = 0; i < 3; i++) {
-    particles.push({ x: e.x + rand(-8, 8), y: e.y, vx: rand(-18, 18), vy: -50 - Math.random() * 30,
+    particles.push({ x: e.x + frand(-8, 8), y: e.y, vx: frand(-18, 18), vy: -50 - Math.random() * 30,
       life: 0.4, color: '#e8e0d0', size: 5 });
   }
   e.hp = 0; e.dead = true; e.waveDespawn = true;
@@ -2818,8 +2946,8 @@ function drawWavePoofs() {
 function spawnPenanceOne(roleKind, ang) {
   const kind = roleKind.kind, role = roleKind.role;
   const data = ENEMY_KINDS[kind];
-  const a = ang != null ? ang : rand(0, Math.PI * 2);
-  const distSpawn = 180 + Math.random() * 60;
+  const a = ang != null ? ang : randIn('event', 0, Math.PI * 2);
+  const distSpawn = 180 + rngNext('event') * 60;
   let x = player.x + Math.cos(a) * distSpawn, y = player.y + Math.sin(a) * distSpawn;
   // nudge out of solids
   if (typeof hitsSolid === 'function' && hitsSolid(x, y, 20)) {
@@ -2835,9 +2963,9 @@ function spawnPenanceOne(roleKind, ang) {
   const tint = role === 1 ? '#d08040' : role === 2 ? '#c89090' : role === 3 ? '#a05040' : role === 4 ? '#8b3030' : '#b85a3a';
   const e = {
     x, y, ...data,
-    kind, side: Math.random() < 0.5 ? -1 : 1,
+    kind, side: rngNext('event') < 0.5 ? -1 : 1,
     maxHp: data.hp, hp: data.hp, hit: 0, slow: 0,
-    cd: rand(0.4, 1.2), windup: 0, windT: 0, slamT: 0, losT: 0, los: false,
+    cd: randIn('event', 0.4, 1.2), windup: 0, windT: 0, slamT: 0, losT: 0, los: false,
     dead: false, penance: true, color: tint, name: 'Penance ' + (['Fighter','Runner','Ranger','Brute','Ogre'][role] || 'Fighter')
   };
   if (role === 1) { // runner: faster, squishier
@@ -2861,9 +2989,9 @@ function canSpawnEventInvite() {
   return true;
 }
 function spawnEventInvite() {
-  const a = rand(0, Math.PI * 2);
-  let x = player.x + Math.cos(a) * (140 + Math.random() * 40);
-  let y = player.y + Math.sin(a) * (140 + Math.random() * 40);
+  const a = randIn('event', 0, Math.PI * 2);
+  let x = player.x + Math.cos(a) * (140 + rngNext('event') * 40);
+  let y = player.y + Math.sin(a) * (140 + rngNext('event') * 40);
   if (typeof hitsSolid === 'function' && hitsSolid(x, y, 26)) {
     for (let r = 20; r <= 160; r += 20) {
       let ok = false;
@@ -2919,7 +3047,7 @@ function payoutPenance(cleared) {
   if (cleared) {
     // 0.9c: preserve clear reward as the existing buff/coin fallback, not a chest source.
     const keys4 = Object.keys(BUFFS);
-    const k = keys4[Math.floor(Math.random() * keys4.length)];
+    const k = keys4[Math.floor(rngNext('loot') * keys4.length)];
     buffs[k] = buffs[k] > 0 ? Math.min(BUFF_MAX, buffs[k] + BUFF_TIME) : BUFF_TIME;
     addRunGold(Math.round(18 * power));
     banner('📯 Swarm cleared!', '+' + coins + ' coins · +' + ren + ' renown · bonus buff/coins · adrenaline', 3.2);
@@ -2943,7 +3071,7 @@ function endPenanceFight(flee) {
   eventFight = null;
   spawnClock = 0;
   waveResumeIn = 0.85; // no backlog spike when normal waves return
-  nextEventAt = elapsed + 90 + Math.random() * 30;
+  nextEventAt = elapsed + 90 + rngNext('event') * 30;
 }
 function updateEvents(dt) {
   if (!playing || paused) return;
@@ -2952,7 +3080,7 @@ function updateEvents(dt) {
     eventInvite.life -= dt;
     if (eventInvite.life <= 0) {
       eventInvite = null;
-      nextEventAt = elapsed + 90 + Math.random() * 30;
+      nextEventAt = elapsed + 90 + rngNext('event') * 30;
     } else if (!leveling && dist(eventInvite, player) < eventInvite.r + player.r) {
       triggerPenanceSwarm();
     } else if (window.__evPol === 'trigger' && !leveling) { // bot/test: always take the horn
@@ -3055,7 +3183,7 @@ function mergeTrashPack() {
   enemies = enemies.filter(e => !e._merged);
   enemies.push({
     x, y, ...data,
-    kind: 3, side: Math.random() < 0.5 ? -1 : 1,
+    kind: 3, side: rng() < 0.5 ? -1 : 1,
     name: 'Elite pack', color: '#a03a28', elite: true, merged: true,
     hp, maxHp: Math.max(1, Math.round(hp)),
     damage: Math.max(ogreTouch, touch * 1.25),
@@ -3081,16 +3209,16 @@ function maybeMergePacks(dt) {
   capHold = mergeTrashPack() ? 0 : MERGE_HOLD * 0.4;
 }
 function spawn(forceElite = false) {
-  const a = rand(0, Math.PI * 2);
+  const a = randIn('spawn', 0, Math.PI * 2);
   const distSpawn = Math.max(W, H) * 0.58 + 60;
   const x = player.x + Math.cos(a) * distSpawn;
   const y = player.y + Math.sin(a) * distSpawn;
 
   let t = 0;
-  if (elapsed > 180) t = Math.random() < 0.18 ? 3 : (Math.random() < 0.35 ? 2 : (Math.random() < 0.45 ? 1 : 0));
-  else if (elapsed > 110) t = Math.random() < 0.28 ? 2 : (Math.random() < 0.4 ? 1 : 0);
-  else if (elapsed > 50) t = Math.random() < 0.32 ? 1 : 0;
-  if (elapsed > 110 && t !== 3 && Math.random() < 0.13) t = 4; // 0.7c: cultists join from 1:50
+  if (elapsed > 180) t = rngNext('spawn') < 0.18 ? 3 : (rngNext('spawn') < 0.35 ? 2 : (rngNext('spawn') < 0.45 ? 1 : 0));
+  else if (elapsed > 110) t = rngNext('spawn') < 0.28 ? 2 : (rngNext('spawn') < 0.4 ? 1 : 0);
+  else if (elapsed > 50) t = rngNext('spawn') < 0.32 ? 1 : 0;
+  if (elapsed > 110 && t !== 3 && rngNext('spawn') < 0.13) t = 4; // 0.7c: cultists join from 1:50
   t = newSpawnKind(t); // 0.16a: Charger from 6:00, Dark Wizard from 9:00 (no extra random calls before 6:00)
 
   if (forceElite) t = 3;
@@ -3102,7 +3230,7 @@ function spawn(forceElite = false) {
   enemies.push({
     x, y, ...data,
     kind: t, // 0.7a: which sprite sheet to use
-    side: Math.random() < 0.5 ? -1 : 1, // 0.7b: preferred side for walking round obstacles
+    side: rngNext('spawn') < 0.5 ? -1 : 1, // 0.7b: preferred side for walking round obstacles
     maxHp: hp, hp,
     damage: data.damage * sc.dmg,
     dmg: Math.max(1, Math.round(data.dmg * sc.dmg)),
@@ -3110,12 +3238,12 @@ function spawn(forceElite = false) {
     gold: Math.max(1, Math.round(data.gold * sc.xp)),
     hit: 0,
     slow: 0,
-    cd: rand(0.6, 1.6), windup: 0, windT: 0, slamT: 0, losT: 0, los: false, // 0.7c: attack state
+    cd: randIn('spawn', 0.6, 1.6), windup: 0, windT: 0, slamT: 0, losT: 0, los: false, // 0.7c: attack state
     dead: false
   });
   if (t === 5 && elapsed >= 2700 && enemies.length < LIVE_CAP) { // 0.16a: 45:00+ chargers come in pairs
     const last = enemies[enemies.length - 1];
-    enemies.push(Object.assign({}, last, { x: last.x + rand(-70, 70), y: last.y + rand(-70, 70), cs: 0, cd: last.cd + 0.4 }));
+    enemies.push(Object.assign({}, last, { x: last.x + randIn('spawn', -70, 70), y: last.y + randIn('spawn', -70, 70), cs: 0, cd: last.cd + 0.4 }));
   }
 }
 
@@ -3144,7 +3272,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
     }
   }
 
-  splatAt(e.x + rand(-8, 8), e.y - e.r - 6, d, isCrit ? 'crit' : (dot ? 'dot' : 'hit'));
+  splatAt(e.x + frand(-8, 8), e.y - e.r - 6, d, isCrit ? 'crit' : (dot ? 'dot' : 'hit'));
 
   if (e.hp <= 0 && !e.dead) {
     e.dead = true;
@@ -3158,7 +3286,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
       for (const o of enemies) { if (o === e || o.hp <= 0 || o.burn > 0) continue; const od = dist(o, e); if (od < bd) { bd = od; best = o; } }
       if (best) { best.burn = 3; best.burnDps = e.burnDps; best.burnTick = 0.5; window.__spreads = (window.__spreads || 0) + 1; }
     }
-    if (M.pyroC && Math.random() < 0.35) firePools.push({ x: e.x, y: e.y, r: 65, life: 2.5, dps: wDmg() * 0.40, tick: 0.25 });
+    if (M.pyroC && rng() < 0.35) firePools.push({ x: e.x, y: e.y, r: 65, life: 2.5, dps: wDmg() * 0.40, tick: 0.25 });
     if (e.freezeT > 0 && M.iceC) {
       const sd = Math.round(wDmg() * 0.5);
       for (const o of enemies) if (o !== e && o.hp > 0 && dist(o, e) < 60) hurt(o, sd, false, true, 'dot');
@@ -3170,7 +3298,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
       addRunGold(c);
       floats.push({ x: e.x, y: e.y - 20, text: '👜 +' + c + ' ◆', life: 0.7, vy: -34, color: '#ffd24a' });
     }
-    if (player.style === 'firemaker' && M.kindle4 && (e.burn > 0) && Math.random() < 0.40)
+    if (player.style === 'firemaker' && M.kindle4 && (e.burn > 0) && rng() < 0.40)
       spawnFire(e.x, e.y, fireRadius(22), fireLifetime(1.6), fireDpsMul(0.18));
 
     atkNoteKill(e); // 0.17a: Necromancer corpses
@@ -3193,7 +3321,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
     for (let i = 0; i < (e.elite ? 10 : 5); i++) {
       particles.push({
         x: e.x, y: e.y,
-        vx: rand(-70, 70), vy: rand(-70, 70),
+        vx: frand(-70, 70), vy: frand(-70, 70),
         life: 0.4 + Math.random() * 0.25,
         color: e.color, size: e.elite ? 4 : 3
       });
@@ -3267,12 +3395,12 @@ function attack() {
       if (player.javelinVuln && ((e.root || 0) > 0 || (e.slow || 0) > 0)) d = Math.round(d * (1 + player.javelinVuln));
     }
 
-    let isCrit = Math.random() < (player.crit || 0);
+    let isCrit = rng() < (player.crit || 0);
     if (bolt && ti === 0) isCrit = true;
     // 0.11a Thief: pickpocket extra crit, guaranteed blackjack crit, post-stealth backstab
     if (player.style === 'thief' && ti === 0) {
       const extra = 0.12 + (M.pocket2 ? 0.08 : 0);
-      if (!isCrit && Math.random() < extra) isCrit = true;
+      if (!isCrit && rng() < extra) isCrit = true;
       if (M.jackC && player.hitN % 5 === 0) isCrit = true;
       if (player.stealth > 0 || player.backstab > 0) {
         isCrit = true;
@@ -3328,7 +3456,7 @@ function attack() {
         else { e.freezeT = e.elite ? 0.6 : 1.2; e.windup = 0; }
       }
     }
-    const doReel = (M.harp3 && Math.random() < 0.30) || (M.harp4 && isCrit) || spike || (player.hookCard && player.style === 'fisher');
+    const doReel = (M.harp3 && rng() < 0.30) || (M.harp4 && isCrit) || spike || (player.hookCard && player.style === 'fisher');
     if (doReel && ti === 0 && e.hp > 0 && !e.boss) {
       const dd = dist(e, player) || 1;
       e.x -= (e.x - player.x) / dd * 45; e.y -= (e.y - player.y) / dd * 45;
@@ -3366,15 +3494,15 @@ function attack() {
       }
     }
     if (ti === 0 && player.style === 'woodcutter') {
-      if (M.cleave3 && !e.boss && e.hp > 0 && Math.random() < 0.20) {
+      if (M.cleave3 && !e.boss && e.hp > 0 && rng() < 0.20) {
         const dd = dist(e, player) || 1;
         e.x += (e.x - player.x) / dd * 40; e.y += (e.y - player.y) / dd * 40;
       }
-      if (M.cleave4 && Math.random() < 0.20 && e.hp > 0) hurt(e, Math.round(d * 0.60), false);
+      if (M.cleave4 && rng() < 0.20 && e.hp > 0) hurt(e, Math.round(d * 0.60), false);
       if (M.cleaveC && player.hitN % 5 === 0) {
         for (const o of enemies) if (o.hp > 0 && dist(o, player) < 90) hurt(o, Math.round(wDmg() * 1.80), o === e ? isCrit : false);
       }
-      if (M.forest3 && e.hp <= 0 && Math.random() < 0.10) {
+      if (M.forest3 && e.hp <= 0 && rng() < 0.10) {
         const c = Math.max(1, Math.round(6 * coinMul()));
         addRunGold(c);
         floats.push({ x: e.x, y: e.y - 18, text: '🪺 +' + c, life: 0.7, vy: -34, color: '#ffd24a' });
@@ -3383,7 +3511,7 @@ function attack() {
     if (ti === 0 && player.style === 'firemaker') {
       if (e.hp > 0) { e.burn = Math.max(e.burn || 0, 2); e.burnDps = Math.max(e.burnDps || 0, wDmg() * 0.10); if (!(e.burnTick > 0)) e.burnTick = 0.5; }
       const chance = 0.15 + (player.fireChance || 0);
-      if (Math.random() < chance) spawnFire(e.x, e.y, fireRadius(28), fireLifetime(2.0), fireDpsMul(0.20));
+      if (rng() < chance) spawnFire(e.x, e.y, fireRadius(28), fireLifetime(2.0), fireDpsMul(0.20));
     }
 
     // 0.9b Fisher: harpoon pierces 2 more in a line (65%) + small splash (35% in 38px) so basics clear a packed slow-blob
@@ -3483,7 +3611,7 @@ function doDash() {
   if (player.m && player.m.scoutC) player.trapArmed = 1;
   sfx('dash');
   for (let i = 0; i < 6; i++) {
-    particles.push({ x: player.x, y: player.y, vx: rand(-40, 40), vy: rand(-40, 40), life: 0.25, color: '#c8e0b0', size: 3 });
+    particles.push({ x: player.x, y: player.y, vx: frand(-40, 40), vy: frand(-40, 40), life: 0.25, color: '#c8e0b0', size: 3 });
   }
 }
 
@@ -3532,7 +3660,7 @@ function doSpecial() {
         if (e.hp <= 0) return;
         const d = Math.round(player.damage * 0.95);
         shots.push({ x: player.x, y: player.y, tx: e.x, ty: e.y, life: 0.12, col: '#b8ff9a', thick: 3, shape: 'ranged' });
-        hurt(e, d, Math.random() < 0.25, false, 'special');
+        hurt(e, d, rng() < 0.25, false, 'special');
       }, i * 55);
     });
   } else if (player.style === 'fisher') { // 0.8b Cast Net / Rare Fishing Spot
@@ -3656,7 +3784,7 @@ function thiefBlackjack(e, isCrit) {
   if (!e || e.hp <= 0) return;
   const forced = M.jackC && player.hitN % 5 === 0;
   const chance = 0.12 + (M.jack1 ? 0.10 : 0) + (player.jackChance || 0);
-  if (!forced && Math.random() >= chance) return;
+  if (!forced && rng() >= chance) return;
   if (e.boss) { e.slow = Math.max(e.slow || 0, 0.5); return; }
   const dur = (M.jackC && forced ? 1.4 : (M.jack2 ? 1.1 : 0.65)) + (player.jackTime || 0);
   e.freezeT = Math.max(e.freezeT || 0, dur);
@@ -3773,7 +3901,7 @@ function timberSlam() {
     spawnLog(player.x + ux * t, player.y + uy * t, rad, life);
   }
   for (let i = 0; i < 16; i++) {
-    particles.push({ x: player.x + ux * 30, y: player.y + uy * 30, vx: ux * 80 + rand(-40, 40), vy: uy * 80 + rand(-40, 40), life: 0.4, color: '#8a6a3a', size: 5 });
+    particles.push({ x: player.x + ux * 30, y: player.y + uy * 30, vx: ux * 80 + frand(-40, 40), vy: uy * 80 + frand(-40, 40), life: 0.4, color: '#8a6a3a', size: 5 });
   }
   floats.push({ x: player.x + ux * 40, y: player.y + uy * 40 - 16, text: '🌲 Timber!', life: 0.8, vy: -30, color: '#c4a06a' });
   fxBurst('timber', player.x, player.y, reach, { ang });
@@ -3889,7 +4017,7 @@ const SLAYER_TASKS = [
 ];
 function rollSlayerTask() {
   const pool = SLAYER_TASKS;
-  let pick = pool[Math.floor(Math.random() * pool.length)];
+  let pick = pool[Math.floor(rngNext('event') * pool.length)];
   if (player.slayerTask && pick.kind === player.slayerTask.kind)
     pick = pool[(pool.indexOf(pick) + 1) % pool.length];
   let need = pick.n;
@@ -3956,12 +4084,12 @@ function trimThralls() {
   }
 }
 function summonThrall() {
-  const k = THRALL_KINDS[Math.floor(Math.random() * THRALL_KINDS.length)];
+  const k = THRALL_KINDS[Math.floor(rng() * THRALL_KINDS.length)];
   let life = 6;
   if (player.m && player.m.thrall2) life = 9;
   if (player.m && player.m.soulC) life += 2;
   life += (player.itemThrallLife || 0) + (player.thrallLifeCard || 0);
-  const ang = Math.random() * Math.PI * 2;
+  const ang = rng() * Math.PI * 2;
   // 0.11d: thrall HP scales with run time after the first minute (giants/elites otherwise melt a fixed 28–48 HP).
   // Mul = 1 + max(0, elapsed-60)/180  →  1.00 @1:00, 1.67 @3:00, 2.33 @5:00, 3.33 @8:00, 4.00 @10:00
   const hp = Math.max(1, Math.round(k.hp * (1 + Math.max(0, elapsed - 60) / 180)));
@@ -4096,7 +4224,7 @@ function tryCraftRunes() {
   const types = ['air', 'fire', 'law', 'death'];
   while ((player.essence || 0) >= cost) {
     player.essence -= cost;
-    const r = types[Math.floor(Math.random() * types.length)];
+    const r = types[Math.floor(rng() * types.length)];
     player.runes[r] = (player.runes[r] || 0) + 1;
     if (player.m && player.m.essC) player.runes.law = (player.runes.law || 0) + 1;
   }
@@ -4125,7 +4253,7 @@ function runeBlink() {
   player.dashIframes = Math.max(player.dashIframes, 0.18);
   player.invuln = Math.max(player.invuln, 0.18);
   for (let i = 0; i < 8; i++) {
-    particles.push({ x: player.x, y: player.y, vx: rand(-50, 50), vy: rand(-50, 50), life: 0.25, color: '#7ec8e8', size: 3 });
+    particles.push({ x: player.x, y: player.y, vx: frand(-50, 50), vy: frand(-50, 50), life: 0.25, color: '#7ec8e8', size: 3 });
   }
   return true;
 }
@@ -4308,7 +4436,7 @@ function itemDef(id) { return ITEMS[id] || ITEMS[id && id.id] || null; }
 function itemClone(id, qty) { return { id: typeof id === 'string' ? id : id.id, qty: qty || 1 }; }
 
 function rollItemTier(royal) {
-  const t = elapsed, r = Math.random();
+  const t = elapsed, r = rngNext('loot');
   if (royal) {
     if (r < 0.20) return 'uncommon';
     if (r < 0.75) return 'rare';
@@ -4333,7 +4461,7 @@ function rollItemTier(royal) {
 function rollItem(royal) {
   const tier = rollItemTier(royal);
   const pool = ITEM_POOL[tier];
-  const id = pool[Math.floor(Math.random() * pool.length)];
+  const id = pool[Math.floor(rngNext('loot') * pool.length)];
   return itemClone(id, 1);
 }
 
@@ -4844,7 +4972,7 @@ function maybeDropMagnet(e) {
   // 0.13a: a pure low-chance roll on a kill. No timer or schedule.
   if (!e || e.boss || e.penance || e.penanceFlee) return false;
   const chance = e.elite ? MAGNET_ELITE_CHANCE : MAGNET_CHANCE;
-  if (Math.random() >= chance) return false;
+  if (rngNext('loot') >= chance) return false;
   magnets.push({ x: e.x, y: e.y, t: Math.random() * 6, r: 16 });
   return true;
 }
@@ -4856,7 +4984,7 @@ function triggerMagnet(m) {
   sfx('pickup');
   shake = Math.max(shake, 0.18);
   for (let i = 0; i < 18; i++) {
-    const a = i / 18 * 6.283, v = rand(60, 180);
+    const a = i / 18 * 6.283, v = frand(60, 180);
     particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.45, color: i % 2 ? '#7ae0ff' : '#ffd24a', size: 4 });
   }
 }
@@ -4918,7 +5046,7 @@ function dropChest(x, y, royal) {
 }
 const TIMED_CHEST_ROLLS = 4; // 0.9c: old 15.92 opens/run vs minute-chest pilot 4.00; 4 rolls ≈ old total loot
 function spawnMinuteChest() {
-  const a = Math.random() * Math.PI * 2;
+  const a = rngNext('loot') * Math.PI * 2;
   return dropChest(player.x + Math.cos(a) * 220, player.y + Math.sin(a) * 220);
 }
 
@@ -5209,14 +5337,14 @@ function openChest(c, force, extraRoll) {
   if (!extraRoll) sfx('chest');
   shake = Math.max(shake, 0.2);
   for (let i = 0; i < 26; i++) {
-    const a = Math.random() * Math.PI * 2, v = rand(60, 190);
+    const a = Math.random() * Math.PI * 2, v = frand(60, 190);
     particles.push({ x: c.x, y: c.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
       life: 0.5 + Math.random() * 0.4, color: Math.random() < 0.7 ? '#ffd24a' : '#fff3b0', size: 4 });
   }
   // 0.10a: 25% item, 25% upgrade, 30% spike, 15% treasure, 5% Phoenix. Royal still pays upgrade+spike, plus a rare+ item.
   let kind = force || (c.royal ? 'royal' : null); // 0.6: boss chest = guaranteed good loot
   if (!kind) {
-    const r = Math.random();
+    const r = rngNext('loot');
     kind = r < 0.25 ? 'item' : r < 0.50 ? 'upgrade' : r < 0.80 ? 'spike' : r < 0.95 ? 'treasure' : 'phoenix';
   }
   if (kind === 'phoenix' && phoenix) kind = 'spike'; // already holding one: give a spike instead
@@ -5273,13 +5401,13 @@ function giveFreeUpgrade() {
   const pool = upgrades.filter(u => (!u[3] || u[3] === player.style) &&
     u[0] !== 'Eat a lobster' &&
     !(u[0] === 'Berserker' && player.berserk) && !(u[0] === 'Ice barrage' && player.freeze));
-  const u = pool[Math.floor(Math.random() * pool.length)];
+  const u = pool[Math.floor(rngNext('loot') * pool.length)];
   try { u[2](player); applyStyle(player.style); } catch (err) {} // applyStyle keeps the range cap
   return u;
 }
 function giveSpike(k) {
   const keys4 = Object.keys(BUFFS);
-  if (!k) k = keys4[Math.floor(Math.random() * keys4.length)];
+  if (!k) k = keys4[Math.floor(rngNext('loot') * keys4.length)];
   buffs[k] = buffs[k] > 0 ? Math.min(BUFF_MAX, buffs[k] + BUFF_TIME) : BUFF_TIME;
   return k;
 }
@@ -5396,7 +5524,7 @@ function separate() {
           const d2 = dx * dx + dy * dy;
           if (d2 >= min * min) continue;
           let d = Math.sqrt(d2);
-          if (d < 0.01) { const a = Math.random() * 6.283; dx = Math.cos(a); dy = Math.sin(a); d = 1; }
+          if (d < 0.01) { const a = rng() * 6.283; dx = Math.cos(a); dy = Math.sin(a); d = 1; }
           const push = (min - d) * SEP_STRENGTH / d;
           const me = e.r * e.r, mo = o.r * o.r, tot = me + mo;
           e.x -= dx * push * (mo / tot); e.y -= dy * push * (mo / tot); // bigger o = e moves more
@@ -5485,7 +5613,7 @@ function bossHitPlayer(d) {
   player.hp -= dmg;
   sfx('hurt');
   shake = Math.max(shake, 0.3);
-  splatAt(player.x + rand(-6, 6), player.y - 22, dmg, 'hurt');
+  splatAt(player.x + frand(-6, 6), player.y - 22, dmg, 'hurt');
   return true;
 }
 
@@ -5503,7 +5631,7 @@ function enemyHitPlayer(d, src) {
   sfx('hurt');
   player.invuln = Math.max(player.invuln, HIT_MERCY);
   shake = Math.max(shake, 0.22);
-  splatAt(player.x + rand(-6, 6), player.y - 22, dmg, 'hurt');
+  splatAt(player.x + frand(-6, 6), player.y - 22, dmg, 'hurt');
   return true;
 }
 // is a world point on screen (m = extra margin)? Enemies only start attacks you can see.
@@ -5584,13 +5712,13 @@ function updateBolts(dt) {
     const col = b.kind === 'magic' ? ATK_COL.magic : ATK_COL.bone;
     if (hitsSolid(b.x, b.y, b.r)) { // obstacles soak up enemy shots
       b.life = 0; b.wall = true;
-      for (let i = 0; i < 4; i++) particles.push({ x: b.x, y: b.y, vx: rand(-60, 60), vy: rand(-60, 60), life: 0.25, color: col, size: 3 });
+      for (let i = 0; i < 4; i++) particles.push({ x: b.x, y: b.y, vx: frand(-60, 60), vy: frand(-60, 60), life: 0.25, color: col, size: 3 });
       continue;
     }
     if (Math.hypot(player.x - b.x, player.y - b.y) < player.r * 0.8 + b.r) {
       b.life = 0; b.done = true; // a dash (or Phoenix) through it makes it fizzle harmlessly
       if (!enemyHitPlayer(b.dmg) && player.invuln > HIT_MERCY) dodged(); // 0.8a: dashed through it
-      for (let i = 0; i < 5; i++) particles.push({ x: b.x, y: b.y, vx: rand(-70, 70), vy: rand(-70, 70), life: 0.3, color: col, size: 3 });
+      for (let i = 0; i < 5; i++) particles.push({ x: b.x, y: b.y, vx: frand(-70, 70), vy: frand(-70, 70), life: 0.3, color: col, size: 3 });
     }
   }
   // 0.8a Evasion: a shot that flew out (not into a wall) after passing within 40px of you
@@ -5622,7 +5750,7 @@ function updateBoss(dt) {
       if (f.blocked) floats.push({ x: f.tx, y: f.ty - 14, text: 'blocked', life: 0.7, vy: -30, color: '#ffd9a0' }); // 0.7b
       else if (Math.hypot(player.x - f.tx, player.y - f.ty) < FB_R + player.r * 0.5) bossHitPlayer(FB_DMG * f.s);
       for (let i = 0; i < 12; i++) {
-        const a = Math.random() * 6.283, v = rand(40, 140);
+        const a = Math.random() * 6.283, v = frand(40, 140);
         particles.push({ x: f.tx, y: f.ty, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.45,
           color: Math.random() < 0.5 ? '#ff6a2a' : '#ffd24a', size: 4 });
       }
@@ -5667,7 +5795,7 @@ function updateBoss(dt) {
     if (a.phase === 'fire') {
       // flames along the cone
       for (let i = 0; i < 5; i++) {
-        const ang = a.ang + rand(-BREATH_HALF, BREATH_HALF), v = rand(200, 420);
+        const ang = a.ang + frand(-BREATH_HALF, BREATH_HALF), v = frand(200, 420);
         particles.push({ x: b.x + Math.cos(ang) * b.r, y: b.y + Math.sin(ang) * b.r,
           vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, life: 0.5,
           color: Math.random() < 0.5 ? '#ff5a1e' : '#ffc23a', size: 5 });
@@ -5712,7 +5840,7 @@ function bossDefeated(e) {
   dropChest(e.x, e.y, true); // 0.9c: immediate royal reward, walkable ground
   if (bossesSlain === 1) spawnExtractShrine(e.x, e.y);
   for (let i = 0; i < 60; i++) {
-    const a = Math.random() * 6.283, v = rand(60, 260);
+    const a = Math.random() * 6.283, v = frand(60, 260);
     particles.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.6 + Math.random() * 0.5,
       color: i % 3 === 0 ? '#ffd24a' : (i % 3 === 1 ? '#ff5a2a' : '#3a3446'), size: 5 });
   }
@@ -6008,7 +6136,7 @@ function pickUpgradesBase() {
   const shuffle = arr => {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(rngNext('up') * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
@@ -6074,7 +6202,7 @@ const NEW_SPAWNS = [
 ];
 function newSpawnKind(t) {
   if (elapsed < 360 || t === 3) return t;          // before 6:00 or an elite roll: unchanged
-  const r = Math.random();
+  const r = rngNext('spawn');
   let acc = 0;
   for (const s of NEW_SPAWNS) {
     let w = 0;
@@ -6142,7 +6270,7 @@ function wizardAct(e, ed, dt) {
       const a = Math.atan2(dy, dx) + (k ? rand(-1.2, 1.2) : 0);
       const nx = e.x + Math.cos(a) * MARKS.blink, ny = e.y + Math.sin(a) * MARKS.blink;
       if (!hitsSolid(nx, ny, e.r)) {
-        for (let i = 0; i < 8; i++) particles.push({ x: e.x, y: e.y, vx: rand(-80, 80), vy: rand(-80, 80), life: 0.3, color: '#b77aff', size: 3 });
+        for (let i = 0; i < 8; i++) particles.push({ x: e.x, y: e.y, vx: frand(-80, 80), vy: frand(-80, 80), life: 0.3, color: '#b77aff', size: 3 });
         e.x = nx; e.y = ny; break;
       }
     }
@@ -6170,7 +6298,7 @@ function castMarks(e) {
     }
     wizMarks.push({ x, y, r: MARKS.r, t: MARKS.fill + i * 0.12, T: MARKS.fill + i * 0.12, dmg, lead: i === 0 });
   }
-  for (let i = 0; i < 6; i++) particles.push({ x: e.x, y: e.y - e.r, vx: rand(-40, 40), vy: rand(-90, -30), life: 0.35, color: '#b77aff', size: 3 });
+  for (let i = 0; i < 6; i++) particles.push({ x: e.x, y: e.y - e.r, vx: frand(-40, 40), vy: frand(-90, -30), life: 0.35, color: '#b77aff', size: 3 });
 }
 function updateMarks(dt) {
   let w = 0;
@@ -6181,7 +6309,7 @@ function updateMarks(dt) {
       if (playing && Math.hypot(player.x - m.x, player.y - m.y) < m.r + player.r * 0.5) {
         if (!enemyHitPlayer(m.dmg) && player.invuln > HIT_MERCY) dodged();
       }
-      for (let k = 0; k < 6; k++) particles.push({ x: m.x, y: m.y, vx: rand(-90, 90), vy: rand(-90, 90), life: 0.3, color: '#c58cff', size: 3 });
+      for (let k = 0; k < 6; k++) particles.push({ x: m.x, y: m.y, vx: frand(-90, 90), vy: frand(-90, 90), life: 0.3, color: '#c58cff', size: 3 });
       continue;
     }
     wizMarks[w++] = m;
@@ -6231,7 +6359,7 @@ function updateMinis(dt) {
   if (elapsed >= miniNextAt && !boss && !eventFight && !miniQueue.length) {
     const room = Math.max(0, MINI_MAX - miniAlive());
     const n = Math.min(miniWaveN, room);
-    const base = rand(0, 6.283);
+    const base = randIn('spawn', 0, 6.283);
     for (let i = 0; i < n; i++) {
       miniQueue.push({ id: miniTypeFor(i), at: elapsed + MINI_WARN + i * MINI_STAGGER, a: base + i * 6.283 / Math.max(1, n), group: miniWaveN });
     }
@@ -6258,7 +6386,7 @@ function updateMinis(dt) {
     if (f.k === 'crack') {
       if (f.t <= 0) {
         if (Math.hypot(player.x - f.x, player.y - f.y) < f.r + player.r * 0.5) { if (!enemyHitPlayer(f.dmg) && player.invuln > HIT_MERCY) dodged(); }
-        for (let k = 0; k < 5; k++) particles.push({ x: f.x, y: f.y, vx: rand(-80, 80), vy: rand(-80, 80), life: 0.3, color: '#c49a6a', size: 4 });
+        for (let k = 0; k < 5; k++) particles.push({ x: f.x, y: f.y, vx: frand(-80, 80), vy: frand(-80, 80), life: 0.3, color: '#c49a6a', size: 4 });
         continue;
       }
     } else if (f.k === 'wave') {
@@ -6285,7 +6413,7 @@ function spawnMini(id, a, group) {
   enemies.push({
     x, y, name: d.name, mini: id, elite: true, kind: 2, shape: id, ak: 'obor', color: d.color, weak: 'melee',
     r: d.r, speed: d.speed, hp, maxHp: hp, damage: d.touch * dm, dmg: Math.round(d.slam * dm), crackDmg: Math.round(d.crack * dm),
-    xp: 0, gold: 0, side: Math.random() < 0.5 ? -1 : 1, hit: 0, slow: 0, cd: 1.2, windup: 0, windT: 0, slamT: 0, losT: 0, los: false,
+    xp: 0, gold: 0, side: rngNext('spawn') < 0.5 ? -1 : 1, hit: 0, slow: 0, cd: 1.2, windup: 0, windT: 0, slamT: 0, losT: 0, los: false,
     ms: 0, mt: 0, swings: 0, tier: (seen >= 2 || elapsed >= 1800) ? (elapsed >= 2700 ? 3 : 2) : 1, dead: false
   });
 }
@@ -6338,15 +6466,15 @@ function miniDefeated(e) {
     orbs.push({ x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r, xp: xp / N, gold: toGold(g), r: 9, elite: true, age: 0 });
   }
   if (dropChest(e.x, e.y, false)) { const c = chests[chests.length - 1]; c.rolls = 1; c.mini = true; }
-  const r = Math.random(); // small luck roll on top of the cache (never the magnet)
+  const r = rngNext('loot'); // small luck roll on top of the cache (never the magnet)
   const tier = r < 0.015 ? 'unique' : r < 0.075 ? 'rare' : null;
   if (tier && ITEM_POOL[tier] && ITEM_POOL[tier].length) {
-    const pool = ITEM_POOL[tier], id = pool[Math.floor(Math.random() * pool.length)];
-    groundItems.push({ x: e.x + rand(-30, 30), y: e.y + rand(-30, 30), id, qty: 1, t: 0 });
+    const pool = ITEM_POOL[tier], id = pool[Math.floor(rngNext('loot') * pool.length)];
+    groundItems.push({ x: e.x + randIn('loot', -30, 30), y: e.y + randIn('loot', -30, 30), id, qty: 1, t: 0 });
     toast((tier === 'unique' ? '🌟 Unique' : '💎 Rare') + ' drop from ' + e.name + '!');
   }
   for (let i = 0; i < 30; i++) {
-    const a = Math.random() * 6.283, v = rand(60, 220);
+    const a = Math.random() * 6.283, v = frand(60, 220);
     particles.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5 + Math.random() * 0.4, color: i % 2 ? '#ffd24a' : e.color, size: 4 });
   }
   shake = Math.max(shake, 0.5);
@@ -6356,7 +6484,7 @@ function rollItemAtLeast(minTier) {
   let tier = rollItemTier(false);
   if (minTier === 'uncommon' && tier === 'common') tier = 'uncommon';
   const pool = ITEM_POOL[tier];
-  return itemClone(pool[Math.floor(Math.random() * pool.length)], 1);
+  return itemClone(pool[Math.floor(rngNext('loot') * pool.length)], 1);
 }
 function miniGoalText() { // null when there is nothing mini-boss related to show
   const alive = miniAlive();
@@ -6607,9 +6735,9 @@ function pickUpgrades() {
   const opened = slots > (player.atkSlotSeen || 0);
   player.atkSlotSeen = slots;
   if (!cards.length || !base || base.length < 3) return base;
-  const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rngNext('up') * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   // ~40% of cards are attack-related when relevant: 1 per hand, sometimes 2. Never all 3.
-  let n = 1 + (Math.random() < 0.2 ? 1 : 0);
+  let n = 1 + (rngNext('up') < 0.2 ? 1 : 0);
   n = Math.min(n, cards.length, 2);
   const news = shuffle(cards.filter(c => c.atkNew)), ranks = shuffle(cards.filter(c => !c.atkNew));
   const chosen = [];
@@ -6637,7 +6765,7 @@ function atkNearest(x, y, R, skip) {
   return best;
 }
 function atkRange() { return Math.max(180, Math.min(0.48 * Math.min(W, H) + 40, (player.range || 160) + 40)); }
-function atkCritDmg(d) { const c = Math.random() < (player.crit || 0); return [c ? Math.round(d * (player.critMul || 2.4)) : d, c]; }
+function atkCritDmg(d) { const c = rng() < (player.crit || 0); return [c ? Math.round(d * (player.critMul || 2.4)) : d, c]; }
 function atkPush(e, ux, uy, d) { if (!e || e.boss || e.hp <= 0) return; if (e.mini) d *= 0.3; e.x += ux * d; e.y += uy * d; }
 function atkRoot(e, t) { if (!e || e.boss) return; e.root = Math.max(e.root || 0, e.mini ? t * 0.5 : t); }
 function atkHit(e, dmg, src) { const [d, c] = atkCritDmg(dmg); hurt(e, d, c, false, src); return c; }
@@ -6919,7 +7047,7 @@ function updateAttacks(dt) {
       let dmg = o.dmg;
       if (o.id === 'darts' && (o.t.mini || o.t.boss || o.t.elite || (typeof isTaskEnemy === 'function' && isTaskEnemy(o.t)))) dmg = Math.round(dmg * ATK_DEFS.darts.bonus);
       const crit = atkHit(o.t, dmg, o.id);
-      if (o.id === 'knives' && Math.random() < ATK_DEFS.knives.pocket) pickpocketCoins(crit);
+      if (o.id === 'knives' && rng() < ATK_DEFS.knives.pocket) pickpocketCoins(crit);
       o.hitList.push(o.t);
       o.hitsLeft--;
       o.t = o.hitsLeft > 0 ? atkNearest(o.x, o.y, 170, o.hitList) : null;
@@ -7244,6 +7372,7 @@ function endRun(reason, extra) {
        Permanent renown: <b>${sum.renown}</b><br>
        King Black Dragon kills: <b>${sum.bossTotal}</b> total · best run <b>${sum.bossBest}</b><br><!-- 0.6 -->
        ${ORDER.map(k => STY[k].sk + ' <b>' + sLvl(k) + '</b>').join(' · ')}</p>
+    ${DEBUG ? '<p class="small">🐞 Run seed <b>' + seedText(runSeed) + '</b> · replay with ?debug=1&amp;seed=' + seedText(runSeed) + '</p>' : ''}
     <p class="small">Permanent coins, skills and renown are saved on this device. Run levels and upgrades reset. The bag is emptied; stash items stay in camp.</p>
     <button type="button" id="again">RETURN TO THE FRONTIER</button>`;
   if ($('again')) $('again').onclick = showFrontierMenu;
@@ -7448,8 +7577,8 @@ function update(dt) {
     if (spawnClock > spawnRate && enemies.length < LIVE_CAP) {
       spawnClock = 0;
       spawn();
-      if (elapsed > 100 && Math.random() < 0.45) spawn();
-      if (elapsed > 160 && Math.random() < 0.25) spawn(true); // elite chance
+      if (elapsed > 100 && rngNext('spawn') < 0.45) spawn();
+      if (elapsed > 160 && rngNext('spawn') < 0.25) spawn(true); // elite chance
     }
   }
   maybeMergePacks(dt);
@@ -7511,13 +7640,13 @@ function update(dt) {
     if ((e.tburn || 0) > 0) { // 0.17b fire trail burn
       e.tburn -= dt; e.tburnTick -= dt;
       if (e.tburnTick <= 0) { e.tburnTick = 0.5; hurt(e, Math.max(1, Math.round(e.tburnDps * 0.5)), false, true, 'trail'); }
-      if (!(e.burn > 0) && Math.random() < dt * 6) particles.push({ x: e.x + rand(-6, 6), y: e.y - e.r * 0.5, vx: rand(-10, 10), vy: -40, life: 0.35, color: '#ff9a3a', size: 3 });
+      if (!(e.burn > 0) && Math.random() < dt * 6) particles.push({ x: e.x + frand(-6, 6), y: e.y - e.r * 0.5, vx: frand(-10, 10), vy: -40, life: 0.35, color: '#ff9a3a', size: 3 });
       if (e.hp <= 0) continue;
     }
     if (e.burn > 0) {
       e.burn -= dt; e.burnTick -= dt;
       if (e.burnTick <= 0) { e.burnTick = 0.5; hurt(e, Math.max(1, Math.round(e.burnDps * 0.5)), false, true, 'fire'); }
-      if (Math.random() < dt * 8) particles.push({ x: e.x + rand(-6, 6), y: e.y - e.r * 0.5, vx: rand(-10, 10), vy: -40, life: 0.35, color: Math.random() < 0.5 ? '#ff7a2a' : '#ffc84a', size: 3 });
+      if (Math.random() < dt * 8) particles.push({ x: e.x + frand(-6, 6), y: e.y - e.r * 0.5, vx: frand(-10, 10), vy: -40, life: 0.35, color: Math.random() < 0.5 ? '#ff7a2a' : '#ffc84a', size: 3 });
       if (e.hp <= 0) continue;
     }
     // 0.7c: attacks. move 1 = walk in, 0 = stand (wind-up / holding a shot), -0.6 = back off
@@ -7775,8 +7904,8 @@ function draw() {
 
   const ox = W / 2 - player.x;
   const oy = H / 2 - player.y;
-  const sx = shake > 0 ? rand(-shake * 8, shake * 8) : 0;
-  const sy = shake > 0 ? rand(-shake * 8, shake * 8) : 0;
+  const sx = shake > 0 ? frand(-shake * 8, shake * 8) : 0;
+  const sy = shake > 0 ? frand(-shake * 8, shake * 8) : 0;
 
   ctx.save();
   ctx.translate(Math.round((ox + sx) * dpr) / dpr, Math.round((oy + sy) * dpr) / dpr); // 0.7a: snapped to whole screen pixels
@@ -8201,14 +8330,21 @@ function loop(now) {
   try { update(dt); }
   catch (err) {
     window.__updErrs = (window.__updErrs || 0) + 1;
+    noteErr('update', err); // 0.18a: counted by category; debug mode prints every one with its stack
     if (!window.__updLogged) { window.__updLogged = 1; console.warn('Last Stand: update error (loop kept running)', err); }
   }
+  const __t1 = DEBUG ? performance.now() : 0;
   try { draw(); }
   catch (err) {
     window.__drawLoopErrs = (window.__drawLoopErrs || 0) + 1;
+    noteErr('draw', err);
     if (!window.__drawLogged) { window.__drawLogged = 1; console.warn('Last Stand: draw error (loop kept running)', err); }
   }
-  notePerf(performance.now() - __t0);
+  const __t2 = performance.now();
+  notePerf(__t2 - __t0);
+  if (elapsed < lsStateAt) lsStateAt = elapsed; // 0.18a: once-a-second sanity check (read-only)
+  if (playing && elapsed - lsStateAt >= 1) { lsStateAt = elapsed; lsCheckState(); }
+  if (DEBUG) dbgFrame(now, dt, __t1 - __t0, __t2 - __t1, __t2 - __t0);
   if (playing && !paused && !bagging) rafId = requestAnimationFrame(loop);
 }
 // 0.4: start the loop (does nothing if one is already running)
@@ -8410,6 +8546,406 @@ function autoPause() {
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); });
 addEventListener('blur', autoPause);
+
+/* ========== 0.18a: INVALID-STATE CHECK (silent; counted in LS_ERR.state) ========== */
+let lsStateAt = 0;
+function lsCheckState() {
+  try {
+    if (!player) return;
+    const bad = [];
+    const fin = v => typeof v === 'number' && isFinite(v);
+    for (const k of ['x', 'y', 'hp', 'maxHp', 'xp', 'next', 'damage', 'speed', 'range']) if (!fin(player[k])) bad.push('player.' + k + '=' + player[k]);
+    if (fin(player.maxHp) && player.maxHp <= 0) bad.push('player.maxHp<=0');
+    if (!fin(elapsed)) bad.push('elapsed=' + elapsed);
+    if (!fin(runGold)) bad.push('runGold=' + runGold);
+    let nanE = 0;
+    for (const e of enemies) if (!e || !fin(e.x) || !fin(e.y) || e.hp !== e.hp || e.maxHp !== e.maxHp) nanE++;
+    if (nanE) bad.push(nanE + ' enemies with NaN x/y/hp');
+    if (enemies.length > LIVE_CAP + 40) bad.push('enemies=' + enemies.length);
+    if (particles.length > 3000) bad.push('particles=' + particles.length);
+    if (orbs.length > ORB_CAP + 60) bad.push('orbs=' + orbs.length);
+    if (bolts.length > 120) bad.push('bolts=' + bolts.length);
+    if (playing && leveling) bad.push('playing and leveling at once');
+    if (save && (!fin(save.gold) || !fin(save.renown))) bad.push('save gold/renown not a number');
+    if (bad.length) noteErr('state', bad.join('; '), 't=' + fmt(fin(elapsed) ? elapsed : 0));
+  } catch (e) { noteErr('state', e, 'check'); }
+}
+
+/* ========== 0.18a: DEBUG OVERLAY (?debug=1) ========== */
+// Add a line with dbgAddLine('name', () => 'text'). Lines refresh 4x a second while a run is live.
+const DBG = { show: true, el: null, lines: [], ring: null, ri: 0, rn: 0, lastNow: 0, at: 0, labEl: null };
+function dbgAddLine(name, fn) { DBG.lines.push({ name, fn }); }
+function dbgFrame(now, dt, updMs, drawMs, totalMs) {
+  if (!DBG.ring) DBG.ring = { fdt: new Float64Array(120), upd: new Float64Array(120), drw: new Float64Array(120), tot: new Float64Array(120) };
+  const R = DBG.ring, i = DBG.ri;
+  R.fdt[i] = DBG.lastNow ? (now - DBG.lastNow) : 16.7; R.upd[i] = updMs; R.drw[i] = drawMs; R.tot[i] = totalMs;
+  DBG.lastNow = now; DBG.ri = (i + 1) % 120; DBG.rn = Math.min(120, DBG.rn + 1);
+  if (now - DBG.at >= 250) { DBG.at = now; dbgRender(); }
+}
+function dbgStats() {
+  const R = DBG.ring, n = DBG.rn;
+  if (!R || !n) return { fps: 0, upd: 0, drw: 0, tot: 0, max: 0, maxGap: 0 };
+  let f = 0, u = 0, d = 0, t = 0, mx = 0, mg = 0;
+  for (let i = 0; i < n; i++) { f += R.fdt[i]; u += R.upd[i]; d += R.drw[i]; t += R.tot[i]; if (R.tot[i] > mx) mx = R.tot[i]; if (R.fdt[i] > mg) mg = R.fdt[i]; }
+  return { fps: f > 0 ? 1000 * n / f : 0, upd: u / n, drw: d / n, tot: t / n, max: mx, maxGap: mg };
+}
+function dbgSpawnInterval() {
+  try { return Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL * (miniAlive() >= 2 ? 1.25 : 1) * earlyPressure(); } catch (e) { return NaN; }
+}
+function dbgRender() {
+  if (!DBG.el || !DBG.show) return;
+  let h = '';
+  for (const L of DBG.lines) {
+    let v;
+    try { v = L.fn(); } catch (e) { v = '(err ' + (e && e.message) + ')'; }
+    h += L.name + ': ' + v + '\n';
+  }
+  DBG.el.textContent = h;
+}
+function dbgToggle(on) {
+  DBG.show = on == null ? !DBG.show : !!on;
+  if (DBG.el) DBG.el.style.display = DBG.show ? 'block' : 'none';
+  if (DBG.show) dbgRender();
+}
+function dbgRegisterDefaultLines() {
+  const f1 = v => (Math.round(v * 10) / 10).toFixed(1);
+  dbgAddLine('FPS', () => { const s = dbgStats(); return Math.round(s.fps) + ' · frame ' + f1(s.tot) + 'ms · max ' + f1(s.max) + 'ms (gap ' + Math.round(s.maxGap) + 'ms, last 120)'; });
+  dbgAddLine('Update / draw', () => { const s = dbgStats(); return f1(s.upd) + 'ms / ' + f1(s.drw) + 'ms'; });
+  dbgAddLine('Enemies', () => enemies.length + ' (mini ' + miniAlive() + (boss ? ', dragon' : '') + ')');
+  dbgAddLine('Projectiles', () => { const a = atkAxes.length + atkChins.length + atkLines.length; return (shots.length + a) + ' yours · ' + (bolts.length + fireballs.length + wizMarks.length) + ' enemy'; });
+  dbgAddLine('Particles', () => particles.length + ' · splats ' + splats.length + ' · fx ' + spellFx.length + ' · floats ' + floats.length + ' · orbs ' + orbs.length);
+  dbgAddLine('Player', () => player ? Math.round(player.x) + ', ' + Math.round(player.y) + ' · hp ' + Math.round(player.hp) + '/' + Math.round(player.maxHp) : '-');
+  dbgAddLine('Run', () => fmt(elapsed) + ' · ' + (player ? (STY[player.style] || {}).n + ' lvl ' + player.level : '-') + ' · kills ' + kills);
+  dbgAddLine('DPS (5s)', () => { const d = dpsInfo(); return Math.round(d.dps) + (d.rows[0] ? ' · top ' + d.rows[0].src + ' ' + d.rows[0].pct + '%' : ''); });
+  dbgAddLine('Scaling', () => { const s = lateScale(); return 'hp ×' + s.hp.toFixed(2) + ' · dmg ×' + s.dmg.toFixed(2) + ' · xp ×' + s.xp.toFixed(2) + ' · early ' + earlyPressure() + '/' + earlyDmg(); });
+  dbgAddLine('Depth', () => { const b = miniBand(elapsed); return 'tier ' + lateTier() + ' · spawn every ' + dbgSpawnInterval().toFixed(2) + 's · dragon #' + (bossCount + 1) + ' at ' + fmt(bossNext) + ' · minis ' + (b ? b.n + '/' + b.every + 's' : 'solo') + ' next ' + fmt(miniNextAt); });
+  dbgAddLine('Seed', () => seedText(runSeed));
+  dbgAddLine('Errors', () => ['update', 'draw', 'save', 'asset', 'state', 'other'].map(k => k + ' ' + LS_ERR[k].n).join(' · '));
+  dbgAddLine('Last error', () => { let best = null; for (const k in LS_ERR) if (LS_ERR[k].n && (!best || LS_ERR[k].at >= best.r.at)) best = { k, r: LS_ERR[k] }; return best ? best.k + ' @' + fmt(best.r.at) + ' ' + best.r.last : 'none'; });
+}
+function dbgInitUi() {
+  const st = document.createElement('style');
+  st.textContent = '#lsDbg{position:fixed;left:6px;top:calc(96px + env(safe-area-inset-top));z-index:60;max-width:70vw;padding:6px 8px;' +
+    'background:rgba(8,12,10,.78);color:#cfe8c8;font:10px/1.35 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;border-radius:8px;pointer-events:none}' +
+    '#lsDbgBar{position:fixed;left:6px;top:calc(64px + env(safe-area-inset-top));z-index:61;display:flex;gap:4px}' +
+    '#lsDbgBar button{font:11px system-ui;padding:3px 7px;border-radius:6px;border:1px solid #6a8;background:#1a2a20;color:#cfe8c8;width:auto;margin:0;min-height:0}' +
+    '#lsLab{position:fixed;inset:0;z-index:80;display:none;background:rgba(6,10,8,.94);color:#dfe;overflow:auto;padding:10px;font:11px system-ui}' +
+    '#lsLab table{border-collapse:collapse;width:100%;font:10px ui-monospace,Menlo,monospace}#lsLab td,#lsLab th{border-bottom:1px solid #2a3a30;padding:2px 3px;text-align:right}' +
+    '#lsLab th:first-child,#lsLab td:first-child{text-align:left}#lsLab button,#lsLab select{font:12px system-ui;padding:4px 8px;margin:2px;width:auto;min-height:0}' +
+    '#lsLab .lsrow{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px}#lsLab h3{margin:4px 0}';
+  document.head.appendChild(st);
+  const el = document.createElement('div'); el.id = 'lsDbg'; document.body.appendChild(el); DBG.el = el;
+  const bar = document.createElement('div'); bar.id = 'lsDbgBar';
+  bar.innerHTML = '<button type="button" id="lsDbgTog">🐞 debug</button><button type="button" id="lsDbgLab">📊 DPS lab</button>';
+  document.body.appendChild(bar);
+  const lab = document.createElement('div'); lab.id = 'lsLab'; document.body.appendChild(lab); DBG.labEl = lab;
+  const stop = ev => { ev.stopPropagation(); };
+  bar.addEventListener('pointerdown', stop, true);
+  $('lsDbgTog').onclick = ev => { ev.stopPropagation(); dbgToggle(); };
+  $('lsDbgLab').onclick = ev => { ev.stopPropagation(); labOpen(); };
+  addEventListener('keydown', e => { if (e.key === '`' || e.key === 'F3') { e.preventDefault(); dbgToggle(); } });
+  dbgRegisterDefaultLines();
+  dbgRender();
+}
+
+/* ========== 0.18a: DPS / BALANCE LAB (?debug=1, or ?debug=1&dps=1 to open it on load) ========== */
+// Training dummies never move, attack or die. Runs are synchronous fixed-step sims on a throwaway
+// save profile; the real save is never touched (LS_SANDBOX blocks persist()).
+const LAB_LEVELS = [1, 5, 10, 20, 'endgame'];
+const LAB_STEP = 1 / 30;
+const LAB = { running: false, results: [], wrapped: null, rec: null, inAttack: false, mainSet: null, died: false, vnow: 0, timers: [], tid: 0 };
+const LAB_SCORE = { 'Keen edge': 50, 'Quick hands': 48, 'Critical eye': 40, 'Long reach': 20, 'Bloodlust': 6, 'Thick skin': 5, 'Stout constitution': 4,
+  'Fleet-footed': 2, 'Ring of wealth': 1, 'Eat a lobster': 0,
+  'Mana shield': 10, 'Hard hat': 10, 'Hardened helm': 10, 'Soul vessel': 10, 'Mending': 10, 'Trail shoes': 10, 'Devotion': 12, 'Granite skin': 10, 'Fishy treats': 10, "Angler's outfit": 8 };
+function labCardScore(u) {
+  if (!u) return -1;
+  if (u.atk) return 100;
+  if (LAB_SCORE[u[0]] != null) return LAB_SCORE[u[0]];
+  return u[3] ? 30 : 3; // other class cards are the build identity
+}
+function labPick(picks) { let bi = 0, bs = -1; picks.forEach((u, i) => { const s = labCardScore(u); if (s > bs) { bs = s; bi = i; } }); return bi; }
+function labXpFor(level) { let xp = 0, l = 1, n = 55; while (l < level && l < 40) { xp += n; l++; n = Math.floor(n * 1.22 + 18); } return xp + 1; }
+function labProfile(cls, endgame) {
+  const s = migrateSave({});
+  if (endgame) {
+    s.sk[cls] = labXpFor(40);
+    s.tal = { might: 12, haste: 12, wis: 12, vit: 12 };
+    s.shop = { hp: 12, arm: 12, boots: 10, mag: 8, coin: 10, dash: 8 };
+    const own = Object.keys(NODE).filter(id => NODE[id].cls === cls);
+    const cap = own.find(id => NODE[id].cap && NODE[id].br === TREES[cls].branches[0]) || null;
+    s.tree[cls] = { own, cap };
+  }
+  return s;
+}
+function labSeedFor(cls, level) { return 100000 + ORDER.indexOf(cls) * 1000 + (level === 'endgame' ? 99 : level); }
+function labDummy(x, y) {
+  return { x, y, name: 'Training dummy', dummy: true, shape: 'dummy', kind: 99, hp: 1e9, maxHp: 1e9, r: 13, speed: 0, damage: 0, dmg: 0, xp: 0, gold: 0,
+    color: '#b08850', weak: null, hit: 0, slow: 0, cd: 1e9, windup: 0, windT: 0, slamT: 0, losT: 0, los: false, dead: false, side: 1 };
+}
+function labCat(src, e, dot) {
+  if (ATK_DEFS[src]) return 'signature';
+  if (src === 'special') return 'special';
+  if (src === 'thralls') return 'summons';
+  if (src === 'traps') return 'traps';
+  if (src === 'dot' || src === 'fire') return 'dot';
+  if (src === 'attack') {
+    if (LAB.inAttack) return (LAB.mainSet && LAB.mainSet.has(e)) ? 'main' : 'aoe';
+    return dot ? 'dot' : 'main';
+  }
+  return 'other';
+}
+function labNewRec() { return { t: 0, total: 0, hits: 0, crits: 0, swings: 0, mainHits: 0, mainDmg: 0, bySrc: {}, byCat: {} }; }
+function labInstall() {
+  const W0 = { hurt, attack, gain, endRun, st: window.setTimeout, ct: window.clearTimeout, keys, sfxOn: sfxPref.on, autoPause };
+  LAB.wrapped = W0;
+  LAB.vnow = 0; LAB.timers = []; LAB.tid = 0;
+  window.setTimeout = function (fn, ms) { const id = ++LAB.tid; LAB.timers.push({ id, at: LAB.vnow + (+ms || 0), fn }); return id; };
+  window.clearTimeout = function (id) { LAB.timers = LAB.timers.filter(t => t.id !== id); };
+  gain = function () {}; // skill XP frozen so damage does not drift mid-test
+  hurt = function (e, d, isCrit, dot, src) {
+    const before = e && e.hp;
+    const s = src || dmgSrc || (dot ? 'dot' : 'attack');
+    W0.hurt(e, d, isCrit, dot, src);
+    const dealt = (typeof before === 'number' && e) ? Math.max(0, before - Math.max(e.hp, 0)) : 0;
+    if (e && e.dummy) { e.hp = e.maxHp; e.dead = false; }
+    const R = LAB.rec;
+    if (R && dealt > 0) {
+      const c = labCat(s, e, dot);
+      R.total += dealt; R.hits++; if (isCrit) R.crits++;
+      R.bySrc[s] = (R.bySrc[s] || 0) + dealt; R.byCat[c] = (R.byCat[c] || 0) + dealt;
+      if (c === 'main') { R.mainHits++; R.mainDmg += dealt; }
+    }
+  };
+  attack = function () {
+    if (player.cyclone > 0) return W0.attack();
+    const t = enemies.filter(e => e.hp > 0 && dist(e, player) < player.range).sort((a, b) => dist(a, player) - dist(b, player))
+      .slice(0, 1 + (player.multi || 0) + (player.split || 0));
+    LAB.mainSet = new Set(t); LAB.inAttack = true;
+    if (LAB.rec && t.length) LAB.rec.swings++;
+    try { W0.attack(); } finally { LAB.inAttack = false; LAB.mainSet = null; }
+  };
+  endRun = function () { LAB.died = true; playing = false; };
+  autoPause = function () {};
+  sfxPref.on = false;
+  LS_SANDBOX = true;
+}
+function labUninstall() {
+  const W0 = LAB.wrapped;
+  if (!W0) return;
+  hurt = W0.hurt; attack = W0.attack; gain = W0.gain; endRun = W0.endRun; autoPause = W0.autoPause;
+  window.setTimeout = W0.st; window.clearTimeout = W0.ct;
+  sfxPref.on = W0.sfxOn; keys = {};
+  LAB.wrapped = null; LAB.timers = [];
+  LS_SANDBOX = false;
+}
+function labStep(opt) {
+  LAB.vnow += LAB_STEP * 1000;
+  if (LAB.timers.length) {
+    const due = LAB.timers.filter(t => t.at <= LAB.vnow);
+    if (due.length) { LAB.timers = LAB.timers.filter(t => t.at > LAB.vnow); for (const t of due) { try { t.fn(); } catch (e) { noteErr('update', e, 'lab timer'); } } }
+  }
+  if (opt && opt.special && player.specialCd <= 0 && playing) { try { doSpecial(); } catch (e) { noteErr('update', e, 'lab special'); } }
+  try { update(LAB_STEP); } catch (e) { noteErr('update', e, 'lab'); }
+  if (LAB.rec) LAB.rec.t += LAB_STEP;
+}
+function labQuiet() { // no chests, horns, dragons, mini bosses or regular spawns during dummy phases
+  nextChestAt = 1e12; nextEventAt = 1e12; eventInvite = null; bossNext = 1e12; bossWarned = false; miniNextAt = 1e12; miniQueue = [];
+}
+function labPhaseDummies(spots, seconds, warm, opt) {
+  enemies = spots.map(p => labDummy(p[0], p[1]));
+  const keep = spots.map(p => [p[0], p[1]]);
+  LAB.rec = null;
+  let t = 0;
+  const tot = warm + seconds;
+  while (t < tot - 1e-9) {
+    if (t >= warm && !LAB.rec) LAB.rec = labNewRec();
+    spawnClock = -1e9; labQuiet();
+    player.hp = player.maxHp; player.x = LAB.px; player.y = LAB.py;
+    if (!playing) { playing = true; }
+    labStep(opt);
+    // dummies stay put, alive and harmless; anything else (thralls' targets etc.) is cleared
+    enemies = enemies.filter(e => e.dummy);
+    enemies.forEach((e, i) => { e.x = keep[i][0]; e.y = keep[i][1]; e.hp = e.maxHp; e.dead = false; e.slow = 0; e.root = 0; e.freezeT = 0; });
+    t += LAB_STEP;
+  }
+  const R = LAB.rec; LAB.rec = null;
+  return labSummary(R);
+}
+function labSummary(R) {
+  const secs = Math.max(1e-6, R.t);
+  const pct = {};
+  for (const k in R.byCat) pct[k] = Math.round(R.byCat[k] / Math.max(1, R.total) * 1000) / 10;
+  return {
+    secs: Math.round(secs * 100) / 100, dps: Math.round(R.total / secs * 10) / 10, total: Math.round(R.total),
+    hits: R.hits, hitsPerSec: Math.round(R.hits / secs * 100) / 100, avgHit: R.hits ? Math.round(R.total / R.hits * 10) / 10 : 0,
+    swings: R.swings, swingsPerSec: Math.round(R.swings / secs * 100) / 100, avgMainHit: R.mainHits ? Math.round(R.mainDmg / R.mainHits * 10) / 10 : 0,
+    crits: R.crits, critRate: R.hits ? Math.round(R.crits / R.hits * 1000) / 10 : 0,
+    byCat: Object.fromEntries(Object.entries(R.byCat).map(([k, v]) => [k, Math.round(v)])), pctByCat: pct,
+    bySrc: Object.fromEntries(Object.entries(R.bySrc).map(([k, v]) => [k, Math.round(v)]))
+  };
+}
+const LAB_WAVE_AT = { 1: 60, 5: 180, 10: 360, 20: 720, endgame: 1500 };
+function labPhaseSurvival(level, cap, opt) {
+  enemies = []; orbs = []; chests = []; groundItems = []; bolts = []; fireballs = []; wizMarks = []; miniFx = [];
+  clearAttackFx(); thralls = []; traps = []; fires = []; woodLogs = []; firePools = []; decoys = [];
+  boss = null; showBossBar(false);
+  elapsed = LAB_WAVE_AT[level] || 60;
+  labQuiet();
+  spawnClock = 0; waveResumeIn = 0; eventFight = null;
+  player.hp = player.maxHp; player.invuln = 0; player.next = 1e12; player.xp = 0;
+  player.x = LAB.px; player.y = LAB.py;
+  LAB.died = false; playing = true;
+  LAB.rec = labNewRec();
+  const k0 = kills;
+  let t = 0, minHp = player.hp;
+  while (t < cap && !LAB.died && playing) {
+    labQuiet();
+    labStep(opt);
+    if (player.hp < minHp) minHp = player.hp;
+    t += LAB_STEP;
+  }
+  const R = LAB.rec; LAB.rec = null;
+  const s = labSummary(R);
+  return { start: fmt(LAB_WAVE_AT[level] || 60), survived: Math.round(t * 10) / 10, died: LAB.died || player.hp <= 0, capped: !LAB.died && t >= cap,
+    kills: kills - k0, waveDps: s.dps, wavePct: s.pctByCat, hpLeft: Math.max(0, Math.round(player.hp)) };
+}
+function labRun(cls, level, opts) {
+  opts = Object.assign({ seconds: 20, warm: 2, survivalCap: 120, special: true, cluster: true, survival: true }, opts || {});
+  if (LAB.running) throw new Error('lab busy');
+  LAB.running = true;
+  const realSave = save, real = { playing, paused, leveling, bagging };
+  const out = { cls, level, seed: labSeedFor(cls, level), picks: [], profile: level === 'endgame' ? 'endgame (skill 40, talents 12, shop max, full tree, branch-1 capstone)' : 'fresh (skill 1, no shop/talents/mastery)' };
+  try {
+    stopLoop();
+    save = labProfile(cls, level === 'endgame');
+    labInstall();
+    nextSeedOverride = out.seed;
+    start(cls);
+    stopLoop();
+    LAB.px = player.x; LAB.py = player.y;
+    labQuiet(); enemies = [];
+    const target = level === 'endgame' ? 30 : level;
+    while (player.level < target) { // deterministic picks from the seeded offer stream
+      player.level++;
+      player.next = player.level === 2 ? 40 : Math.floor(player.next * 1.28 + 14);
+      let picks;
+      try { picks = pickUpgrades(); } catch (e) { picks = []; }
+      if (!picks || !picks.length) picks = upgrades.filter(u => !u[3]).slice(0, 3);
+      const u = picks[labPick(picks)];
+      try { u[2](player); applyStyle(player.style); } catch (e) { noteErr('update', e, 'lab pick'); }
+      out.picks.push(String(u[0]));
+    }
+    player.xp = 0;
+    out.capstone = (save.tree[cls] && save.tree[cls].cap) || null;
+    out.stats = { damage: player.damage, rate: +(STY[cls].rate * player.rm2 / (player.itemAspd || 1)).toFixed(3), crit: +(player.crit || 0).toFixed(3), critMul: player.critMul, range: Math.round(player.range), maxHp: Math.round(player.maxHp), armor: +(player.armor || 0).toFixed(3), skill: sLvl(cls) };
+    out.attacks = (player.atks || []).map(a => a.id + ' r' + a.rank);
+    const px = player.x, py = player.y;
+    out.single = labPhaseDummies([[px + 80, py]], opts.seconds, opts.warm, opts);
+    if (opts.cluster) {
+      clearAttackFx(); player.specialCd = 0;
+      const spots = [[px + 80, py]];
+      for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283; spots.push([px + 80 + Math.cos(a) * 26, py + Math.sin(a) * 26]); }
+      out.cluster = labPhaseDummies(spots, opts.seconds, opts.warm, opts);
+    }
+    if (opts.survival) { player.specialCd = 0; out.survival = labPhaseSurvival(level, opts.survivalCap, opts); }
+  } catch (e) {
+    out.error = String(e && e.message || e);
+    noteErr('update', e, 'lab run');
+  } finally {
+    labUninstall();
+    save = realSave;
+    stopLoop();
+    playing = false; paused = false; leveling = false; bagging = false; runEnded = false;
+    enemies = []; orbs = []; chests = []; groundItems = []; bolts = []; fireballs = []; boss = null;
+    try { clearAttackFx(); } catch (e) {}
+    LAB.running = false;
+  }
+  LAB.results = LAB.results.filter(r => !(r.cls === cls && r.level === level));
+  LAB.results.push(out);
+  return out;
+}
+function labRestoreMenu() {
+  try {
+    resetJoystick(); hideToast(); showBossBar(false);
+    $('pauseBtn').style.display = 'none'; $('dashBtn').style.display = 'none'; $('abilityBtn').style.display = 'none';
+    if ($('bagHud')) $('bagHud').style.display = 'none';
+    hideRunHud();
+    $('overlay').style.display = 'flex';
+    showFrontierMenu();
+    $('saveinfo').textContent = `Saved on this device · Coins ${toGold(save.gold)} · Renown ${save.renown} · Best survival ${fmt(save.best)}`;
+    renderStashMenu();
+  } catch (e) { noteErr('other', e, 'lab menu'); }
+}
+function labRunMany(classes, levels, opts) {
+  const out = [];
+  for (const c of classes) for (const l of levels) out.push(labRun(c, l, opts));
+  labRestoreMenu();
+  return out;
+}
+function labReport() {
+  return JSON.parse(JSON.stringify({ version: '0.18a', step: LAB_STEP, generated: new Date().toISOString(), method: {
+    dummies: 'single dummy 80px from the player; cluster = 8 dummies (1 + ring of 7 at 26px) centred 80px away; player stands still; special used on cooldown',
+    measure: '2s warm-up then 20s measured, fixed 1/30s steps, skill XP frozen',
+    picks: 'level-ups use the seeded offer stream; pick = class attack card > Keen edge > Quick hands > Critical eye > class cards > Long reach > defensive',
+    survival: 'player stands still (AFK) vs the normal spawn director from a fixed start time per preset (1:00/3:00/6:00/12:00/25:00), no dragon/minis/horn/chests, no level-ups, cap 120s'
+  }, results: LAB.results }));
+}
+function labTableHtml(rows) {
+  const p = (s, k) => s && s.pctByCat && s.pctByCat[k] ? s.pctByCat[k] + '' : '-';
+  let h = '<table><tr><th>Class</th><th>Lvl</th><th>1-tgt DPS</th><th>8-tgt DPS</th><th>avg hit</th><th>hits/s</th><th>swings/s</th><th>crit%</th><th>main%</th><th>aoe%</th><th>sig%</th><th>spec%</th><th>dot%</th><th>summ%</th><th>wave DPS</th><th>survive</th></tr>';
+  for (const r of rows) {
+    const s = r.single || {}, c = r.cluster || {}, v = r.survival || {};
+    h += '<tr><td>' + (STY[r.cls] ? STY[r.cls].n : r.cls) + '</td><td>' + r.level + '</td><td>' + (s.dps || 0) + '</td><td>' + (c.dps || '-') + '</td><td>' + (s.avgHit || 0) + '</td><td>' + (s.hitsPerSec || 0) +
+      '</td><td>' + (s.swingsPerSec || 0) + '</td><td>' + (s.critRate || 0) + '</td><td>' + p(c, 'main') + '</td><td>' + p(c, 'aoe') + '</td><td>' + p(c, 'signature') + '</td><td>' + p(c, 'special') + '</td><td>' + p(c, 'dot') + '</td><td>' + p(c, 'summons') +
+      '</td><td>' + (v.waveDps != null ? v.waveDps : '-') + '</td><td>' + (v.survived != null ? v.survived + 's' + (v.capped ? '+' : '') : '-') + '</td></tr>';
+  }
+  return h + '</table>';
+}
+function labOpen() {
+  const el = DBG.labEl; if (!el) return;
+  if (playing && !paused && !leveling && !bagging) togglePause();
+  const cur = (player && player.style) || 'melee';
+  el.innerHTML = '<h3>📊 DPS lab (developer only)</h3><div class="lsrow"><select id="lsLabCls">' + ORDER.map(k => '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + STY[k].n + '</option>').join('') +
+    '</select><button type="button" id="lsLabOne">Run class (5 levels)</button><button type="button" id="lsLabAll">Run all 12</button><button type="button" id="lsLabJson">Copy JSON</button><button type="button" id="lsLabClose">Close</button></div>' +
+    '<div class="small" id="lsLabMsg">Runs abandon the current run. Dummies never move or die; survival = AFK vs the normal spawns. Results: LS_DEBUG.dpsReport()</div><div id="lsLabOut">' + labTableHtml(LAB.results) + '</div>';
+  el.style.display = 'block';
+  const msg = t => { if ($('lsLabMsg')) $('lsLabMsg').textContent = t; };
+  const go = classes => {
+    let i = 0;
+    const jobs = []; classes.forEach(c => LAB_LEVELS.forEach(l => jobs.push([c, l])));
+    const next = () => {
+      if (i >= jobs.length) { labRestoreMenu(); el.style.display = 'block'; msg('Done · ' + jobs.length + ' runs · LS_DEBUG.dpsReport() has the JSON'); $('lsLabOut').innerHTML = labTableHtml(LAB.results); return; }
+      const [c, l] = jobs[i++]; msg('Running ' + STY[c].n + ' level ' + l + ' (' + i + '/' + jobs.length + ')…');
+      try { labRun(c, l); } catch (e) { noteErr('other', e, 'lab'); }
+      $('lsLabOut').innerHTML = labTableHtml(LAB.results);
+      setTimeout(next, 30);
+    };
+    if (playing || paused) { paused = false; endRun('abandon'); }
+    setTimeout(next, 30);
+  };
+  $('lsLabOne').onclick = () => go([$('lsLabCls').value]);
+  $('lsLabAll').onclick = () => go(ORDER.slice());
+  $('lsLabJson').onclick = () => { try { navigator.clipboard.writeText(JSON.stringify(labReport(), null, 1)); msg('Copied.'); } catch (e) { msg('Copy failed; use LS_DEBUG.dpsReport()'); } };
+  $('lsLabClose').onclick = () => { el.style.display = 'none'; };
+}
+if (DEBUG) {
+  try { dbgInitUi(); } catch (e) { noteErr('other', e, 'debug ui'); }
+  window.LS_DEBUG = {
+    version: '0.18a',
+    errors: () => JSON.parse(JSON.stringify(LS_ERR)),
+    addLine: dbgAddLine, toggle: dbgToggle, render: dbgRender, stats: dbgStats,
+    lines: () => DBG.lines.map(l => { try { return [l.name, String(l.fn())]; } catch (e) { return [l.name, 'ERR ' + e.message]; } }),
+    seed: () => runSeed, seedText: () => seedText(runSeed), setNextSeed: s => { nextSeedOverride = Math.abs(Math.floor(+s || 0)) % 1000000; return nextSeedOverride; },
+    checkState: () => { lsCheckState(); return LS_ERR.state.n; },
+    dpsRun: (cls, level, opts) => { const r = labRun(cls, level, opts); labRestoreMenu(); return JSON.parse(JSON.stringify(r)); },
+    dpsRunMany: (classes, levels, opts) => JSON.parse(JSON.stringify(labRunMany(classes || ORDER.slice(), levels || LAB_LEVELS.slice(), opts))),
+    dpsReport: () => labReport(),
+    dpsTable: () => labTableHtml(LAB.results),
+    openLab: () => labOpen(),
+    saveInfo: () => JSON.parse(JSON.stringify(saveLoadInfo))
+  };
+  if (DEBUG_DPS) setTimeout(() => { try { labOpen(); } catch (e) {} }, 50);
+}
 
 // initial save text
 $('saveinfo').textContent = `Saved on this device · Coins ${toGold(save.gold)} · Renown ${save.renown} · Best survival ${fmt(save.best)}`;
