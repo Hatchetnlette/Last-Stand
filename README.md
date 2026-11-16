@@ -19,6 +19,7 @@ Test link: Prototype 0.17a (one signature attack per class at level 5, shared po
 0.17b (test): Hunter main attack buff, Magic trim, Firemaker burn trail, slightly harder early game.
 0.18a (test): developer tools (?debug=1 overlay, run seeds, DPS lab), save hardening, error reporting; no balance change.
 0.18b (test): extraction milestones + 5:00 Retreat shrine, bank/risk goal box, late-game pressure scaling, healing budget rework + Melee Planted anti-AFK, Slayer darts fix.
+0.18c test: earned AFK (Fortitude from permanent progress, Weary/Swarmed stand-still rules from 20:00, AFK record).
 Last checked: 2026-11-06 14:08 America/Chicago
 
 Play it at https://hatchetnlette.github.io/Last-Stand/
