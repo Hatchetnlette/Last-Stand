@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.18a</title>
+<title>Last Stand — Prototype 0.18b</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -266,6 +266,17 @@ body.playing #hint{display:none}
 #goalHud span{display:inline-block;background:#0c1410cc;border:1px solid #4a5c48;
   border-radius:10px;padding:3px 10px;max-width:100%;white-space:normal}
 body.bossOn #goalHud{top:122px}
+#goalHud span{pointer-events:auto;cursor:pointer}
+#goalHud small{display:block;font-size:10.5px;font-weight:700;color:#d8e8c8;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#goalHud small.pulse{animation:msPulse .8s ease-in-out infinite alternate;color:#ffd86a}
+@keyframes msPulse{from{opacity:.55}to{opacity:1}}
+body.goal2.playing #buffs{top:146px}
+body.goal2.bossOn.playing #buffs{top:170px}
+body.goal2.playing #streak{top:182px}
+.mstab{margin:6px 0 4px;font-size:12px;text-align:left}
+.mstab table{width:100%;border-collapse:collapse;font-size:11px}
+.mstab td,.mstab th{padding:2px 4px;border-bottom:1px solid #3a4a38;text-align:left}
+.mstab tr.now td{color:#ffd86a}
 body.playing #buffs{top:128px}
 body.bossOn.playing #buffs{top:152px}
 body.playing #streak{top:164px}
@@ -341,7 +352,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.18a</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.18b</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, and extract at the shrine after the first dragon. Death keeps half your coins.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -828,6 +839,19 @@ const MAGNET_ELITE_CHANCE = 0.0055; // 0.55% on an elite
 const MAGNET_HOME_SPD = 820;        // how fast a magnet yanks every orb to you
 const CHEST_CAP = 10;      // unopened ordinary chests; royal/dragon chests are never auto-opened or deleted
 const LIVE_CAP = 90;
+// 0.18b: late pressure keeps climbing (m = minutes). Before 5:00 everything is exactly 0.18a.
+const LIVE_CAP_MAX = 150;
+function liveCap() { return Math.min(LIVE_CAP_MAX, Math.round(LIVE_CAP + 1.5 * Math.max(0, elapsed / 60 - 10))); }
+function spawnIntervalBase() { return elapsed < 300 ? Math.max(0.22, 1.0 - elapsed * 0.0038) : 0.22 / (1 + 0.02 * (elapsed / 60 - 5)); }
+function eliteRoll() { return Math.min(0.50, 0.25 + 0.007 * Math.max(0, elapsed / 60 - 5)); }
+function specialShareMul() { return elapsed < 1200 ? 1 : Math.min(0.40, 0.22 + 0.006 * (elapsed / 60 - 20)) / 0.22; }
+const HUNTED_AT = 1200, HUNTED_SPEED = 1.15; // 20:00+: elites move 15% faster
+// 0.18b Melee "Planted" (from 5:00): after 2.5s without moving the horde closes in (ramps over 2s):
+// up to +0.75 damage taken, -0.45 damage dealt, Shield bash knockback -0.6. Any movement resets it at once.
+// (Healing while still is handled by the 0.18b health rules: Rooted.)
+const PLANT_AFTER = 2.5, PLANT_RAMP = 2, PLANT_TAKEN = 0.75, PLANT_OUT = 0.45, PLANT_KB = 0.6;
+function plantedK() { if (!player || player.style !== 'melee' || elapsed < 300) return 0; return Math.max(0, Math.min(1, ((player.stillT || 0) - PLANT_AFTER) / PLANT_RAMP)); }
+let plantHinted = false;
 const MERGE_HOLD = 5;      // seconds at the live cap before a trash pack becomes an elite
 const MERGE_PACK = 5;
 const LATE_START = 300;    // scaling and pack-merges start at 5:00
@@ -848,7 +872,7 @@ function lateScale(t) {
   // HP: 1 + 7*(1-exp(-late/3900)) → 15:00 ×2.00, 30:00 ×3.24, 60:00 ×5.00 (soft-caps toward ×8)
   // Damage lags HP so hits stay survivable: 1 + 2.2*(1-exp(-late/2800)) → 15:00 ×1.42, 30:00 ×1.91, 60:00 ×2.52
   // XP/gold: 1 + 0.45*(hpMul-1) so late kills pay more without exploding the purse
-  const hp = 1 + 7 * (1 - Math.exp(-late / 3900));
+  const hp = late > 1500 ? (1 + 7 * (1 - Math.exp(-1500 / 3900))) + 0.04 * (late - 1500) / 60 : 1 + 7 * (1 - Math.exp(-late / 3900)); // 0.18b: +0.04/min after 30:00
   return { hp, dmg: 1 + 2.2 * (1 - Math.exp(-late / 2800)), xp: 1 + 0.45 * (hp - 1) };
 }
 // 0.13b: a landed hit (or a second of contact) always keeps a little sting after 5:00,
@@ -1046,8 +1070,15 @@ function renderGoal(force) {
   if (!el || !playing) return;
   if (!force && elapsed - goalDomAt < 0.2) return;
   goalDomAt = elapsed;
-  const t = nextGoal();
-  if (el.textContent !== t) el.textContent = t;
+  const g = goalLines(); // 0.18b: [line1, line2|null, pulse]
+  const key = g[0] + '|' + (g[1] || '') + '|' + (g[2] ? 1 : 0);
+  if (el.dataset.k !== key) {
+    el.dataset.k = key;
+    const esc = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    el.innerHTML = esc(g[0]) + (g[1] ? '<small class="' + (g[2] ? 'pulse' : '') + '">' + esc(g[1]) + '</small>' : '');
+    document.body.classList.toggle('goal2', !!g[1]);
+    miniArrowBox = null; // 0.18b: the goal pill changed height, re-measure the edge-arrow safe box
+  }
 }
 function initSplat(s, x, y, v, kind) {
   s.x = x; s.y = y; s.v = v; s.kind = kind; s.tw = 0;
@@ -2087,6 +2118,7 @@ function migrateSave(s) {
   s.chestsTotal = cnt(s.chestsTotal, 1e9);
   s.shopSpent = num(s.shopSpent);
   if (s.treeRefund !== undefined) s.treeRefund = num(s.treeRefund); // 0.18a
+  if (s.deepDelves !== undefined) s.deepDelves = cnt(s.deepDelves, 1e9); // 0.18b
   s.hunterQuest = !!s.hunterQuest;
   // 0.14a: stash is a persistent 2-slot trunk. Sanitize without touching ITEMS (it is declared later).
   if (!Array.isArray(s.stash)) s.stash = [];
@@ -2182,6 +2214,64 @@ const THRALL_HARD_CAP = 4;
 const TRAP_HARD_CAP = 3;
 function armorCap() { return player.armorCap || 0.65; }
 function healAmt(n) { return n * (player.healMul || 1); } // 0.8b Barbarian Fury halves food heals
+/* ========== 0.18b: HEALTH RULES — one budget for every in-run heal ========== */
+// R1 One gate: every in-run heal (kill-heal, lifesteal, prayer/ward, specials, food passives, item regen, thralls...) goes through healP().
+//    One-off level-up card heals (Mending's +10, eating a Lobster card) are rewards, not sustain, and are not gated.
+// R2 Heal budget: a bucket refills at HEAL_RATE[class] x max HP per second and holds HEAL_BURST seconds of refill. Heal beyond it is lost.
+//    Before 5:00 the gate is off (0.18a early game untouched). 5:00-10:00 the budget is x3, tightening to x1 at 20:00.
+// R3 Active play: after ROOT_AFTER s without moving you are Rooted: heals AND the budget refill ramp down to ROOT_FLOOR[class] over ROOT_RAMP s.
+//    Any movement clears it at once. (From 5:00.)
+// R4 Diminishing returns: every source shares the one bucket, so stacking more heal sources gives less and less.
+// R5 Wounded: from 20:00 an elite's touch wounds you for WOUND_T s: heals x WOUND_MUL.
+const HEAL_RATE = { melee: 0.018, priest: 0.022, necromancer: 0.015, fisher: 0.014, magic: 0.008, _: 0.010 };
+const ROOT_FLOOR = { priest: 0.45, melee: 0.25, _: 0.35 };
+const HEAL_BURST = 8, HEAL_GATE_AT = 300, ROOT_AFTER = 2.5, ROOT_RAMP = 2, WOUND_AT = 1200, WOUND_T = 2.5, WOUND_MUL = 0.5;
+let healStats = { by: {}, ask: {}, lost: 0, asked: 0, got: 0 };
+let rootHinted = false;
+function healGateOn() { return playing && elapsed >= HEAL_GATE_AT; }
+function healCapMul() { return elapsed < 600 ? 3 : elapsed < 1200 ? 3 - 2 * (elapsed - 600) / 600 : 1; }
+function healRatePct() { const s = player && player.style; return (HEAL_RATE[s] || HEAL_RATE._) * healCapMul(); }
+function healRateNow() { return player ? healRatePct() * player.maxHp : 0; }
+function rootK() { if (!player || elapsed < HEAL_GATE_AT) return 0; return Math.max(0, Math.min(1, ((player.stillT || 0) - ROOT_AFTER) / ROOT_RAMP)); }
+function healEff() {
+  const fl = ROOT_FLOOR[player.style] !== undefined ? ROOT_FLOOR[player.style] : ROOT_FLOOR._;
+  let k = 1 - (1 - fl) * rootK();
+  if ((player.woundT || 0) > 0) k *= WOUND_MUL;
+  return k;
+}
+function resetHealRules() { healStats = { by: {}, ask: {}, lost: 0, asked: 0, got: 0 }; rootHinted = false; if (player) { player.healBank = null; player.woundT = 0; } }
+function healTick(dt) {
+  if (!player) return;
+  if (player.woundT > 0) player.woundT = Math.max(0, player.woundT - dt);
+  if (!healGateOn()) { player.healBank = null; return; }
+  const r = healRateNow(), cap = r * HEAL_BURST;
+  player.healBank = player.healBank == null ? cap : Math.min(cap, player.healBank + r * healEff() * dt); // Rooted/Wounded also slow the refill, so a cap-limited heal is cut too
+  if (!rootHinted && rootK() >= 0.5 && player.hp < player.maxHp) { rootHinted = true; try { toast('⚠ Rooted: standing still weakens your healing. Keep moving!'); } catch (e) {} }
+}
+// n = heal amount (after healAmt where the old code used it); over = allowed overheal above max HP (brew)
+function healP(n, src, over) {
+  if (!player || !(n > 0) || !(player.hp > 0)) return 0;
+  const room = player.maxHp + (over || 0) - player.hp;
+  if (room <= 0) return 0;
+  let a = Math.min(n, room);
+  const k = src || 'other';
+  healStats.asked += a; healStats.ask[k] = (healStats.ask[k] || 0) + a;
+  if (healGateOn()) {
+    a *= healEff();
+    if (player.healBank == null) player.healBank = healRateNow() * HEAL_BURST;
+    a = Math.max(0, Math.min(a, player.healBank));
+    player.healBank -= a;
+  }
+  player.hp += a;
+  healStats.got += a; healStats.lost += Math.min(n, room) - a;
+  healStats.by[k] = (healStats.by[k] || 0) + a;
+  return a;
+}
+function healInfoHtml() { // 0.18b: one line in the pause menu so the rules are visible
+  if (!playing || !player) return '';
+  if (elapsed < HEAL_GATE_AT) return '<div class="mstab">❤ Healing: no cap yet (the heal cap starts at 5:00)</div>';
+  return '<div class="mstab">❤ Healing cap <b>' + healRateNow().toFixed(1) + ' HP/s</b> (' + (healRatePct() * 100).toFixed(1) + '% max HP' + (healCapMul() > 1.01 ? ', ×' + healCapMul().toFixed(1) + ' early bonus' : '') + ') · standing still over ' + ROOT_AFTER + 's weakens healing' + (elapsed >= WOUND_AT ? ' · elite hits wound (heals ×' + WOUND_MUL + ')' : '') + '</div>';
+}
 function eatLobster(p) { // 0.8b Cook: shared lobster-card apply
   p.ateLobster = true;
   const M = p.m || {};
@@ -2454,6 +2544,7 @@ function start(k) {
   if ($('bagFull')) $('bagFull').style.display = 'none';
   if ($('bagTip')) $('bagTip').style.display = 'none';
   if (typeof resetExtractState === 'function') resetExtractState();
+  resetMilestones(); resetHealRules(); // 0.18b
   if (typeof resetAttacks === 'function') resetAttacks();
   resetMinis(); // 0.16a
   hideToast();
@@ -2745,7 +2836,7 @@ let MENU = $('panel').innerHTML;
 let lastClass = 'melee'; // 0.8a: the Mastery screen opens on the class you last played
 // 0.9c: class blurb copy for the compact picker (same info the old stacked buttons showed)
 const CLASS_INFO = {
-  melee:  { icon: '⚔', name: 'Melee',  blurb: 'Tough bruiser · extra health & armour · short range<br>Special: Whirlwind (spin AoE) · Upgrades: Whirlwind, Soul harvest, Granite skin' },
+  melee:  { icon: '⚔', name: 'Melee',  blurb: 'Tough bruiser · extra health & armour · short range · fights on the move<br>Special: Whirlwind (spin AoE) · Upgrades: Whirlwind, Soul harvest, Granite skin' },
   ranged: { icon: '🏹', name: 'Ranged', blurb: 'Fast kiter · long range · crits<br>Special: Barrage (rapid multi-shot) · Upgrades: Twin shot, Ruby bolts, Eagle eye' },
   magic:  { icon: '✨', name: 'Magic',  blurb: 'Glass cannon · splash damage · low health<br>Special: Arcane Nova (big freeze blast) · Upgrades: Blast radius, Ice barrage, Arcane focus' },
   fisher: { icon: '🎣', name: 'Fisher', blurb: 'Mid-range angler · harpoon + nets · lobster feasts<br>Special: Cast Net (slow the pack) · Upgrades: Hooked, Net practice, Fishy treats' },
@@ -3203,7 +3294,7 @@ function maybeMergePacks(dt) {
   if (elapsed < LATE_START || eventFight || miniAlive() >= 2) { capHold = 0; return; } // 0.16a: no merges with 2+ mini bosses
   let n = 0;
   for (const e of enemies) if (e.hp > 0 && !e.dead) n++;
-  if (n < LIVE_CAP) { capHold = Math.max(0, capHold - dt * 2); return; }
+  if (n < liveCap()) { capHold = Math.max(0, capHold - dt * 2); return; }
   capHold += dt;
   if (capHold < MERGE_HOLD) return;
   capHold = mergeTrashPack() ? 0 : MERGE_HOLD * 0.4;
@@ -3241,7 +3332,8 @@ function spawn(forceElite = false) {
     cd: randIn('spawn', 0.6, 1.6), windup: 0, windT: 0, slamT: 0, losT: 0, los: false, // 0.7c: attack state
     dead: false
   });
-  if (t === 5 && elapsed >= 2700 && enemies.length < LIVE_CAP) { // 0.16a: 45:00+ chargers come in pairs
+  { const ne = enemies[enemies.length - 1]; if (ne.elite && elapsed >= HUNTED_AT) ne.speed *= HUNTED_SPEED; } // 0.18b Hunted
+  if (t === 5 && elapsed >= 2700 && enemies.length < liveCap()) { // 0.16a: 45:00+ chargers come in pairs
     const last = enemies[enemies.length - 1];
     enemies.push(Object.assign({}, last, { x: last.x + randIn('spawn', -70, 70), y: last.y + randIn('spawn', -70, 70), cs: 0, cd: last.cd + 0.4 }));
   }
@@ -3251,6 +3343,7 @@ function spawn(forceElite = false) {
 function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (no on-hit effects). 0.12a: optional src for the DPS meter.
   if (e.dead) return;
   if (buffs.dagger > 0) d = Math.round(d * 2); // 0.5: Dragon dagger = double damage
+  { const pk = plantedK(); if (pk > 0) d = Math.max(1, Math.round(d * (1 - PLANT_OUT * pk))); } // 0.18b Melee Planted
   const M = player.m;
   if (M.ice2 && (e.slow > 0 || e.chill > 0)) d = Math.round(d * 1.12); // 0.8a Cold snap
   if (e.dizzy > 0) d = Math.round(d * 1.25); // 0.16a: a dizzy Charger takes +25%
@@ -3268,7 +3361,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
       player.leech -= hl;
       const room = player.maxHp - player.hp;
       if (hl > room && M.bloodC) { player.bloodShield = Math.min(player.maxHp * 0.25, (player.bloodShield || 0) + (hl - room)); hl = room; }
-      player.hp = Math.min(player.maxHp, player.hp + hl);
+      healP(hl, 'leech');
     }
   }
 
@@ -3280,7 +3373,7 @@ function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (
     streak++;
     streakTimer = 2.8;
     if (typeof onEnemyKilled === 'function') onEnemyKilled(e);
-    if (player.kh || player.itemKh) player.hp = Math.min(player.maxHp, player.hp + (player.kh || 0) + healAmt(player.itemKh || 0));
+    if (player.kh || player.itemKh) healP((player.kh || 0) + healAmt(player.itemKh || 0), 'kill'); // 0.18b health rules
     if (e.burn > 0 && M.pyro4) { // 0.8a Wildfire
       let best = null, bd = 70;
       for (const o of enemies) { if (o === e || o.hp <= 0 || o.burn > 0) continue; const od = dist(o, e); if (od < bd) { bd = od; best = o; } }
@@ -3464,7 +3557,7 @@ function attack() {
     if (spike && ti === 0 && e.hp > 0 && (e.elite || e.boss || e.kind === 2)) { e.bleed = 2; e.bleedDps = wDmg() * 0.10; e.bleedTick = 0.5; }
     if (M.net2 && e.hp > 0) e.chill = Math.max(e.chill || 0, 0.5);
     if (player.itemChill && e.hp > 0) e.chill = Math.max(e.chill || 0, player.itemChill);
-    if (M.zerkC && player.hp / player.maxHp < 0.3) player.hp = Math.min(player.maxHp, player.hp + 2);
+    if (M.zerkC && player.hp / player.maxHp < 0.3) healP(2, 'onhit');
 
     // 0.11a on-hit class effects (primary target only unless noted)
     if (ti === 0 && player.style === 'thief') {
@@ -3481,10 +3574,10 @@ function attack() {
     if (ti === 0 && player.style === 'priest') {
       if (M.smite1) {
         const heal = Math.min(4, Math.max(1, Math.round(d * 0.03)));
-        player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + heal);
+        healP(heal, 'smite', player.brewOver || 0);
       }
       if (player.smiteHealCard) {
-        player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + player.smiteHealCard);
+        healP(player.smiteHealCard, 'smite', player.brewOver || 0);
       }
       if (M.smite3 || player.prayHit) refillPray(1, true);
       if (M.smiteC && player.hitN % 4 === 0) {
@@ -3641,7 +3734,7 @@ function doSpecial() {
     }
     if (player.soulWhirl && hitN) {
       const heal = Math.min(24, hitN * player.soulWhirl);
-      player.hp = Math.min(player.maxHp, player.hp + heal);
+      healP(heal, 'special');
       healSplat(heal);
     }
     if (M.whirl4) player.specialCd = Math.max(0, player.specialCd - Math.min(3, hitN * 0.2));
@@ -3747,7 +3840,7 @@ function netPulse(cx, cy, R, mul) {
   }
   if (player.netHealCard && netCaught) {
     const heal = Math.min(32, netCaught * player.netHealCard);
-    player.hp = Math.min(player.maxHp, player.hp + heal);
+    healP(heal, 'special');
     healSplat(heal);
   }
   for (let i = 0; i < 20; i++) {
@@ -3838,7 +3931,7 @@ function holyBolt() {
   const M = player.m || {};
   const n = M.holy4 ? 5 : 3;
   const heal = M.holy2 ? 32 : 20;
-  player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + healAmt(heal));
+  healP(healAmt(heal), 'special', player.brewOver || 0);
   healSplat(healAmt(heal));
   const t = enemies.filter(e => e.hp > 0).sort((a, b) => dist(a, player) - dist(b, player)).slice(0, n);
   const myRun = runId;
@@ -3872,7 +3965,7 @@ function spawnLog(x, y, r, life) {
   woodLogs.push({ x: px, y: py, r: r || 22, life: (life || 6) + (player.logLifeCard || 0), splinterCd: 0 });
   if (woodLogs.length > 6) woodLogs.shift();
   if (player.m && player.m.forestC) {
-    player.hp = Math.min(player.maxHp, player.hp + healAmt(8));
+    healP(healAmt(8), 'log');
     healSplat(8);
   }
 }
@@ -3997,7 +4090,7 @@ function updateLogsAndFires(dt) {
   }
   if (warmth) {
     player._warmth = (player._warmth || 0) + dt;
-    if (player._warmth >= 1) { player._warmth -= 1; player.hp = Math.min(player.maxHp, player.hp + 3); }
+    if (player._warmth >= 1) { player._warmth -= 1; healP(3, 'fire'); }
   } else player._warmth = 0;
 }
 
@@ -4035,11 +4128,11 @@ function isTaskEnemy(e) {
 function onSlayerKill(e) {
   if (player.style !== 'slayer' || !player.slayerTask || !isTaskEnemy(e)) return;
   player.slayerTask.have++;
-  if (player.m && player.m.task3) player.hp = Math.min(player.maxHp, player.hp + 4);
+  if (player.m && player.m.task3) healP(4, 'task');
   if (player.slayerTask.have >= player.slayerTask.need) {
     floats.push({ x: player.x, y: player.y - 30, text: '✅ Task complete', life: 1.1, vy: -32, color: '#c8e080' });
     if (player.taskFinishCard) {
-      player.hp = Math.min(player.maxHp, player.hp + 18);
+      healP(18, 'task');
       player.specialCd = Math.max(0, (player.specialCd || 0) - 2);
     }
     if (player.m && player.m.taskC) {
@@ -4059,7 +4152,7 @@ function thrallCap() {
 }
 function expireThrall(th, natural) {
   if (player.soulVesselHeal) {
-    player.hp = Math.min(player.maxHp, player.hp + player.soulVesselHeal);
+    healP(player.soulVesselHeal, 'thrall');
     healSplat(player.soulVesselHeal);
   }
   if (natural && player.m && player.m.thrallC) {
@@ -4137,7 +4230,7 @@ function updateThralls(dt) {
         if (player.m && player.m.thrall3) mul *= 1.30;
         mul *= (player.thrallDmgCard || 1);
         hurt(best, Math.max(1, Math.round(wDmg() * mul)), false, false, 'thralls');
-        if (player.m && player.m.thrall4) player.hp = Math.min(player.maxHp, player.hp + 2);
+        if (player.m && player.m.thrall4) healP(2, 'thrall');
       }
     }
   }
@@ -4275,7 +4368,7 @@ function doOuraniaPulse() {
       death: spent.death ? 1 : 0
     };
   } else player.runes = { air:0, fire:0, law:0, death:0 };
-  if (player.m && player.m.altar4) player.hp = Math.min(player.maxHp, player.hp + 18);
+  if (player.m && player.m.altar4) healP(18, 'special');
   if (player.m && player.m.altarC) player.runeAltar = { x: player.x, y: player.y, r: 70, life: 4, tick: 0 };
   for (let i = 0; i < 24; i++) {
     const a = (i / 24) * Math.PI * 2;
@@ -4632,7 +4725,8 @@ function dmgTakenNow() {
   }
   if (player.style === 'necromancer' && player.m && player.m.soul4 && thralls.some(th => th.hp > 0)) m *= 0.92;
   if (player._slayerTaken) m *= player._slayerTaken;
-  if (player.graniteStill && (player.stillT || 0) >= 0.6) m *= 0.75;
+  if (player.graniteStill && (player.stillT || 0) < 1.0) m *= 0.75; // 0.18b: Granite skin now works while moving (or 1s after)
+  { const pk = plantedK(); if (pk > 0) m *= 1 + PLANT_TAKEN * pk; } // 0.18b Melee Planted
   return m;
 }
 
@@ -5020,9 +5114,10 @@ function drawMagnets() {
 }
 function enforceChestCap() {
   // 0.13a: ordinary unopened chests are capped. Royal / dragon chests are never auto-opened or removed.
-  if (chests.length <= CHEST_CAP) return;
-  while (chests.length > CHEST_CAP) {
-    const i = chests.findIndex(c => !c.royal && !c.got);
+  const capN = () => chests.filter(c => !c.ms).length; // 0.18b: milestone caches don't take a chest slot and are never auto-opened
+  if (capN() <= CHEST_CAP) return;
+  while (capN() > CHEST_CAP) {
+    const i = chests.findIndex(c => !c.royal && !c.ms && !c.got);
     if (i < 0) break;
     const c = chests[i];
     c.got = true;
@@ -5050,6 +5145,92 @@ function spawnMinuteChest() {
   return dropChest(player.x + Math.cos(a) * 220, player.y + Math.sin(a) * 220);
 }
 
+
+/* ========== 0.18b: RUN MILESTONES ("go deeper or bank it") ========== */
+// 5/10/15/20/30 min, then every 10 min. bonus = added to the extract multiplier (on top of the dragon bonus);
+// cache = dropped on the ground (lost on death, like everything in the bag); renown = paid only when you extract.
+const MILESTONES = [
+  { t: 300,  bonus: 0.00, cache: null,   renown: 0,  reward: 'shrine opens',        danger: 'dragon · scaling starts', short: 'dragon' },
+  { t: 600,  bonus: 0.10, cache: 'r25',  renown: 10, reward: 'supply cache',        danger: 'more enemies on screen',  short: 'more foes' },
+  { t: 900,  bonus: 0.20, cache: 'rare', renown: 20, reward: 'rare cache',          danger: 'more elites',             short: 'elites+' },
+  { t: 1200, bonus: 0.35, cache: 'rare', renown: 35, reward: 'rare cache',          danger: 'elites hunt 15% faster',  short: 'hunted' },
+  { t: 1800, bonus: 0.60, cache: 'deep', renown: 60, reward: 'deep cache + trophy', danger: 'chargers chain · wizard lines', short: 'chain+lines' }
+];
+const MS_EXTRA_EVERY = 600, MS_EXTRA_BONUS = 0.15, MS_EXTRA_RENOWN = 25, RETREAT_MUL = 0.75;
+const MS_CACHE_NAME = { r25: 'Supply cache', rare: 'Rare cache', deep: 'Deep cache' };
+function msDef(i) {
+  if (i < MILESTONES.length) return MILESTONES[i];
+  const k = i - MILESTONES.length + 1;
+  return { t: 1800 + MS_EXTRA_EVERY * k, bonus: Math.round((0.60 + MS_EXTRA_BONUS * k) * 100) / 100, cache: null, renown: MS_EXTRA_RENOWN,
+    reward: '+' + MS_EXTRA_RENOWN + ' renown', danger: 'the horde keeps growing', short: 'horde+' };
+}
+var msIdx = 0, msNextAt = 300, msBonus = 0, msRenown = 0, msTrophy = 0;
+function resetMilestones() { msIdx = 0; msNextAt = msDef(0).t; msBonus = 0; msRenown = 0; msTrophy = 0; plantHinted = false; }
+function rollMsItem(k) {
+  const r = rngNext('loot');
+  const tier = k === 'r25' ? (r < 0.25 ? 'rare' : 'uncommon') : k === 'deep' ? (r < 0.10 ? 'unique' : 'rare') : 'rare';
+  const pool = ITEM_POOL[tier];
+  return itemClone(pool[Math.floor(rngNext('loot') * pool.length)], 1);
+}
+function msDropCache(kind) {
+  const a = rngNext('loot') * Math.PI * 2;
+  if (dropChest(player.x + Math.cos(a) * 150, player.y + Math.sin(a) * 150, false)) {
+    const c = chests[chests.length - 1]; c.rolls = 1; c.ms = kind;
+    return c;
+  }
+  return null;
+}
+function msNextMul(d) { return 1 + EXTRACT_MUL_PER * Math.max(0, (bossesSlain || 0) - 1) + d.bonus; }
+function reachMilestone() {
+  const d = msDef(msIdx);
+  msIdx++; msNextAt = msDef(msIdx).t;
+  msBonus = d.bonus; msRenown += d.renown; if (d.cache === 'deep') msTrophy++;
+  const fresh = !extractShrine;
+  if (fresh) { // 0.18b: open behind the player's movement so a kiting player does not walk straight into it
+    const mv = playerMoveInputMag() > 0.05 && joystick.active;
+    spawnExtractShrine(player.x, player.y, mv ? Math.atan2(-joystick.y, -joystick.x) : ((player.facing || 1) < 0 ? 0.17 : Math.PI + 0.17)); // idle: behind where you face (a dash goes the way you face)
+  }
+  if (d.cache) msDropCache(d.cache);
+  const mulTxt = (bossesSlain || 0) <= 0 ? 'retreat ×' + RETREAT_MUL.toFixed(2) + ' until a dragon falls' : 'bank ×' + extractMultiplier().toFixed(2);
+  const title = '⏱ ' + fmt(d.t) + ' reached' + (fresh ? ' · ⛩ Shrine open' : '');
+  const sub = mulTxt + (d.cache ? ' · ' + MS_CACHE_NAME[d.cache] + ' dropped' : '') + (d.renown ? ' · +' + d.renown + ' renown on extract' : '') + ' · ⚠ ' + d.danger;
+  try {
+    if (boss || bannerTimer > 0.6) toast(title + ' · ' + sub); else banner(title, sub, 3.4);
+  } catch (e) {}
+}
+function updateMilestones() { let g = 0; while (elapsed >= msNextAt && g++ < 50) reachMilestone(); }
+function goalLines() { // 0.18b: [line 1, line 2 or null, pulse]
+  const urgentNow = !!(eventFight || eventInvite || boss || extractChannel > 0 || miniAlive() || miniQueue.length ||
+    (extractShrine && onExtractShrine() && miniNear(MINI_EXTRACT_BLOCK)));
+  const goal = nextGoal();
+  if (!extractShrine) return [goal, null, false];
+  const mul = extractMultiplier();
+  const bank = Math.floor(runEarnedCoins() * mul);
+  const l1 = '⛩ Bank now ' + fmtCoins(bank) + '◆ ×' + mul.toFixed(2) + ((bossesSlain || 0) <= 0 ? ' retreat' : '');
+  if (urgentNow) return [l1, goal, false];
+  const n = msDef(msIdx);
+  const l2 = '▶ ' + fmt(n.t) + ' ×' + msNextMul(n).toFixed(2) + '+ · ' + n.reward + ' · ⚠ ' + n.short;
+  return [l1, l2, n.t - elapsed <= 20];
+}
+function msTableHtml() {
+  if (!playing || !player) return '';
+  const rows = [];
+  if (msIdx > 0) rows.push([msDef(msIdx - 1), true]);
+  rows.push([msDef(msIdx), false]); rows.push([msDef(msIdx + 1), false]);
+  if (msIdx === 0) rows.push([msDef(2), false]);
+  const mulOf = (d, now) => now ? extractMultiplier() : msNextMul(d);
+  return '<div class="mstab"><b>⛩ Milestones</b> · bank now <b>' + fmtCoins(Math.floor(runEarnedCoins() * extractMultiplier())) + '◆</b> (death keeps 50%)' +
+    '<table><tr><th>Time</th><th>Bank</th><th>Reward</th><th>Danger</th></tr>' +
+    rows.slice(0, 3).map(([d, now]) => '<tr class="' + (now ? 'now' : '') + '"><td>' + fmt(d.t) + (now ? ' ✓' : '') + '</td><td>×' + mulOf(d, now).toFixed(2) + (now ? '' : '+') + '</td><td>' + d.reward + '</td><td>' + d.danger + '</td></tr>').join('') +
+    '</table></div>';
+}
+function bindGoalTap() { // 0.18b: tap the goal box to pause and see the milestone table
+  const el = $('goalText'); if (!el || el.__tap) return; el.__tap = true;
+  const go = ev => { ev.stopPropagation(); ev.preventDefault(); if (playing && !paused && !leveling && !bagging && !extractPicking) togglePause(); };
+  el.addEventListener('pointerdown', go);
+  el.addEventListener('touchstart', ev => { ev.stopPropagation(); }, { passive: true });
+}
+setTimeout(() => { try { bindGoalTap(); } catch (e) {} }, 0);
 
 function resetExtractState() {
   extractShrine = null;
@@ -5104,8 +5285,9 @@ function bagSalvageCoins(it) {
   const each = BAG_SALVAGE[d.tier] || BAG_SALVAGE.common;
   return each * qty;
 }
-function extractMultiplier() {
-  return 1 + EXTRACT_MUL_PER * Math.max(0, (bossesSlain || 0) - 1);
+function extractMultiplier() { // 0.18b: Retreat x0.75 before any dragon; else dragon bonus + milestone bonus (additive)
+  if ((bossesSlain || 0) <= 0) return RETREAT_MUL;
+  return 1 + EXTRACT_MUL_PER * Math.max(0, (bossesSlain || 0) - 1) + msBonus;
 }
 function runEarnedCoins() {
   return Math.floor(toGold(runGold) + elapsed / 11);
@@ -5126,7 +5308,7 @@ function cancelExtractChannel() {
   extractChannel = 0;
   extractSurged = false;
 }
-function spawnExtractShrine(nearX, nearY) {
+function spawnExtractShrine(nearX, nearY, ang0) { // 0.18b: ang0 = first direction to try (default 0.17 rad, as before)
   if (extractShrine) return extractShrine;
   const tryAt = (x, y) => typeof hitsSolid !== 'function' || !hitsSolid(x, y, EXTRACT_SHRINE_R * 0.7);
   const chestOk = (x, y) => chests.every(c => Math.hypot(x - c.x, y - c.y) > 70);
@@ -5134,7 +5316,7 @@ function spawnExtractShrine(nearX, nearY) {
   const dists = [EXTRACT_SHRINE_DIST, 240, 280, 160, 320, 120];
   for (const dist of dists) {
     for (let i = 0; i < 24; i++) {
-      const a = i * Math.PI / 12 + 0.17;
+      const a = i * Math.PI / 12 + (ang0 === undefined ? 0.17 : ang0);
       const nx = nearX + Math.cos(a) * dist, ny = nearY + Math.sin(a) * dist;
       if (tryAt(nx, ny) && chestOk(nx, ny)) { x = nx; y = ny; found = true; break; }
     }
@@ -5255,9 +5437,9 @@ function updateExtract(dt) {
   if (miniNear(MINI_EXTRACT_BLOCK)) { cancelExtractChannel(); return; } // 0.16a: no extracting with a mini boss within 260px
   if (extractChannel <= 0 && !extractSurged) {
     extractSurged = true;
-    if (!eventFight && (typeof waveResumeIn === 'number' ? waveResumeIn <= 0 : true) && enemies.length < LIVE_CAP) {
+    if (!eventFight && (typeof waveResumeIn === 'number' ? waveResumeIn <= 0 : true) && enemies.length < liveCap()) {
       spawn();
-      if (enemies.length < LIVE_CAP) spawn();
+      if (enemies.length < liveCap()) spawn();
     }
     if (typeof banner === 'function') banner('⛩ Extraction', 'Stand still to extract. Move or dash cancels.', 2.2);
   }
@@ -5342,7 +5524,7 @@ function openChest(c, force, extraRoll) {
       life: 0.5 + Math.random() * 0.4, color: Math.random() < 0.7 ? '#ffd24a' : '#fff3b0', size: 4 });
   }
   // 0.10a: 25% item, 25% upgrade, 30% spike, 15% treasure, 5% Phoenix. Royal still pays upgrade+spike, plus a rare+ item.
-  let kind = force || (c.royal ? 'royal' : null); // 0.6: boss chest = guaranteed good loot
+  let kind = force || (c.royal ? 'royal' : (c && c.ms ? 'mscache' : null)); // 0.6: boss chest = guaranteed good loot. 0.18b: milestone cache
   if (!kind) {
     const r = rngNext('loot');
     kind = r < 0.25 ? 'item' : r < 0.50 ? 'upgrade' : r < 0.80 ? 'spike' : r < 0.95 ? 'treasure' : 'phoenix';
@@ -5363,6 +5545,8 @@ function openChest(c, force, extraRoll) {
   } else if (BUFFS[kind] || kind === 'spike') {
     const k = giveSpike(BUFFS[kind] ? kind : null);
     banner(BUFFS[k].icon + ' ' + BUFFS[k].n + '!', BUFFS[k].d);
+  } else if (kind === 'mscache') {
+    bagPending.push(rollMsItem(c.ms)); // 0.18b
   } else if (kind === 'treasure') {
     const coins = Math.round((25 + elapsed / 4) * coinMul()); // 0.10a
     const xp = Math.round(player.next * 0.5);
@@ -5384,7 +5568,7 @@ function openChest(c, force, extraRoll) {
       const prevSub = (($('lootBanner').querySelector('span') || {}).textContent || '').trim();
       const sub = [prevSub, foundLine].filter(Boolean).join(' · ');
       banner('🎁 Rich chest · ' + c.rolls + ' loot rolls!', sub);
-    } else if (kind === 'item' && names.length) {
+    } else if ((kind === 'item' || kind === 'mscache') && names.length) {
       const d0 = itemDef(found[0].id) || {};
       banner('🎁 ' + names[0] + (names.length > 1 ? ' +' + (names.length - 1) : ''), d0.d || foundLine);
     } else if (foundLine) {
@@ -6032,7 +6216,7 @@ const upgrades = [
   // style specific
   ['Whirlwind', 'Your swings also hit every enemy around you.', p => { p.sweep = (p.sweep || 0) + 32; p.sweepCard = 1; }, 'melee'],
   ['Soul harvest', 'Whirlwind heals you for 6 HP per enemy it hits.', p => p.soulWhirl = 6, 'melee'],
-  ['Granite skin', 'If you stand still for 0.6s, take 25% less damage.', p => p.graniteStill = true, 'melee'],
+  ['Granite skin', 'While moving (and for 1s after you stop), take 25% less damage.', p => p.graniteStill = true, 'melee'],
   ['Berserker', 'Damage increased by 20% while below 40% HP.', p => p.berserk = true, 'melee'],
 
   ['Twin shot', 'Fire at one extra target.', p => { p.multi = (p.multi || 0) + 1; if (p.m && p.m.rapid4) p.damage = Math.round(p.damage * 1.1); }, 'ranged'], // 0.8a: Ammo pouch
@@ -6207,7 +6391,7 @@ function newSpawnKind(t) {
   for (const s of NEW_SPAWNS) {
     let w = 0;
     for (const b of s.bands) if (elapsed >= b[0]) w = b[1];
-    acc += w;
+    acc += w * specialShareMul(); // 0.18b: Charger + Wizard share 22% -> 40% after 20:00
     if (r < acc) return s.kind;
   }
   return t;
@@ -6623,7 +6807,7 @@ const AXE_CAP = 24, CHIN_CAP = 12, BLAST_CAP = 14, ZONE_CAP = 16, LINE_CAP = 8;
 const ATK_DEFS = {
   bash: { id:'bash', cls:'melee', type:'pulse', n:'Shield bash', icon:'🛡', col:'#ffd27a',
     cd:[2.2, 2.1, 2.0, 1.9, 1.7], rad:[80, 86, 92, 98, 106], arc:0.8, kb:[40, 44, 48, 52, 58], mul:[0.50, 0.60, 0.70, 0.80, 0.92],
-    desc: r => 'Bash a ' + ATK_DEFS.bash.rad[r] + 'px cone in front of you every ' + ATK_DEFS.bash.cd[r] + 's, knocking enemies back. Hold the line.' },
+    desc: r => 'Bash a ' + ATK_DEFS.bash.rad[r] + 'px cone in front of you every ' + ATK_DEFS.bash.cd[r] + 's, knocking enemies back. Planted (still 2.5s+) bashes push less.' },
   cannon: { id:'cannon', cls:'ranged', type:'zone', zk:'cannon', n:'Dwarf multicannon', icon:'💣', col:'#9aa4ae',
     cd:[10, 9.5, 9, 8.5, 8], life:[6, 6.5, 7, 7.5, 8], fire:[0.6, 0.55, 0.5, 0.45, 0.4], reach:260, max:1, mul:[0.66, 0.72, 0.78, 0.84, 0.90], // 0.17a tune: was 0.55-0.75
     desc: r => 'Set down a cannon that fires at enemies within ' + ATK_DEFS.cannon.reach + 'px for ' + ATK_DEFS.cannon.life[r] + 's (every ' + ATK_DEFS.cannon.cd[r] + 's). Kite around it.' },
@@ -6772,7 +6956,7 @@ function atkHit(e, dmg, src) { const [d, c] = atkCritDmg(dmg); hurt(e, d, c, fal
 // ---- bounce (old axe engine): homing projectiles that hop to the next enemy
 function bounceTarget(D, skip, R) {
   if (D.prio) { // Slayer darts: mini boss > boss > elite > task > nearest
-    let best = null, bs = -1;
+    let best = null, bs = -Infinity; // 0.18b fix: was -1, so plain enemies (score -distance) were never picked
     for (const e of enemies) {
       if (e.hp <= 0 || e.dead || skip.indexOf(e) >= 0) continue;
       const d = Math.hypot(e.x - player.x, e.y - player.y); if (d > R) continue;
@@ -6860,7 +7044,7 @@ function castPulse(a, D) {
   const t = atkNearest(player.x, player.y, R + 20);
   if (!t) return false;
   const ang = Math.atan2(t.y - player.y, t.x - player.x);
-  const dmg = atkDmg(D.mul[r], D.cd[r]);
+  const dmg = atkDmg(D.mul[r], D.cd[r]), kb = 1 - PLANT_KB * plantedK(); // 0.18b Planted: knockback -PLANT_KB
   for (const e of enemies) {
     if (e.hp <= 0 || e.dead) continue;
     const dx = e.x - player.x, dy = e.y - player.y, d = Math.hypot(dx, dy) || 1;
@@ -6868,7 +7052,7 @@ function castPulse(a, D) {
     let da = Math.atan2(dy, dx) - ang; while (da > Math.PI) da -= 6.283; while (da < -Math.PI) da += 6.283;
     if (Math.abs(da) > D.arc && d > 24) continue;
     atkHit(e, dmg, D.id);
-    atkPush(e, dx / d, dy / d, D.kb[r]);
+    atkPush(e, dx / d, dy / d, D.kb[r] * kb);
   }
   player.bashFx = { a: ang, r: R, t: 0.22, arc: D.arc };
   player.auraFlash = 0.22;
@@ -6939,7 +7123,7 @@ function updateZones(dt) {
     }
     if (z.zk === 'ward' && player.hp > 0 && Math.hypot(player.x - z.x, player.y - z.y) < z.r) {
       const h = healAmt(player.maxHp * z.heal);
-      if (player.hp < player.maxHp) { player.hp = Math.min(player.maxHp, player.hp + h); if (Math.random() < 0.3) healSplat(Math.max(1, Math.round(h)), player.x, player.y - 28); }
+      if (player.hp < player.maxHp) { healP(h, 'ward'); if (Math.random() < 0.3) healSplat(Math.max(1, Math.round(h)), player.x, player.y - 28); }
     }
   }
 }
@@ -7321,17 +7505,21 @@ function endRun(reason, extra) {
       : Math.floor(earned * EXTRACT_DEATH_KEEP);
     let coinLine;
     if (reason === 'extract') {
+      const verbX = (bossesSlain || 0) <= 0 ? 'Retreated (no dragon slain)' : 'Extracted'; // 0.18b
       coinLine = bagBonus > 0
-        ? ('Extracted: ' + fmtCoins(earned) + ' × ' + mul.toFixed(2) + ' + ' + fmtCoins(bagBonus) + ' bag = ' + fmtCoins(paid))
-        : ('Extracted: ' + fmtCoins(earned) + ' × ' + mul.toFixed(2) + ' = ' + fmtCoins(paid));
+        ? (verbX + ': ' + fmtCoins(earned) + ' × ' + mul.toFixed(2) + ' + ' + fmtCoins(bagBonus) + ' bag = ' + fmtCoins(paid))
+        : (verbX + ': ' + fmtCoins(earned) + ' × ' + mul.toFixed(2) + ' = ' + fmtCoins(paid));
     } else {
       const verb = reason === 'abandon' ? 'Abandoned' : 'Died';
       coinLine = verb + ': kept 50% of ' + fmtCoins(earned) + ' = ' + fmtCoins(paid);
     }
     save.gold = toGold(save.gold) + paid;
     let renownRun = Math.max(1, Math.floor(elapsed / 28) + Math.floor(kills / 22)) + 8 * bossesSlain; // 0.8a: +8 per boss
-    const extractRenown = reason === 'extract' ? EXTRACT_RENOWN_PER * bossesSlain : 0;
+    const msRenownPaid = reason === 'extract' ? msRenown : 0; // 0.18b: milestone renown pays only on extract
+    const extractRenown = (reason === 'extract' ? EXTRACT_RENOWN_PER * bossesSlain : 0) + msRenownPaid;
     renownRun += extractRenown;
+    const deepDelve = reason === 'extract' ? msTrophy : 0;
+    if (deepDelve) save.deepDelves = (save.deepDelves || 0) + deepDelve;
     const trophyRenown = reason === 'extract' ? miniTrophies : 0; // 0.16a: mini boss trophies pay only on extract
     renownRun += trophyRenown;
     // 0.9a: event renown was already added during the run; still show it. Base run renown is separate.
@@ -7341,7 +7529,7 @@ function endRun(reason, extra) {
     const kept = extra.kept || null;
     const keptName = kept && itemDef(kept.id) ? (itemDef(kept.id).icon + ' ' + itemDef(kept.id).n) : '';
     persist();
-    lastRunSummary = { earned, paid, mul, bagBonus, coinLine, reason, extractRenown, keptName, trophyRenown, miniKills, miniTrophies,
+    lastRunSummary = { msRenownPaid, msRenownLost: reason === 'extract' ? 0 : msRenown, msBonus, msReached: msIdx, deepDelve, earned, paid, mul, bagBonus, coinLine, reason, extractRenown, keptName, trophyRenown, miniKills, miniTrophies,
       renownRun, renownEvent, elapsed, kills, chestsOpened, bossesSlain,
       gold: save.gold, renown: save.renown, bossTotal: save.bossTotal, bossBest: save.bossBest };
     runEnded = true;
@@ -7357,7 +7545,7 @@ function endRun(reason, extra) {
     gold: save.gold, renown: save.renown, bossTotal: save.bossTotal || 0, bossBest: save.bossBest || 0 };
   const title = sum.reason === 'extract' ? 'YOU MADE IT OUT' : 'THE FRONTIER CLAIMS YOU';
   const keptLine = sum.keptName ? ('<br>Kept in stash: <b>' + sum.keptName + '</b>') : '';
-  const extractRenownBit = (sum.extractRenown ? (` · extract +${sum.extractRenown}`) : '') + (sum.trophyRenown ? (` · trophies +${sum.trophyRenown}`) : (sum.reason !== 'extract' && sum.miniTrophies ? ` · ${sum.miniTrophies} trophies lost` : ''));
+  const extractRenownBit = (sum.extractRenown ? (` · extract +${sum.extractRenown}${sum.msRenownPaid ? ' (milestones +' + sum.msRenownPaid + ')' : ''}`) : '') + (sum.msRenownLost ? ` · milestone renown ${sum.msRenownLost} lost` : '') + (sum.deepDelve ? ' · 🏆 Deep delve' : '') + (sum.trophyRenown ? (` · trophies +${sum.trophyRenown}`) : (sum.reason !== 'extract' && sum.miniTrophies ? ` · ${sum.miniTrophies} trophies lost` : ''));
   $('overlay').style.display = 'flex';
   $('panel').innerHTML = `
     <h2>${title}</h2>
@@ -7392,6 +7580,8 @@ function update(dt) {
   for (const k in buffs) buffs[k] = Math.max(0, buffs[k] - dt);
   if (bannerTimer > 0) { bannerTimer -= dt; if (bannerTimer <= 0) $('lootBanner').style.opacity = '0'; }
   updateEvents(dt); // 0.9a
+  updateMilestones(); // 0.18b
+  healTick(dt); // 0.18b health rules
   player.specialCd = Math.max(0, player.specialCd - dt);
   // 0.8a: Mastery timers
   if (player.m.guard3) player.shieldCd = Math.max(0, player.shieldCd - dt);
@@ -7407,7 +7597,7 @@ function update(dt) {
     player.feastT -= dt;
     if (player.feastT <= 0) {
       player.feastT = 28;
-      player.hp = Math.min(player.maxHp, player.hp + healAmt(22));
+      healP(healAmt(22), 'food');
       player.meatT = 5; player.meatMul = 1.15;
       floats.push({ x: player.x, y: player.y - 28, text: '🦈 Feast!', life: 1.0, vy: -36, color: '#ffb070' });
     }
@@ -7427,7 +7617,7 @@ function update(dt) {
       for (const e of enemies) if (e.hp > 0 && dist(e, player) < 115) { hurt(e, Math.round(player.damage * 0.80), false, false, 'special'); cHits++; }
       if (player.soulWhirl && cHits) {
         const heal = Math.min(18, cHits * 2);
-        player.hp = Math.min(player.maxHp, player.hp + heal);
+        healP(heal, 'special');
       }
       for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; particles.push({ x: player.x + Math.cos(a) * 40, y: player.y + Math.sin(a) * 40, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, life: 0.25, color: '#ffd27a', size: 4 }); }
     }
@@ -7480,7 +7670,7 @@ function update(dt) {
     }
     if (player.m && player.m.prot4 && player.hp > 0 && player.hp / player.maxHp < 0.15 && player.pray >= 20 && player.prayCd <= 0) {
       player.pray -= 20; player.prayCd = 20;
-      player.hp = Math.min(player.maxHp, player.hp + healAmt(25));
+      healP(healAmt(25), 'prayer');
       floats.push({ x: player.x, y: player.y - 28, text: '💖 Redemption', life: 0.9, vy: -36, color: '#ffb0c8' });
     }
     if (player.altar) {
@@ -7488,7 +7678,7 @@ function update(dt) {
       if (player.altar.tick <= 0) {
         player.altar.tick = 0.5;
         if (Math.hypot(player.x - player.altar.x, player.y - player.altar.y) <= player.altar.r)
-          player.hp = Math.min(player.maxHp, player.hp + 3);
+          healP(3, 'altar');
       }
       if (player.altar.life <= 0) player.altar = null;
     }
@@ -7535,6 +7725,7 @@ function update(dt) {
   // 0.11e Granite skin: track time spent standing still
   if (player.moving) player.stillT = 0;
   else player.stillT = (player.stillT || 0) + dt;
+  if (!plantHinted && plantedK() >= 0.5) { plantHinted = true; toast('⚠ Planted: the horde closes in. Keep moving!'); } // 0.18b
 
   let spd = moveSpeed(); // 0.9c: additive, at most class base × 1.40
   player.x += dx * spd * dt;
@@ -7573,12 +7764,12 @@ function update(dt) {
   // 0.11c: normal waves pause for the whole Penance event, then resume after waveResumeIn (no backlog).
   if (waveResumeIn > 0) waveResumeIn = Math.max(0, waveResumeIn - dt);
   if (!eventFight && waveResumeIn <= 0) {
-    const spawnRate = Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL * (miniAlive() >= 2 ? 1.25 : 1) * earlyPressure(); // 0.17b: earlyPressure // 0.16a: trash eases off with 2+ mini bosses
-    if (spawnClock > spawnRate && enemies.length < LIVE_CAP) {
+    const spawnRate = spawnIntervalBase() * (boss ? 1.8 : 1) * ATK_SPAWN_MUL * (miniAlive() >= 2 ? 1.25 : 1) * earlyPressure(); // 0.17b: earlyPressure // 0.16a: trash eases off with 2+ mini bosses
+    if (spawnClock > spawnRate && enemies.length < liveCap()) {
       spawnClock = 0;
       spawn();
       if (elapsed > 100 && rngNext('spawn') < 0.45) spawn();
-      if (elapsed > 160 && rngNext('spawn') < 0.25) spawn(true); // elite chance
+      if (elapsed > 160 && rngNext('spawn') < eliteRoll()) spawn(true); // elite chance (0.18b: 25% -> 50% by 40:00)
     }
   }
   maybeMergePacks(dt);
@@ -7693,6 +7884,7 @@ function update(dt) {
       if (minContact > 0 && dmg < minContact && e.damage > 0) dmg = minContact;
       player._slayerTaken = 0;
       player.hp -= dmg;
+      if (e.elite && elapsed >= WOUND_AT) player.woundT = WOUND_T; // 0.18b Wounded: heals x0.5
       sfx('hurt');
       if (Math.random() < 0.08) shake = Math.max(shake, 0.12);
     }
@@ -7796,7 +7988,7 @@ function update(dt) {
     if (player._regenAcc >= 1) {
       const h = Math.floor(player._regenAcc);
       player._regenAcc -= h;
-      player.hp = Math.min(player.maxHp + (player.brewOver || 0), player.hp + h);
+      healP(h, 'regen', player.brewOver || 0);
     }
   }
   if (player.potAtk > 0) player.potAtk = Math.max(0, player.potAtk - dt);
@@ -8189,6 +8381,9 @@ function draw() {
   }
   ctx.globalAlpha = 1; ctx.textAlign = 'left';
 
+  { const pk = Math.max(plantedK(), rootK()); if (pk > 0) { // 0.18b: ring while Rooted (amber) / Melee Planted (red)
+    ctx.save(); ctx.strokeStyle = plantedK() > 0 ? '#ff4a3a' : '#ffb040'; ctx.globalAlpha = 0.3 + 0.4 * pk * (0.6 + 0.4 * Math.sin(elapsed * 9)); ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(player.x, player.y + 18, 24 + 6 * pk, 9 + 2 * pk, 0, 0, 7); ctx.stroke(); ctx.restore(); } }
   // player
   if (spriteReady(art.player)) { // 0.7a: 4-direction walking sprite
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -8497,6 +8692,7 @@ function togglePause() {
         <button type="button" id="splatToggle" aria-pressed="true">💢 Numbers on</button>
         <button type="button" id="mapToggle" aria-pressed="true">🗺️ Map on</button>
       </div>
+      ${msTableHtml()}${healInfoHtml()}
       <div id="pauseAtkMount"></div>
       <div id="pauseBagMount"></div>
       <button id="resume">Resume</button>
@@ -8561,7 +8757,7 @@ function lsCheckState() {
     let nanE = 0;
     for (const e of enemies) if (!e || !fin(e.x) || !fin(e.y) || e.hp !== e.hp || e.maxHp !== e.maxHp) nanE++;
     if (nanE) bad.push(nanE + ' enemies with NaN x/y/hp');
-    if (enemies.length > LIVE_CAP + 40) bad.push('enemies=' + enemies.length);
+    if (enemies.length > liveCap() + 40) bad.push('enemies=' + enemies.length);
     if (particles.length > 3000) bad.push('particles=' + particles.length);
     if (orbs.length > ORB_CAP + 60) bad.push('orbs=' + orbs.length);
     if (bolts.length > 120) bad.push('bolts=' + bolts.length);
@@ -8590,7 +8786,7 @@ function dbgStats() {
   return { fps: f > 0 ? 1000 * n / f : 0, upd: u / n, drw: d / n, tot: t / n, max: mx, maxGap: mg };
 }
 function dbgSpawnInterval() {
-  try { return Math.max(0.22, 1.0 - elapsed * 0.0038) * (boss ? 1.8 : 1) * ATK_SPAWN_MUL * (miniAlive() >= 2 ? 1.25 : 1) * earlyPressure(); } catch (e) { return NaN; }
+  try { return spawnIntervalBase() * (boss ? 1.8 : 1) * ATK_SPAWN_MUL * (miniAlive() >= 2 ? 1.25 : 1) * earlyPressure(); } catch (e) { return NaN; }
 }
 function dbgRender() {
   if (!DBG.el || !DBG.show) return;
@@ -8619,6 +8815,9 @@ function dbgRegisterDefaultLines() {
   dbgAddLine('DPS (5s)', () => { const d = dpsInfo(); return Math.round(d.dps) + (d.rows[0] ? ' · top ' + d.rows[0].src + ' ' + d.rows[0].pct + '%' : ''); });
   dbgAddLine('Scaling', () => { const s = lateScale(); return 'hp ×' + s.hp.toFixed(2) + ' · dmg ×' + s.dmg.toFixed(2) + ' · xp ×' + s.xp.toFixed(2) + ' · early ' + earlyPressure() + '/' + earlyDmg(); });
   dbgAddLine('Depth', () => { const b = miniBand(elapsed); return 'tier ' + lateTier() + ' · spawn every ' + dbgSpawnInterval().toFixed(2) + 's · dragon #' + (bossCount + 1) + ' at ' + fmt(bossNext) + ' · minis ' + (b ? b.n + '/' + b.every + 's' : 'solo') + ' next ' + fmt(miniNextAt); });
+  dbgAddLine('Pressure', () => 'cap ' + liveCap() + ' · elite ' + Math.round(eliteRoll() * 100) + '% · chg+wiz ×' + specialShareMul().toFixed(2) + (plantedK() > 0 ? ' · PLANTED ' + Math.round(plantedK() * 100) + '%' : ''));
+  dbgAddLine('Heal', () => !player ? '-' : 'cap ' + healRateNow().toFixed(1) + '/s (' + (healRatePct() * 100).toFixed(1) + '%) · bank ' + Math.round(player.healBank == null ? 0 : player.healBank) + ' · eff ' + Math.round(healEff() * 100) + '%' + (rootK() > 0 ? ' ROOTED' : '') + ((player.woundT || 0) > 0 ? ' WOUNDED' : '') + ' · got ' + Math.round(healStats.got) + ' lost ' + Math.round(healStats.lost));
+  dbgAddLine('Milestone', () => 'next ' + fmt(msNextAt > 1e9 ? 0 : msNextAt) + ' · bonus +' + msBonus.toFixed(2) + ' · bank ×' + extractMultiplier().toFixed(2) + ' · renown ' + msRenown + (msTrophy ? ' · deep' : ''));
   dbgAddLine('Seed', () => seedText(runSeed));
   dbgAddLine('Errors', () => ['update', 'draw', 'save', 'asset', 'state', 'other'].map(k => k + ' ' + LS_ERR[k].n).join(' · '));
   dbgAddLine('Last error', () => { let best = null; for (const k in LS_ERR) if (LS_ERR[k].n && (!best || LS_ERR[k].at >= best.r.at)) best = { k, r: LS_ERR[k] }; return best ? best.k + ' @' + fmt(best.r.at) + ' ' + best.r.last : 'none'; });
@@ -8749,7 +8948,7 @@ function labStep(opt) {
   if (LAB.rec) LAB.rec.t += LAB_STEP;
 }
 function labQuiet() { // no chests, horns, dragons, mini bosses or regular spawns during dummy phases
-  nextChestAt = 1e12; nextEventAt = 1e12; eventInvite = null; bossNext = 1e12; bossWarned = false; miniNextAt = 1e12; miniQueue = [];
+  nextChestAt = 1e12; nextEventAt = 1e12; eventInvite = null; bossNext = 1e12; bossWarned = false; miniNextAt = 1e12; miniQueue = []; msNextAt = 1e12;
 }
 function labPhaseDummies(spots, seconds, warm, opt) {
   enemies = spots.map(p => labDummy(p[0], p[1]));
@@ -8760,7 +8959,7 @@ function labPhaseDummies(spots, seconds, warm, opt) {
   while (t < tot - 1e-9) {
     if (t >= warm && !LAB.rec) LAB.rec = labNewRec();
     spawnClock = -1e9; labQuiet();
-    player.hp = player.maxHp; player.x = LAB.px; player.y = LAB.py;
+    player.hp = player.maxHp; player.x = LAB.px; player.y = LAB.py; player.stillT = 0; // 0.18b: dummy DPS = active footwork (Planted is measured by the stand-still test)
     if (!playing) { playing = true; }
     labStep(opt);
     // dummies stay put, alive and harmless; anything else (thralls' targets etc.) is cleared
@@ -8883,7 +9082,7 @@ function labRunMany(classes, levels, opts) {
   return out;
 }
 function labReport() {
-  return JSON.parse(JSON.stringify({ version: '0.18a', step: LAB_STEP, generated: new Date().toISOString(), method: {
+  return JSON.parse(JSON.stringify({ version: '0.18b', step: LAB_STEP, generated: new Date().toISOString(), method: {
     dummies: 'single dummy 80px from the player; cluster = 8 dummies (1 + ring of 7 at 26px) centred 80px away; player stands still; special used on cooldown',
     measure: '2s warm-up then 20s measured, fixed 1/30s steps, skill XP frozen',
     picks: 'level-ups use the seeded offer stream; pick = class attack card > Keen edge > Quick hands > Critical eye > class cards > Long reach > defensive',
@@ -8931,7 +9130,7 @@ function labOpen() {
 if (DEBUG) {
   try { dbgInitUi(); } catch (e) { noteErr('other', e, 'debug ui'); }
   window.LS_DEBUG = {
-    version: '0.18a',
+    version: '0.18b',
     errors: () => JSON.parse(JSON.stringify(LS_ERR)),
     addLine: dbgAddLine, toggle: dbgToggle, render: dbgRender, stats: dbgStats,
     lines: () => DBG.lines.map(l => { try { return [l.name, String(l.fn())]; } catch (e) { return [l.name, 'ERR ' + e.message]; } }),
