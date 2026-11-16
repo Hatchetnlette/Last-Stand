@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.18b</title>
+<title>Last Stand — Prototype 0.18c</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -352,7 +352,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.18b</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.18c</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, and extract at the shrine after the first dragon. Death keeps half your coins.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -852,6 +852,62 @@ const HUNTED_AT = 1200, HUNTED_SPEED = 1.15; // 20:00+: elites move 15% faster
 const PLANT_AFTER = 2.5, PLANT_RAMP = 2, PLANT_TAKEN = 0.75, PLANT_OUT = 0.45, PLANT_KB = 0.6;
 function plantedK() { if (!player || player.style !== 'melee' || elapsed < 300) return 0; return Math.max(0, Math.min(1, ((player.stillT || 0) - PLANT_AFTER) / PLANT_RAMP)); }
 let plantHinted = false;
+/* ========== 0.18c: FORTITUDE — earned AFK from permanent progress ========== */
+// F (0-100) is computed once at run start for the class you picked, from the save only:
+//   30 x (skill level - 1) / 39 + 30 x mastery nodes / 15 + 20 x General Store ranks / 60 + 20 x Training ranks / 48.
+// In-run cards, bag items, unspent coins/renown, other classes' trees do not count.
+// Relief e = (F/100)^2 eases the 0.18b anti-AFK knobs toward the *_TOP values. F = 0 is exactly 0.18b.
+// Tuning (0.18c stand battery): Priest's cap tops out at x2.6 (others x2); from 45:00 the relief fades to 0 by 75:00 so the deep swarm always wins.
+const FORT_TOP = { cap: { priest: 1.6, _: 1 }, root: { priest: 0.90, melee: 0.80, _: 0.85 }, plantTaken: 0.15, plantOut: 0.10, plantKb: 0.20, woundMul: 0.85, woundT: 1.5 };
+const FORT_SHOP_MAX = { hp: 12, arm: 12, boots: 10, mag: 8, coin: 10, dash: 8 }; // 60 ranks
+const FORT_FADE_AT = 2700, FORT_FADE_LEN = 1800; // deep-run fade: relief x1 until FADE_AT, then down to 0 over FADE_LEN
+// 0.18c retune "Weary" (all classes, from 20:00): after WEARY_AFTER s still, damage dealt decays over WEARY_RAMP s by up to
+// WEARY_MAX (Fortitude 100 softens it to WEARY_TOP, never removes it). Any movement resets it. Moving play is untouched.
+const WEARY_AT = 1200, WEARY_AFTER = 3, WEARY_RAMP = 10, WEARY_MAX = 0.5, WEARY_TOP = 0.4;
+// Weary keeps deepening by WEARY_DEEP per second after the ramp (to WEARY_CAP) and, if WEARY_KB, weakens your knockback by the same share,
+// so no stand-still can hold the horde off forever. Guard: Fortitude 100 takes GUARD_TOP less damage while still from 20:00 (0 at Fortitude 0).
+const WEARY_DEEP = 0.01, WEARY_CAP = 0.95, WEARY_KB = 1, GUARD_TOP = 0.5;
+let wearyHinted = false;
+// 0.18c retune "Swarmed" (all classes, from 20:00): after SW_AFTER s still (Fortitude 100: SW_AFTER_TOP s), damage taken grows
+// +SW_RATE per second still, without limit, so no stand-still lasts forever. Any movement resets it.
+const SW_AFTER = 15, SW_AFTER_TOP = 45, SW_RATE = 0.05;
+function swarmedMul() { if (!player || elapsed < WEARY_AT) return 1; const x = (player.stillT || 0) - fortLerp(SW_AFTER, SW_AFTER_TOP); return x > 0 ? 1 + SW_RATE * x : 1; }
+function wearyK() { if (!player || elapsed < WEARY_AT) return 0; return Math.max(0, Math.min(1, ((player.stillT || 0) - WEARY_AFTER) / WEARY_RAMP)); }
+function wearyCut() { const k = wearyK(); if (!(k > 0)) return 0; const deep = WEARY_DEEP > 0 ? Math.max(0, (player.stillT || 0) - WEARY_AFTER - WEARY_RAMP) * WEARY_DEEP : 0; return Math.min(WEARY_CAP, k * fortLerp(WEARY_MAX, WEARY_TOP) + deep); }
+function guardMul() { if (!(GUARD_TOP > 0) || wearyK() <= 0) return 1; return 1 - GUARD_TOP * fortEff(); }
+const FORT_GLASS = ['ranged', 'woodcutter', 'thief', 'slayer', 'hunter'];
+let fortF = 0, fortE = 0, fortOverride = null; // fortOverride: debug / test only
+let afkCur = 0, afkRunBest = 0, afkRunAt = 0; // 0.18c AFK record (this run)
+function fortParts(cls, sv) {
+  sv = sv || save;
+  const z = { skill: 0, tree: 0, shop: 0, train: 0 };
+  if (!sv || !cls) return z;
+  const sk = Math.max(0, lvl((sv.sk && sv.sk[cls]) || 0) - 1);
+  const t = sv.tree && sv.tree[cls]; const nodes = t && Array.isArray(t.own) ? t.own.length : 0;
+  let sh = 0; for (const k in FORT_SHOP_MAX) sh += Math.min(FORT_SHOP_MAX[k], Math.max(0, +((sv.shop || {})[k]) || 0));
+  let tl = 0; for (const k of ['might', 'haste', 'wis', 'vit']) tl += Math.min(12, Math.max(0, +((sv.tal || {})[k]) || 0));
+  z.skill = 30 * Math.min(1, sk / 39); z.tree = 30 * Math.min(1, nodes / 15); z.shop = 20 * Math.min(1, sh / 60); z.train = 20 * Math.min(1, tl / 48);
+  return z;
+}
+function fortitudeFor(cls, sv) { const z = fortParts(cls, sv); return Math.max(0, Math.min(100, z.skill + z.tree + z.shop + z.train)); }
+function fortSet() {
+  fortF = (fortOverride != null && isFinite(fortOverride)) ? Math.max(0, Math.min(100, +fortOverride)) : (player ? fortitudeFor(player.style) : 0);
+  fortE = (fortF / 100) * (fortF / 100);
+  afkCur = 0; afkRunBest = 0; afkRunAt = 0; wearyHinted = false;
+}
+function fortEff() { return fortE > 0 ? fortE * (elapsed < FORT_FADE_AT ? 1 : Math.max(0, 1 - (elapsed - FORT_FADE_AT) / FORT_FADE_LEN)) : 0; }
+function fortLerp(a, b) { const e = fortEff(); return e > 0 ? a + (b - a) * e : a; }
+function plantTaken() { return fortLerp(PLANT_TAKEN, FORT_TOP.plantTaken); }
+function plantOut() { return fortLerp(PLANT_OUT, FORT_TOP.plantOut); }
+function plantKb() { return fortLerp(PLANT_KB, FORT_TOP.plantKb); }
+function fortPct() { return Math.round(fortF); }
+function afkTick(dt) { // contiguous stand-still after the Rooted delay, from 5:00
+  if (!player) return;
+  if (!player.moving && (player.stillT || 0) > ROOT_AFTER && elapsed >= HEAL_GATE_AT && player.hp > 0) {
+    afkCur += dt; if (afkCur > afkRunBest) { afkRunBest = afkCur; afkRunAt = elapsed - afkCur; }
+  } else afkCur = 0;
+  if (!wearyHinted && wearyK() >= 0.3) { wearyHinted = true; try { toast('⚠ Weary: standing still weakens your attacks. Keep moving!'); } catch (e) {} }
+}
 const MERGE_HOLD = 5;      // seconds at the live cap before a trash pack becomes an elite
 const MERGE_PACK = 5;
 const LATE_START = 300;    // scaling and pack-merges start at 5:00
@@ -2119,6 +2175,10 @@ function migrateSave(s) {
   s.shopSpent = num(s.shopSpent);
   if (s.treeRefund !== undefined) s.treeRefund = num(s.treeRefund); // 0.18a
   if (s.deepDelves !== undefined) s.deepDelves = cnt(s.deepDelves, 1e9); // 0.18b
+  if (s.afkBest !== undefined) { // 0.18c: optional per-class AFK record { secs, at }
+    const a = (s.afkBest && typeof s.afkBest === 'object' && !Array.isArray(s.afkBest)) ? s.afkBest : {}; s.afkBest = {};
+    for (const k in TREES) if (a[k] && typeof a[k] === 'object' && num(a[k].secs) > 0) s.afkBest[k] = { secs: Math.floor(num(a[k].secs)), at: Math.floor(num(a[k].at)) };
+  }
   s.hunterQuest = !!s.hunterQuest;
   // 0.14a: stash is a persistent 2-slot trunk. Sanitize without touching ITEMS (it is declared later).
   if (!Array.isArray(s.stash)) s.stash = [];
@@ -2230,16 +2290,19 @@ let healStats = { by: {}, ask: {}, lost: 0, asked: 0, got: 0 };
 let rootHinted = false;
 function healGateOn() { return playing && elapsed >= HEAL_GATE_AT; }
 function healCapMul() { return elapsed < 600 ? 3 : elapsed < 1200 ? 3 - 2 * (elapsed - 600) / 600 : 1; }
-function healRatePct() { const s = player && player.style; return (HEAL_RATE[s] || HEAL_RATE._) * healCapMul(); }
+function healRatePct() { const s = player && player.style; return (HEAL_RATE[s] || HEAL_RATE._) * healCapMul() * (fortE > 0 ? 1 + (FORT_TOP.cap[s] !== undefined ? FORT_TOP.cap[s] : FORT_TOP.cap._) * fortEff() : 1); } // 0.18c: x(1+e)
 function healRateNow() { return player ? healRatePct() * player.maxHp : 0; }
 function rootK() { if (!player || elapsed < HEAL_GATE_AT) return 0; return Math.max(0, Math.min(1, ((player.stillT || 0) - ROOT_AFTER) / ROOT_RAMP)); }
 function healEff() {
-  const fl = ROOT_FLOOR[player.style] !== undefined ? ROOT_FLOOR[player.style] : ROOT_FLOOR._;
+  const fl = rootFloor();
   let k = 1 - (1 - fl) * rootK();
-  if ((player.woundT || 0) > 0) k *= WOUND_MUL;
+  if ((player.woundT || 0) > 0) k *= woundMul();
   return k;
 }
-function resetHealRules() { healStats = { by: {}, ask: {}, lost: 0, asked: 0, got: 0 }; rootHinted = false; if (player) { player.healBank = null; player.woundT = 0; } }
+function rootFloor() { const st = player && player.style; const b = ROOT_FLOOR[st] !== undefined ? ROOT_FLOOR[st] : ROOT_FLOOR._; const t = FORT_TOP.root[st] !== undefined ? FORT_TOP.root[st] : FORT_TOP.root._; return fortLerp(b, t); }
+function woundMul() { return fortLerp(WOUND_MUL, FORT_TOP.woundMul); }
+function woundTime() { return fortLerp(WOUND_T, FORT_TOP.woundT); }
+function resetHealRules() { fortSet(); healStats = { by: {}, ask: {}, lost: 0, asked: 0, got: 0 }; rootHinted = false; if (player) { player.healBank = null; player.woundT = 0; } }
 function healTick(dt) {
   if (!player) return;
   if (player.woundT > 0) player.woundT = Math.max(0, player.woundT - dt);
@@ -2267,10 +2330,20 @@ function healP(n, src, over) {
   healStats.by[k] = (healStats.by[k] || 0) + a;
   return a;
 }
+function fortInfoHtml() { // 0.18c: one Fortitude line in the pause menu
+  if (!playing || !player) return '';
+  const nm = (CLASS_INFO[player.style] || {}).name || player.style;
+  let t = '🛡 Fortitude <b>' + fortPct() + '%</b> (' + nm + ': skill, Mastery, Store, Training)';
+  if (fortF < 1) t += ' · raise it to stand still longer';
+  else t += ' · standing still costs less' + (elapsed >= FORT_FADE_AT ? ' (fading past ' + fmt(FORT_FADE_AT) + ')' : '') + ' (Rooted ' + Math.round(rootFloor() * 100) + '% heals' + (player.style === 'melee' ? ', Planted +' + Math.round(plantTaken() * 100) + '% taken' : '') + ')';
+  if (elapsed >= WEARY_AT) t += ' · from 20:00 standing still also weakens your attacks (−' + Math.round(fortLerp(WEARY_MAX, WEARY_TOP) * 100) + '%, then worse the longer you stay' + (GUARD_TOP > 0 && fortF >= 1 ? '; Fortitude guards you −' + Math.round(GUARD_TOP * fortEff() * 100) + '% damage taken' : '') + ') and after ' + Math.round(fortLerp(SW_AFTER, SW_AFTER_TOP)) + 's the horde hits harder';
+  if (fortF >= 50 && FORT_GLASS.includes(player.style)) t += ' · this class has little healing, so it still can\'t park';
+  return '<div class="mstab" id="fortLine">' + t + '</div>';
+}
 function healInfoHtml() { // 0.18b: one line in the pause menu so the rules are visible
   if (!playing || !player) return '';
   if (elapsed < HEAL_GATE_AT) return '<div class="mstab">❤ Healing: no cap yet (the heal cap starts at 5:00)</div>';
-  return '<div class="mstab">❤ Healing cap <b>' + healRateNow().toFixed(1) + ' HP/s</b> (' + (healRatePct() * 100).toFixed(1) + '% max HP' + (healCapMul() > 1.01 ? ', ×' + healCapMul().toFixed(1) + ' early bonus' : '') + ') · standing still over ' + ROOT_AFTER + 's weakens healing' + (elapsed >= WOUND_AT ? ' · elite hits wound (heals ×' + WOUND_MUL + ')' : '') + '</div>';
+  return '<div class="mstab">❤ Healing cap <b>' + healRateNow().toFixed(1) + ' HP/s</b> (' + (healRatePct() * 100).toFixed(1) + '% max HP' + (healCapMul() > 1.01 ? ', ×' + healCapMul().toFixed(1) + ' early bonus' : '') + ') · standing still over ' + ROOT_AFTER + 's weakens healing' + (elapsed >= WOUND_AT ? ' · elite hits wound (heals ×' + (+woundMul().toFixed(2)) + ')' : '') + '</div>';
 }
 function eatLobster(p) { // 0.8b Cook: shared lobster-card apply
   p.ateLobster = true;
@@ -2872,7 +2945,8 @@ function refreshClassPicker() { // 0.9c / 0.11a: sync dropdown label, blurb, Sta
   if (mcap) {
     mcap.dataset.mc = k;
     const t = save.tree[k], c = t && t.cap ? NODE[t.cap] : null;
-    mcap.textContent = (t && t.own.length) ? '🌳 Mastery: ' + t.own.length + ' node' + (t.own.length > 1 ? 's' : '') + (c ? ' · ★ ' + c.name : '') : '';
+    const fq = Math.round(fortitudeFor(k)); // 0.18c
+    mcap.textContent = ((t && t.own.length) ? '🌳 Mastery: ' + t.own.length + ' node' + (t.own.length > 1 ? 's' : '') + (c ? ' · ★ ' + c.name : '') : '') + (fq > 0 ? ((t && t.own.length) ? ' · ' : '') + '🛡 Fortitude ' + fq + '%' : '');
   }
   if ($('startBtn')) $('startBtn').textContent = info.icon + ' Start as ' + info.name;
 }
@@ -3343,7 +3417,8 @@ function spawn(forceElite = false) {
 function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (no on-hit effects). 0.12a: optional src for the DPS meter.
   if (e.dead) return;
   if (buffs.dagger > 0) d = Math.round(d * 2); // 0.5: Dragon dagger = double damage
-  { const pk = plantedK(); if (pk > 0) d = Math.max(1, Math.round(d * (1 - PLANT_OUT * pk))); } // 0.18b Melee Planted
+  { const pk = plantedK(); if (pk > 0) d = Math.max(1, Math.round(d * (1 - plantOut() * pk))); } // 0.18b Melee Planted (0.18c: eased by Fortitude)
+  { const wc = wearyCut(); if (wc > 0) d = Math.max(1, Math.round(d * (1 - wc))); } // 0.18c Weary: standing still from 20:00 weakens all your damage
   const M = player.m;
   if (M.ice2 && (e.slow > 0 || e.chill > 0)) d = Math.round(d * 1.12); // 0.8a Cold snap
   if (e.dizzy > 0) d = Math.round(d * 1.25); // 0.16a: a dizzy Charger takes +25%
@@ -4726,7 +4801,8 @@ function dmgTakenNow() {
   if (player.style === 'necromancer' && player.m && player.m.soul4 && thralls.some(th => th.hp > 0)) m *= 0.92;
   if (player._slayerTaken) m *= player._slayerTaken;
   if (player.graniteStill && (player.stillT || 0) < 1.0) m *= 0.75; // 0.18b: Granite skin now works while moving (or 1s after)
-  { const pk = plantedK(); if (pk > 0) m *= 1 + PLANT_TAKEN * pk; } // 0.18b Melee Planted
+  { const pk = plantedK(); if (pk > 0) m *= 1 + plantTaken() * pk; } // 0.18b Melee Planted (0.18c: eased by Fortitude)
+  { const sw = swarmedMul(); if (sw > 1) m *= sw; } { const gm = guardMul(); if (gm < 1) m *= gm; } // 0.18c Swarmed: a long stand-still from 20:00 gets steadily more dangerous
   return m;
 }
 
@@ -6950,7 +7026,7 @@ function atkNearest(x, y, R, skip) {
 }
 function atkRange() { return Math.max(180, Math.min(0.48 * Math.min(W, H) + 40, (player.range || 160) + 40)); }
 function atkCritDmg(d) { const c = rng() < (player.crit || 0); return [c ? Math.round(d * (player.critMul || 2.4)) : d, c]; }
-function atkPush(e, ux, uy, d) { if (!e || e.boss || e.hp <= 0) return; if (e.mini) d *= 0.3; e.x += ux * d; e.y += uy * d; }
+function atkPush(e, ux, uy, d) { if (!e || e.boss || e.hp <= 0) return; if (e.mini) d *= 0.3; if (WEARY_KB) { const wc = wearyCut(); if (wc > 0) d *= 1 - wc; } /* 0.18c Weary: weaker knockback while standing still */ e.x += ux * d; e.y += uy * d; }
 function atkRoot(e, t) { if (!e || e.boss) return; e.root = Math.max(e.root || 0, e.mini ? t * 0.5 : t); }
 function atkHit(e, dmg, src) { const [d, c] = atkCritDmg(dmg); hurt(e, d, c, false, src); return c; }
 // ---- bounce (old axe engine): homing projectiles that hop to the next enemy
@@ -7044,7 +7120,7 @@ function castPulse(a, D) {
   const t = atkNearest(player.x, player.y, R + 20);
   if (!t) return false;
   const ang = Math.atan2(t.y - player.y, t.x - player.x);
-  const dmg = atkDmg(D.mul[r], D.cd[r]), kb = 1 - PLANT_KB * plantedK(); // 0.18b Planted: knockback -PLANT_KB
+  const dmg = atkDmg(D.mul[r], D.cd[r]), kb = 1 - plantKb() * plantedK(); // 0.18b Planted: knockback -PLANT_KB (0.18c: eased by Fortitude)
   for (const e of enemies) {
     if (e.hp <= 0 || e.dead) continue;
     const dx = e.x - player.x, dy = e.y - player.y, d = Math.hypot(dx, dy) || 1;
@@ -7525,11 +7601,13 @@ function endRun(reason, extra) {
     // 0.9a: event renown was already added during the run; still show it. Base run renown is separate.
     save.renown += renownRun;
     save.best = Math.max(save.best, Math.floor(elapsed));
+    const afkCls = player && player.style, afkSecs = Math.floor(afkRunBest + 1e-6); let afkNew = false; // 0.18c AFK record
+    if (afkCls && afkSecs > 0) { if (!save.afkBest || typeof save.afkBest !== 'object') save.afkBest = {}; const pb = save.afkBest[afkCls]; if (!pb || afkSecs > pb.secs) { save.afkBest[afkCls] = { secs: afkSecs, at: Math.floor(afkRunAt) }; afkNew = true; } }
     if (elapsed >= 240 && chestsOpened >= 3) save.hunterQuest = true;
     const kept = extra.kept || null;
     const keptName = kept && itemDef(kept.id) ? (itemDef(kept.id).icon + ' ' + itemDef(kept.id).n) : '';
     persist();
-    lastRunSummary = { msRenownPaid, msRenownLost: reason === 'extract' ? 0 : msRenown, msBonus, msReached: msIdx, deepDelve, earned, paid, mul, bagBonus, coinLine, reason, extractRenown, keptName, trophyRenown, miniKills, miniTrophies,
+    lastRunSummary = { afkSecs, afkNew, afkCls, afkBestSecs: (afkCls && save.afkBest && save.afkBest[afkCls]) ? save.afkBest[afkCls].secs : 0, afkFort: fortPct(), msRenownPaid, msRenownLost: reason === 'extract' ? 0 : msRenown, msBonus, msReached: msIdx, deepDelve, earned, paid, mul, bagBonus, coinLine, reason, extractRenown, keptName, trophyRenown, miniKills, miniTrophies,
       renownRun, renownEvent, elapsed, kills, chestsOpened, bossesSlain,
       gold: save.gold, renown: save.renown, bossTotal: save.bossTotal, bossBest: save.bossBest };
     runEnded = true;
@@ -7553,6 +7631,7 @@ function endRun(reason, extra) {
     <p>You survived <b>${fmt(sum.elapsed)}</b> and defeated <b>${sum.kills}</b> enemies.<br>
        Chests opened: <b>${sum.chestsOpened}</b><br><!-- 0.5 -->
        Bosses slain: <b>${sum.bossesSlain}</b>${sum.miniKills ? ' · mini bosses <b>' + sum.miniKills + '</b>' : ''}${keptLine}</p><!-- 0.6 / 0.16a -->
+    ${(sum.afkSecs || sum.afkBestSecs) ? '<p class="small" id="afkLine">🧍 AFK <b>' + fmt(sum.afkSecs || 0) + '</b> this run · ' + ((CLASS_INFO[sum.afkCls] || {}).name || sum.afkCls) + ' best <b>' + fmt(sum.afkBestSecs || 0) + '</b>' + (sum.afkNew ? ' · 🏆 new record' : '') + ' · 🛡 Fortitude ' + sum.afkFort + '%</p>' : ''}<!-- 0.18c -->
     <p>Run coins (full): <b>${sum.earned}</b>${sum.reason === 'extract' ? ' · multiplier <b>×' + (sum.mul != null ? Number(sum.mul).toFixed(2) : '1.00') + '</b>' : ''}<br>
        Coins banked this run: <b>${sum.paid != null ? sum.paid : sum.earned}</b><br>
        Permanent coin purse: <b>${sum.gold}</b><br>
@@ -7726,6 +7805,7 @@ function update(dt) {
   if (player.moving) player.stillT = 0;
   else player.stillT = (player.stillT || 0) + dt;
   if (!plantHinted && plantedK() >= 0.5) { plantHinted = true; toast('⚠ Planted: the horde closes in. Keep moving!'); } // 0.18b
+  afkTick(dt); // 0.18c AFK record
 
   let spd = moveSpeed(); // 0.9c: additive, at most class base × 1.40
   player.x += dx * spd * dt;
@@ -7884,7 +7964,7 @@ function update(dt) {
       if (minContact > 0 && dmg < minContact && e.damage > 0) dmg = minContact;
       player._slayerTaken = 0;
       player.hp -= dmg;
-      if (e.elite && elapsed >= WOUND_AT) player.woundT = WOUND_T; // 0.18b Wounded: heals x0.5
+      if (e.elite && elapsed >= WOUND_AT) player.woundT = woundTime(); // 0.18b Wounded: heals x0.5 (0.18c: eased by Fortitude)
       sfx('hurt');
       if (Math.random() < 0.08) shake = Math.max(shake, 0.12);
     }
@@ -8692,7 +8772,7 @@ function togglePause() {
         <button type="button" id="splatToggle" aria-pressed="true">💢 Numbers on</button>
         <button type="button" id="mapToggle" aria-pressed="true">🗺️ Map on</button>
       </div>
-      ${msTableHtml()}${healInfoHtml()}
+      ${msTableHtml()}${fortInfoHtml()}${healInfoHtml()}
       <div id="pauseAtkMount"></div>
       <div id="pauseBagMount"></div>
       <button id="resume">Resume</button>
@@ -8816,7 +8896,7 @@ function dbgRegisterDefaultLines() {
   dbgAddLine('Scaling', () => { const s = lateScale(); return 'hp ×' + s.hp.toFixed(2) + ' · dmg ×' + s.dmg.toFixed(2) + ' · xp ×' + s.xp.toFixed(2) + ' · early ' + earlyPressure() + '/' + earlyDmg(); });
   dbgAddLine('Depth', () => { const b = miniBand(elapsed); return 'tier ' + lateTier() + ' · spawn every ' + dbgSpawnInterval().toFixed(2) + 's · dragon #' + (bossCount + 1) + ' at ' + fmt(bossNext) + ' · minis ' + (b ? b.n + '/' + b.every + 's' : 'solo') + ' next ' + fmt(miniNextAt); });
   dbgAddLine('Pressure', () => 'cap ' + liveCap() + ' · elite ' + Math.round(eliteRoll() * 100) + '% · chg+wiz ×' + specialShareMul().toFixed(2) + (plantedK() > 0 ? ' · PLANTED ' + Math.round(plantedK() * 100) + '%' : ''));
-  dbgAddLine('Heal', () => !player ? '-' : 'cap ' + healRateNow().toFixed(1) + '/s (' + (healRatePct() * 100).toFixed(1) + '%) · bank ' + Math.round(player.healBank == null ? 0 : player.healBank) + ' · eff ' + Math.round(healEff() * 100) + '%' + (rootK() > 0 ? ' ROOTED' : '') + ((player.woundT || 0) > 0 ? ' WOUNDED' : '') + ' · got ' + Math.round(healStats.got) + ' lost ' + Math.round(healStats.lost));
+  dbgAddLine('Heal', () => !player ? '-' : 'cap ' + healRateNow().toFixed(1) + '/s (' + (healRatePct() * 100).toFixed(1) + '%) · bank ' + Math.round(player.healBank == null ? 0 : player.healBank) + ' · eff ' + Math.round(healEff() * 100) + '%' + (rootK() > 0 ? ' ROOTED' : '') + ((player.woundT || 0) > 0 ? ' WOUNDED' : '') + ' · got ' + Math.round(healStats.got) + ' lost ' + Math.round(healStats.lost) + ' · fort ' + fortPct() + '% e ' + fortEff().toFixed(2) + (fortEff() < fortE - 1e-9 ? '/' + fortE.toFixed(2) + ' (deep fade)' : '') + ' root ' + Math.round(rootFloor() * 100) + '% wound ×' + woundMul().toFixed(2) + '/' + woundTime().toFixed(1) + 's' + (player.style === 'melee' ? ' plant +' + Math.round(plantTaken() * 100) + '%/-' + Math.round(plantOut() * 100) + '%' : '') + ' · afk ' + Math.floor(afkCur) + 's' + (wearyK() > 0 ? ' WEARY -' + Math.round(wearyCut() * 100) + '%' : '') + (swarmedMul() > 1 ? ' SWARMED x' + swarmedMul().toFixed(2) : ''));
   dbgAddLine('Milestone', () => 'next ' + fmt(msNextAt > 1e9 ? 0 : msNextAt) + ' · bonus +' + msBonus.toFixed(2) + ' · bank ×' + extractMultiplier().toFixed(2) + ' · renown ' + msRenown + (msTrophy ? ' · deep' : ''));
   dbgAddLine('Seed', () => seedText(runSeed));
   dbgAddLine('Errors', () => ['update', 'draw', 'save', 'asset', 'state', 'other'].map(k => k + ' ' + LS_ERR[k].n).join(' · '));
@@ -9082,7 +9162,7 @@ function labRunMany(classes, levels, opts) {
   return out;
 }
 function labReport() {
-  return JSON.parse(JSON.stringify({ version: '0.18b', step: LAB_STEP, generated: new Date().toISOString(), method: {
+  return JSON.parse(JSON.stringify({ version: '0.18c', step: LAB_STEP, generated: new Date().toISOString(), method: {
     dummies: 'single dummy 80px from the player; cluster = 8 dummies (1 + ring of 7 at 26px) centred 80px away; player stands still; special used on cooldown',
     measure: '2s warm-up then 20s measured, fixed 1/30s steps, skill XP frozen',
     picks: 'level-ups use the seeded offer stream; pick = class attack card > Keen edge > Quick hands > Critical eye > class cards > Long reach > defensive',
@@ -9130,7 +9210,7 @@ function labOpen() {
 if (DEBUG) {
   try { dbgInitUi(); } catch (e) { noteErr('other', e, 'debug ui'); }
   window.LS_DEBUG = {
-    version: '0.18b',
+    version: '0.18c',
     errors: () => JSON.parse(JSON.stringify(LS_ERR)),
     addLine: dbgAddLine, toggle: dbgToggle, render: dbgRender, stats: dbgStats,
     lines: () => DBG.lines.map(l => { try { return [l.name, String(l.fn())]; } catch (e) { return [l.name, 'ERR ' + e.message]; } }),
@@ -9141,7 +9221,9 @@ if (DEBUG) {
     dpsReport: () => labReport(),
     dpsTable: () => labTableHtml(LAB.results),
     openLab: () => labOpen(),
-    saveInfo: () => JSON.parse(JSON.stringify(saveLoadInfo))
+    saveInfo: () => JSON.parse(JSON.stringify(saveLoadInfo)),
+    fortitude: (cls) => ({ F: cls ? fortitudeFor(cls) : fortF, e: cls ? Math.pow(fortitudeFor(cls) / 100, 2) : fortE, parts: fortParts(cls || (player && player.style) || lastClass || 'melee') }),
+    setFortitude: v => { fortOverride = (v == null || v === '') ? null : +v; return fortOverride; } // applies from the next run (debug only)
   };
   if (DEBUG_DPS) setTimeout(() => { try { labOpen(); } catch (e) {} }, 50);
 }
