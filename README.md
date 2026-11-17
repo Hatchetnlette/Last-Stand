@@ -21,6 +21,7 @@ Test link: Prototype 0.17a (one signature attack per class at level 5, shared po
 0.18b (test): extraction milestones + 5:00 Retreat shrine, bank/risk goal box, late-game pressure scaling, healing budget rework + Melee Planted anti-AFK, Slayer darts fix.
 0.18c test: earned AFK (Fortitude from permanent progress, Weary/Swarmed stand-still rules from 20:00, AFK record).
 0.18c2 main: stat caps, percentage health cards, Spoils for maxed cards (includes everything from 0.12 to 0.18c).
+Test link: 0.18d (Phase 1 evolutions + fusions)
 Last checked: 2026-11-06 14:08 America/Chicago
 
 Play it at https://hatchetnlette.github.io/Last-Stand/
