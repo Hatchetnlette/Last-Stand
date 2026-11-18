@@ -22,6 +22,7 @@ Test link: Prototype 0.17a (one signature attack per class at level 5, shared po
 0.18c test: earned AFK (Fortitude from permanent progress, Weary/Swarmed stand-still rules from 20:00, AFK record).
 0.18c2 main: stat caps, percentage health cards, Spoils for maxed cards (includes everything from 0.12 to 0.18c).
 Test link: 0.18d (Phase 1 evolutions + fusions)
+Test link: 0.19a (three classes + ability pool)
 Last checked: 2026-11-06 14:08 America/Chicago
 
 Play it at https://hatchetnlette.github.io/Last-Stand/

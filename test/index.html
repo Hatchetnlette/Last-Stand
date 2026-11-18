@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.18d</title>
+<title>Last Stand — Prototype 0.19a</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -57,6 +57,8 @@ button:disabled{opacity:.4;cursor:default}
 .choice{background:#243328;text-align:left}
 .choice.atkcard{background:#2e2a18;border-color:#e8c56a}
 .choice.atkcard strong{color:#ffd86a}
+.choice.abilcard{background:#12302c;border:2px solid #5ec8c0;box-shadow:0 0 8px #5ec8c055}
+.choice.abilcard strong{color:#9ff0e6}
 .choice.evocard{background:#3a3010;border:2px solid #ffd24a;box-shadow:0 0 10px #ffd24a66}
 .choice.evocard strong{color:#ffe08a}
 .choice.fusecard{background:#2a1a3a;border:2px solid #b77aff;box-shadow:0 0 10px #b77aff66}
@@ -67,6 +69,9 @@ body.playing #atkHud{display:flex}
 #atkHud .atks{width:32px;height:38px;border-radius:8px;background:#0c1410d9;border:1px solid #4a5c48;
   display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:16px;line-height:1}
 #atkHud .atks.own{border-color:#e8c56a}
+#atkHud .atks.abil{border-color:#5ec8c0}
+#atkHud .atks.open.abil{border-color:#5ec8c0;color:#9ff0e6}
+#atkHud .atks.zz{opacity:.55}
 #atkHud .atks.open{border-style:dashed;border-color:#8a9a78;color:#c8d8b0;font-size:15px}
 #atkHud .atks.lock{opacity:0.55;font-size:10px;color:#a8b5a0}
 #atkHud .pips{display:flex;gap:1px;margin-top:3px}
@@ -365,7 +370,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.18d</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.19a</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, and extract at the shrine after the first dragon. Death keeps half your coins.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -422,7 +427,7 @@ const DEBUG_DPS = DEBUG && LS_Q.get('dps') === '1';
 // 0.18a save versioning (declared here because the save is loaded before the SAVE section runs)
 const SAVE_VERSION = 4; // first versioned save; 0.17b and older saves have no saveV and migrate losslessly
 const SAVE_CORRUPT_KEY = 'laststand_save_corrupt_backup';
-const SAVE_KEY = 'laststand_save_v3', SAVE_KEY_ALT = 'laststand_save_v3_test'; // 0.18c2 main link: 0.11a's key first, then the test link's once
+const SAVE_KEY = 'laststand_save_v4', SAVE_KEY_ALT = 'laststand_save_v4'; // 0.19a: fresh start on a new key (Hatch t134u: no carry-over); 0.18d/0.18c2 saves (v3) are left untouched
 let saveLoadInfo = { source: 'defaults', corrupt: [], from: null };
 let LS_SANDBOX = false; // 0.18a: true only while the DPS lab runs; persist() never writes then
 const LS_ERR = {};
@@ -2146,7 +2151,7 @@ function backupCorruptSave(key, raw) {
   } catch (e) { noteErr('save', e, 'corrupt backup'); }
 }
 function loadSave() {
-  for (const key of [SAVE_KEY, SAVE_KEY_ALT]) { // 0.18c2: main link reads its own key first
+  for (const key of [SAVE_KEY]) { // 0.19a: only the new key (old v3 saves are ignored, never migrated)
     const r = readSaveKey(key);
     if (r.ok) {
       saveLoadInfo.source = key;
@@ -2194,6 +2199,7 @@ function migrateSave(s) {
     for (const k in TREES) if (a[k] && typeof a[k] === 'object' && num(a[k].secs) > 0) s.afkBest[k] = { secs: Math.floor(num(a[k].secs)), at: Math.floor(num(a[k].at)) };
   }
   s.hunterQuest = !!s.hunterQuest;
+  s.lastAbilities = Array.isArray(s.lastAbilities) ? s.lastAbilities.filter((x, i, a) => ['harpoon','log','orbit','knives','darts','snare','trail','corpse','ward','thralls'].includes(x) && a.indexOf(x) === i).slice(0, 2) : []; // 0.19a: last run's abilities (offer weighting)
   // 0.14a: stash is a persistent 2-slot trunk. Sanitize without touching ITEMS (it is declared later).
   if (!Array.isArray(s.stash)) s.stash = [];
   s.stash = s.stash.filter(it => it && (typeof it === 'string' || typeof it.id === 'string')).slice(0, STASH_SLOTS).map(it => {
@@ -2279,6 +2285,7 @@ function newPlayer() {
     kindleT: 0,
     slayerTask: null, slayerMark: null, slayerNewAt: 0,
     feats: {}, evo: null, fusion: null, evoSkipUntil: 0, fusSkipUntil: 0, evoGuardN: 0, evoGuardT: 0, evoShat: [], // 0.18d
+    evos: [], abilDry: 0, abilSeen: 0, abilMul: null, abilDmgDone: {}, // 0.19a
     essence: 0, essenceMax: 40, runes: { air:0, fire:0, law:0, death:0 }, runeAltar: null, lawBlinkCd: 0,
     snareT: 0, trapArmed: 0, huntBuff: 0
   };
@@ -2902,7 +2909,7 @@ function respecTree(cls) { // free: refunds 100% of the renown spent in this cla
   return r;
 }
 function mastery(cls, sel) {
-  cls = TREES[cls] ? cls : 'melee';
+  cls = (TREES[cls] && classVisible(cls)) ? cls : 'melee';
   const T = TREES[cls], t = save.tree[cls], lv = sLvl(cls), spent = treeSpent(cls);
   if (!sel || !NODE[sel] || NODE[sel].cls !== cls) { // default: first thing you can buy, else first node
     let first = null;
@@ -2911,7 +2918,7 @@ function mastery(cls, sel) {
   }
   const capN = t.cap ? NODE[t.cap] : null;
   let h = '<div class="mast"><div class="mhead"><h2>MASTERY</h2><span class="ren" id="mren">✦ ' + save.renown + ' renown</span></div>';
-  h += '<div class="mtabs">' + Object.keys(TREES).map(k => '<button type="button" data-t="' + k + '"' + (k === cls ? ' class="on"' : '') + '>' +
+  h += '<div class="mtabs">' + Object.keys(TREES).filter(k => classVisible(k) || k === cls).map(k => '<button type="button" data-t="' + k + '"' + (k === cls ? ' class="on"' : '') + '>' +
     TREES[k].icon + ' ' + TREES[k].name + '<small>' + TREES[k].skill + ' ' + sLvl(k) + '</small></button>').join('') + '</div>';
   h += '<div class="mslot">★ Capstone slot: <b>' + (capN ? capN.icon + ' ' + capN.name : 'empty') + '</b>' + (CAPS_LIVE ? ' · own all 3, equip 1' : ' · capstones coming in 0.8b') + '</div>';
   h += '<div class="mgrid">' + T.branches.map(br => '<div class="mcol"><div class="mbt">' + br.icon + ' ' + br.name + '</div>' +
@@ -3038,11 +3045,13 @@ function closeClassList() {
   if (drop) drop.setAttribute('aria-expanded', 'false');
 }
 function refreshClassPicker() { // 0.9c / 0.11a: sync dropdown label, blurb, Start, locks, mastery line
+  if (!classVisible(lastClass)) lastClass = 'melee'; // 0.19a: 3 classes
   const k = lastClass || 'melee';
   const info = CLASS_INFO[k] || CLASS_INFO.melee;
   document.querySelectorAll('#classList .classopt').forEach(b => {
     const id = b.dataset.s;
     const ok = classUnlocked(id);
+    b.style.display = classVisible(id) ? '' : 'none'; // 0.19a: the 9 cut classes are hidden (not deleted)
     b.classList.toggle('lock', !ok);
     b.classList.toggle('on', id === k);
     const lk = b.querySelector('.unlock');
@@ -3050,7 +3059,7 @@ function refreshClassPicker() { // 0.9c / 0.11a: sync dropdown label, blurb, Sta
   });
   if ($('classDropLabel')) $('classDropLabel').textContent = 'Class: ' + info.icon + ' ' + info.name;
   if ($('classInfoName')) $('classInfoName').textContent = info.icon + ' ' + info.name;
-  if ($('classInfoBlurb')) $('classInfoBlurb').innerHTML = info.blurb;
+  if ($('classInfoBlurb')) $('classInfoBlurb').innerHTML = info.blurb + (function () { try { return abilBlurb(k); } catch (e) { return ''; } })(); // 0.19a (bind() runs before the ability module loads; the module refreshes the picker once ready)
   const mcap = $('classInfoMcap');
   if (mcap) {
     mcap.dataset.mc = k;
@@ -3107,7 +3116,7 @@ function bind() {
   };
   const fu = fisherUnlocked();
   $('saveinfo').textContent = `Saved on this device · Coins ${toGold(save.gold)} · Best ${fmt(save.best)} · Attack ${sLvl('melee')} · Ranged ${sLvl('ranged')} · Magic ${sLvl('magic')}` +
-    (fu ? ` · Fishing ${sLvl('fisher')}` : '');
+    (fu && classVisible('fisher') ? ` · Fishing ${sLvl('fisher')}` : '');
   if (typeof renderStashMenu === 'function') renderStashMenu();
 }
 bind();
@@ -3526,6 +3535,7 @@ function spawn(forceElite = false) {
 /* ========== COMBAT ========== */
 function hurt(e, d, isCrit, dot, src) { // 0.8a: dot = burn tick / Retribution (no on-hit effects). 0.12a: optional src for the DPS meter.
   if (e.dead) return;
+  if (src && player.abilMul) { const am = player.abilMul[src]; if (am) { d = Math.max(1, Math.round(d * am)); const dd = player.abilDmgDone || (player.abilDmgDone = {}); dd[src] = (dd[src] || 0) + d; } } // 0.19a abilities
   if (buffs.dagger > 0) d = Math.round(d * 2); // 0.5: Dragon dagger = double damage
   { const pk = plantedK(); if (pk > 0) d = Math.max(1, Math.round(d * (1 - plantOut() * pk))); } // 0.18b Melee Planted (0.18c: eased by Fortitude)
   { const wc = wearyCut(); if (wc > 0) d = Math.max(1, Math.round(d * (1 - wc))); } // 0.18c Weary: standing still from 20:00 weakens all your damage
@@ -4314,7 +4324,7 @@ function isTaskEnemy(e) {
   return false;
 }
 function onSlayerKill(e) {
-  if (player.style !== 'slayer' || !player.slayerTask || !isTaskEnemy(e)) return;
+  if ((player.style !== 'slayer' && !atkOwned('darts')) || !player.slayerTask || !isTaskEnemy(e)) return; // 0.19a: whoever holds Slayer darts
   player.slayerTask.have++;
   if (player.m && player.m.task3) healP(4, 'task');
   if (player.slayerTask.have >= player.slayerTask.need) {
@@ -4413,12 +4423,12 @@ function updateThralls(dt) {
         th.y += dy / d * th.speed * dt;
       }
       th.atk -= dt;
-      if (d < th.r + best.r + 8 && th.atk <= 0) {
+      if (d < th.r + best.r + 8 && th.atk <= 0 && !(th.abil && !abilLive({ abil: true }))) { // 0.19a: ability thralls rest while you stand still
         th.atk = 0.7;
         let mul = th.dmg;
         if (player.m && player.m.thrall3) mul *= 1.30;
         mul *= (player.thrallDmgCard || 1);
-        hurt(best, Math.max(1, Math.round(wDmg() * mul)), false, false, 'thralls');
+        hurt(best, th.hitDmg ? Math.max(1, Math.round(th.hitDmg * (player.thrallDmgCard || 1))) : Math.max(1, Math.round(wDmg() * mul)), false, false, 'thralls'); // 0.19a: ability thralls hit for atkDmg
         if (player.m && player.m.thrall4) healP(2, 'thrall');
       }
     }
@@ -4631,7 +4641,7 @@ function doSlayerStrike() {
 }
 
 function onEnemyKilled(e) {
-  if (player.style === 'slayer') onSlayerKill(e);
+  if (player.style === 'slayer' || atkOwned('darts')) onSlayerKill(e); // 0.19a: task kills count for whoever holds Slayer darts
   if (player.style === 'runecrafter' && player.m && player.m.ess4) grantEssence(3);
   if (e && e.wither) e.wither = 0;
 }
@@ -5853,7 +5863,7 @@ function renderBuffs() {
   if (fires.length) h += '<div class="pill">🔥 ×' + fires.length + '</div>';
   if (thralls.length) h += '<div class="pill">💀 ×' + thralls.length + '</div>';
   if (traps.length) h += '<div class="pill">📦 ×' + traps.length + '</div>';
-  if (player.style === 'slayer' && player.slayerTask)
+  if ((player.style === 'slayer' || atkOwned('darts')) && player.slayerTask) // 0.19a
     h += '<div class="pill">📜 ' + player.slayerTask.name + ' ' + player.slayerTask.have + '/' + player.slayerTask.need + (player.fusion ? optCall('fusion', () => fusTaskPill(), '') : '') + '</div>';
   if ((player.huntBuff || 0) > 0) h += '<div class="pill">🦅 ' + player.huntBuff.toFixed(1) + 's</div>';
   if (player.style === 'runecrafter') {
@@ -6606,7 +6616,7 @@ function upgradesOverlap(a, b) {
   return A.some(f => B.includes(f));
 }
 function pickUpgradesBase() {
-  const styleUps = upgrades.filter(u => u[3] === player.style && !alreadyHasUpgrade(u));
+  const styleUps = upgrades.filter(u => (u[3] === player.style || abilTagOn(u[3])) && !alreadyHasUpgrade(u)); // 0.19a: + tagged ability cards
   const generic = upgrades.filter(u => !u[3] && !alreadyHasUpgrade(u));
   const shuffle = arr => {
     const a = arr.slice();
@@ -7172,7 +7182,7 @@ function mainDps() {
 function atkDmg(mul, period) { return Math.max(1, Math.round(mainDps() * period * mul)); }
 function addAttack(id) {
   if (!player.atks) player.atks = [];
-  if (atkOwned(id) || player.atks.length >= atkSlots() || !ATK_DEFS[id]) return false;
+  if (atkOwned(id) || sigCount() >= atkSlots() || !ATK_DEFS[id]) return false; // 0.19a: abilities have their own slots
   player.atks.push({ id, rank: 1, cd: 0.4, at: player.level }); // 0.15b: learned level for the rank-up gate
   atkHudSig = '';
   return true;
@@ -7187,7 +7197,7 @@ function rankAttack(id) {
 function atkCards() {
   const out = [];
   const owned = player.atks || [];
-  const free = owned.length < atkSlots();
+  const free = sigCount() < atkSlots(); // 0.19a
   if (free) for (const id of atkOrder()) { // 0.17a: only your class's signature attack
     if (atkOwned(id)) continue;
     const d = ATK_DEFS[id];
@@ -7197,9 +7207,10 @@ function atkCards() {
   for (const a of owned) {
     if (a.rank >= ATK_MAX_RANK) continue;
     if (!atkRankReady(a)) continue; // 0.15b: rank-up gate
+    if (a.abil && !abilOn()) continue; // 0.19a: abilities off -> no ability rank-ups
     const d = ATK_DEFS[a.id];
-    const c = [d.icon + ' ' + d.n + ' → rank ' + (a.rank + 1), d.desc(a.rank), p => rankAttack(a.id)];
-    c.atk = a.id; c.atkNew = false; out.push(c);
+    const c = [d.icon + ' ' + d.n + ' → rank ' + (a.rank + 1), (a.abil ? 'Ability rank-up · ' : '') + d.desc(a.rank), p => rankAttack(a.id)];
+    c.atk = a.id; c.atkNew = false; c.abil = !!a.abil; out.push(c);
   }
   return out;
 }
@@ -7217,7 +7228,7 @@ function pickUpgrades0() { // 0.18d: wrapped by pickUpgrades() (Evolve / Fuse ca
   n = Math.min(n, cards.length, 2);
   const news = shuffle(cards.filter(c => c.atkNew)), ranks = shuffle(cards.filter(c => !c.atkNew));
   const chosen = [];
-  if (news.length && (opened || (player.atks || []).length < slots)) chosen.push(news.shift());
+  if (news.length && (opened || sigCount() < slots)) chosen.push(news.shift());
   const rest = shuffle(news.concat(ranks));
   while (chosen.length < n && rest.length) chosen.push(rest.shift());
   const picks = base.slice(0, 3);
@@ -7272,40 +7283,40 @@ const EVOLUTIONS = [
     req: [{ t: 'rank', atk: 'bind', min: 5 }, { t: 'card', name: 'Ice barrage', min: 1 }, { t: 'feat', key: 'bindElite', min: 280, label: 'elites bound' }],
     def: { rad: 84, root: 1.4, mul: 0.56 }, beh: { shatter: 0.4, shatterR: 50 },
     line: 'Bigger, longer root; anything that dies while entangled shatters (40% splash).' },
-  { id: 'dragon_harpoon', cls: 'fisher', from: 'harpoon', n: 'Dragon Harpoon', icon: '🐲',
-    req: [{ t: 'rank', atk: 'harpoon', min: 5 }, { t: 'card', name: 'Critical eye', min: 1 }, { t: 'feat', key: 'kills:harpoon', min: 1000, label: 'harpoon kills' }],
+  { id: 'dragon_harpoon', cls: null, ability: 'harpoon', from: 'harpoon', n: 'Dragon Harpoon', icon: '🐲',
+    req: [{ t: 'rank', atk: 'harpoon', min: 5 }, { t: 'card', name: 'Critical eye', min: 1 }, { t: 'feat', key: 'kills:harpoon', min: 500, label: 'harpoon kills' }],
     def: { mul: 0.17 }, beh: { returns: 1, reel: 60 },
     line: 'Harpoons fly back (two passes); crits reel the target 60px toward you.' },
-  { id: 'crystal_felling', cls: 'woodcutter', from: 'log', n: 'Crystal Felling', icon: '💎',
-    req: [{ t: 'rank', atk: 'log', min: 5 }, { t: 'card', name: 'Keen edge', min: 1 }, { t: 'feat', key: 'kills:log', min: 220, label: 'log kills' }],
+  { id: 'crystal_felling', cls: null, ability: 'log', from: 'log', n: 'Crystal Felling', icon: '💎',
+    req: [{ t: 'rank', atk: 'log', min: 5 }, { t: 'card', name: 'Keen edge', min: 1 }, { t: 'feat', key: 'kills:log', min: 160, label: 'log kills' }],
     def: {}, beh: { split: 2, fan: 0.436, splitMul: 0.5 },
     line: 'On its first hit the log splits into 3 (25° fan; split logs 50%).' },
-  { id: 'dragon_knives', cls: 'thief', from: 'knives', n: 'Dragon Knives', icon: '🗡',
-    req: [{ t: 'rank', atk: 'knives', min: 5 }, { t: 'card', name: 'Sneak', min: 1 }, { t: 'feat', key: 'crits:knives', min: 1300, label: 'knife crits' }],
+  { id: 'dragon_knives', cls: null, ability: 'knives', from: 'knives', n: 'Dragon Knives', icon: '🗡',
+    req: [{ t: 'rank', atk: 'knives', min: 5 }, { t: 'card', name: 'Critical eye', min: 1 }, { t: 'feat', key: 'crits:knives', min: 650, label: 'knife crits' }],
     def: { hits: 2, mul: 0.16 }, beh: { pocketCrit: 2 },
     line: 'Every knife bounces once more; knife crits pickpocket double.' },
-  { id: 'ward_saradomin', cls: 'priest', from: 'ward', n: 'Ward of Saradomin', icon: '☀️',
-    req: [{ t: 'rank', atk: 'ward', min: 5 }, { t: 'card', name: 'Stout constitution', min: 1 }, { t: 'feat', key: 'wardMove', min: 120, label: 's moving in your ground' }],
+  { id: 'ward_saradomin', cls: null, ability: 'ward', from: 'ward', n: 'Ward of Saradomin', icon: '☀️',
+    req: [{ t: 'rank', atk: 'ward', min: 5 }, { t: 'card', name: 'Stout constitution', min: 1 }, { t: 'feat', key: 'wardMove', min: 90, label: 's moving in your ground' }],
     def: {}, beh: { follow: { rad: 0.5, mul: 0.95, heal: 0.5 } },
     line: 'A half-size second ward follows you while you move (its heal still uses the heal budget).' },
-  { id: 'inferno_trail', cls: 'firemaker', from: 'trail', n: 'Inferno Trail', icon: '🌋',
-    req: [{ t: 'rank', atk: 'trail', min: 5 }, { t: 'card', name: 'Fleet-footed', min: 1 }, { t: 'feat', key: 'kills:trail', min: 1600, label: 'trail kills' }],
+  { id: 'inferno_trail', cls: null, ability: 'trail', from: 'trail', n: 'Inferno Trail', icon: '🌋',
+    req: [{ t: 'rank', atk: 'trail', min: 5 }, { t: 'card', name: 'Fleet-footed', min: 1 }, { t: 'feat', key: 'kills:trail', min: 800, label: 'trail kills' }],
     def: { rad: 39 }, beh: { burnStack: 3, stackK: 0.35 },
     line: 'Trail 40% wider; its burns stack up to 3 times.' },
-  { id: 'soul_harvest', cls: 'necromancer', from: 'corpse', n: 'Soul Harvest', icon: '👻',
-    req: [{ t: 'rank', atk: 'corpse', min: 5 }, { t: 'card', name: 'Bloodlust', min: 1 }, { t: 'feat', key: 'kills:corpse', min: 900, label: 'explosion kills' }],
+  { id: 'soul_harvest', cls: null, ability: 'corpse', from: 'corpse', n: 'Soul Harvest', icon: '👻',
+    req: [{ t: 'rank', atk: 'corpse', min: 5 }, { t: 'card', name: 'Bloodlust', min: 1 }, { t: 'feat', key: 'kills:corpse', min: 450, label: 'explosion kills' }],
     def: { mul: 0.38 }, beh: { raise: { every: 8, life: 8, max: 1 } },
     line: 'Every 8th explosion raises an 8s thrall (1 extra at a time); explosions +5%.' },
-  { id: 'abyssal_darts', cls: 'slayer', from: 'darts', n: 'Abyssal Darts', icon: '🩸',
-    req: [{ t: 'rank', atk: 'darts', min: 5 }, { t: 'card', name: 'Keen edge', min: 1 }, { t: 'feat', key: 'tasks', min: 40, label: 'tasks done' }],
+  { id: 'abyssal_darts', cls: null, ability: 'darts', from: 'darts', n: 'Abyssal Darts', icon: '🩸',
+    req: [{ t: 'rank', atk: 'darts', min: 5 }, { t: 'card', name: 'Keen edge', min: 1 }, { t: 'feat', key: 'tasks', min: 16, label: 'tasks done' }],
     def: {}, beh: { chain: 2, chainMul: 0.6, chainR: 240 },
     line: 'Each dart chains to 2 more task, elite or mini-boss targets (60%).' },
-  { id: 'chinchompa_snares', cls: 'hunter', from: 'snare', n: 'Chinchompa Snares', icon: '🐿',
-    req: [{ t: 'rank', atk: 'snare', min: 5 }, { t: 'card', name: 'Quick hands', min: 1 }, { t: 'feat', key: 'springs', min: 350, label: 'snares sprung' }],
+  { id: 'chinchompa_snares', cls: null, ability: 'snare', from: 'snare', n: 'Chinchompa Snares', icon: '🐿',
+    req: [{ t: 'rank', atk: 'snare', min: 5 }, { t: 'card', name: 'Quick hands', min: 1 }, { t: 'feat', key: 'springs', min: 220, label: 'snares sprung' }],
     def: {}, beh: { chain: 100, hopMul: 0.3 },
     line: 'A sprung snare sets off a nearby armed snare with prey on it, or a chinchompa hops to the nearest enemy outside the blast and bursts (30%).' },
-  { id: 'abyssal_orbit', cls: 'runecrafter', from: 'orbit', n: 'Abyssal Orbit', icon: '🟣',
-    req: [{ t: 'rank', atk: 'orbit', min: 5 }, { t: 'card', name: 'Catalyse', min: 1 }, { t: 'feat', key: 'kills:orbit', min: 2000, label: 'orbit kills' }],
+  { id: 'abyssal_orbit', cls: null, ability: 'orbit', from: 'orbit', n: 'Abyssal Orbit', icon: '🟣',
+    req: [{ t: 'rank', atk: 'orbit', min: 5 }, { t: 'card', name: 'Catalyse', min: 1 }, { t: 'feat', key: 'kills:orbit', min: 1000, label: 'orbit kills' }],
     def: { count: 6, rad: 135 }, beh: { flip: true },
     line: 'Ring 30% wider with +1 rune; each lap flips air runes between push and pull.' }
 ];
@@ -7323,22 +7334,22 @@ const FUSIONS = [
   { id: 'flame_staff', cls: 'magic', n: 'Flame Staff', icon: '🔥', rarity: 'common',
     in: [{ t: 'main', cls: 'magic' }, { t: 'card', name: 'Keen edge', min: 2 }], beh: { burnGround: { r: 40, life: 1.5, mul: 1.2, every: 0.5 } },
     line: 'Your splash leaves 1.5s of burning ground.' },
-  { id: 'barbarian_rod', cls: 'fisher', n: 'Barbarian Rod', icon: '🎣', rarity: 'common',
-    in: [{ t: 'main', cls: 'fisher' }, { t: 'card', name: 'Quick hands', min: 2 }], beh: { multiCast: 5, mul: 1.0 },
+  { id: 'barbarian_rod', cls: null, ability: 'harpoon', n: 'Barbarian Rod', icon: '🎣', rarity: 'common',
+    in: [{ t: 'atk', atk: 'harpoon' }, { t: 'card', name: 'Quick hands', min: 2 }], beh: { multiCast: 5, mul: 1.0 },
     line: 'Every 5th cast throws a second line at another target.' },
-  { id: 'slayer_ring', cls: 'slayer', n: 'Slayer Ring', icon: '💍', rarity: 'uncommon',
-    in: [{ t: 'main', cls: 'slayer' }, { t: 'card', name: 'Ring of wealth', min: 1 }], beh: { taskCoins: 1 },
+  { id: 'slayer_ring', cls: null, ability: 'darts', n: 'Slayer Ring', icon: '💍', rarity: 'uncommon',
+    in: [{ t: 'atk', atk: 'darts' }, { t: 'card', name: 'Ring of wealth', min: 1 }], beh: { taskCoins: 1 },
     line: 'Finished tasks drop a coin pouch; the task pill shows the reward.' },
-  { id: 'infernal_log', cls: 'woodcutter', n: 'Infernal Log', icon: '🪵', rarity: 'rare',
+  { id: 'infernal_log', cls: null, ability: 'log', n: 'Infernal Log', icon: '🪵', rarity: 'rare',
     in: [{ t: 'atk', atk: 'log' }, { t: 'item', id: 'infernal_axe' }], beh: { logFire: { every: 36, r: 28, life: 1.6, mul: 1.2 } },
     line: 'Rolling logs leave a trail of fire.' },
-  { id: 'abyssal_dagger_pp', cls: 'thief', n: 'Abyssal dagger (p++)', icon: '🧪', rarity: 'rare',
-    in: [{ t: 'main', cls: 'thief' }, { t: 'item', id: 'abyssal_dagger' }], beh: { stabEvery: 8, venom: 0.25 },
+  { id: 'abyssal_dagger_pp', cls: 'melee', n: 'Abyssal dagger (p++)', icon: '🧪', rarity: 'rare',
+    in: [{ t: 'main', cls: 'melee' }, { t: 'item', id: 'abyssal_dagger' }], beh: { stabEvery: 8, venom: 0.25 },
     line: 'Every 8th hit is a double stab that poisons.' },
-  { id: 'book_saradomin', cls: 'priest', n: 'Book of Saradomin', icon: '📖', rarity: 'rare',
+  { id: 'book_saradomin', cls: null, ability: 'ward', n: 'Book of Saradomin', icon: '📖', rarity: 'rare',
     in: [{ t: 'atk', atk: 'ward' }, { t: 'item', id: 'holy_book' }], beh: { nova: { every: 3, mul: 1.2, rad: 1.3 } },
     line: 'Your ground pulses a holy nova every 3s (damage only, no extra heal).' },
-  { id: 'soulreaper_sceptre', cls: 'necromancer', n: 'Soulreaper Sceptre', icon: '💀', rarity: 'rare',
+  { id: 'soulreaper_sceptre', cls: null, ability: 'corpse', n: 'Soulreaper Sceptre', icon: '💀', rarity: 'rare',
     in: [{ t: 'atk', atk: 'corpse' }, { t: 'item', id: 'ancient_sceptre' }], beh: { corpseSpread: 0.35 },
     line: 'Each corpse explosion spreads: a second blast (35%) bursts on the nearest enemy just outside it.' }
 ];
@@ -7357,7 +7368,7 @@ function validateEvolutions() {
   for (const k in EVO_BY_ID) delete EVO_BY_ID[k]; for (const k in EVO_DEF) delete EVO_DEF[k];
   for (let i = EVOLUTIONS.length - 1; i >= 0; i--) {
     const E = EVOLUTIONS[i], B = E && ATK_DEFS[E.from];
-    const bad = !E || !E.id || !B || B.cls !== E.cls || EVO_BY_ID[E.id] || !Array.isArray(E.req) || !E.req.every(evoReqOk);
+    const bad = !E || !E.id || !B || (E.ability ? E.ability !== E.from : B.cls !== E.cls) || EVO_BY_ID[E.id] || !Array.isArray(E.req) || !E.req.every(evoReqOk);
     if (bad) { noteErr('state', 'evolution dropped: ' + (E && E.id), 'evolve'); EVOLUTIONS.splice(i, 1); continue; }
     if (!E.req.some(r => r.t === 'level')) E.req.push({ t: 'level', min: EVO_MIN_LEVEL });
     const D = Object.assign({}, B);
@@ -7371,7 +7382,7 @@ function validateFusions() {
   for (const k in FUS_BY_ID) delete FUS_BY_ID[k];
   for (let i = FUSIONS.length - 1; i >= 0; i--) {
     const F = FUSIONS[i];
-    const bad = !F || !F.id || !STY[F.cls] || FUS_BY_ID[F.id] || !Array.isArray(F.in) || !F.in.every(evoReqOk) || ['common', 'uncommon', 'rare'].indexOf(F.rarity) < 0;
+    const bad = !F || !F.id || !(F.ability ? ATK_DEFS[F.ability] : STY[F.cls]) || FUS_BY_ID[F.id] || !Array.isArray(F.in) || !F.in.every(evoReqOk) || ['common', 'uncommon', 'rare'].indexOf(F.rarity) < 0;
     if (bad) { noteErr('state', 'fusion dropped: ' + (F && F.id), 'fusion'); FUSIONS.splice(i, 1); continue; }
     F.beh = F.beh || {}; F.mods = F.mods || {}; FUS_BY_ID[F.id] = F;
   }
@@ -7390,15 +7401,20 @@ function featAdd(k, n) { const f = player.feats || (player.feats = {}); f[k] = (
 function fusOn() { return !!(player && player.fusion && optOn('fusion') && FUS_BY_ID[player.fusion]); }
 function fusBeh(k) { if (!fusOn() || !evoAwake()) return null; const v = FUS_BY_ID[player.fusion].beh[k]; return v == null ? null : v; }
 function fusMod(k, dflt) { if (!fusOn() || !evoAwake()) return dflt; const v = FUS_BY_ID[player.fusion].mods[k]; return v == null ? dflt : v; }
-function evoForClass() { const id = ATK_CLASS[player.style]; return id ? EVOLUTIONS.find(E => E.from === id && E.cls === player.style) || null : null; }
-function evoReadyNow() {
-  const E = evoForClass(); if (!E) return null;
-  const a = atkOwned(E.from); if (!a || a.evo) return null;
-  return reqState(E.req).every(s => s.ok) ? E : null;
+function evoForClass() { const id = ATK_CLASS[player.style]; return id ? EVOLUTIONS.find(E => E.from === id && !E.ability && E.cls === player.style) || null : null; } // 0.19a: the signature's evolution
+function evoReadyNow() { // 0.19a: any held attack (signature or ability); max EVO_MAX per run, the second from EVO_SECOND_LEVEL
+  if (evoCount() >= EVO_MAX) return null;
+  for (const a of (player.atks || [])) {
+    if (a.evo) continue;
+    const E = evoFor(a); if (!E) continue;
+    if (reqState(evoReqList(E)).every(s => s.ok)) return E;
+  }
+  return null;
 }
+function fusOwner(F) { if (F.ability) { const a = atkOwned(F.ability); return !!(a && a.abil && abilOn()); } return F.cls === player.style; } // 0.19a
 function fusReadyNow() {
   if (player.fusion || (player.level || 1) < FUSION_MIN_LEVEL) return [];
-  return FUSIONS.filter(F => F.cls === player.style && reqState(F.in).every(s => s.ok));
+  return FUSIONS.filter(F => fusOwner(F) && reqState(F.in).every(s => s.ok));
 }
 function fusRoll() { return mix32(Math.imul((runSeed | 0) + 7, 131) ^ mix32((player.level | 0) * 977 + 4243)) / 4294967296; } // own hash: never touches a game RNG stream
 // ---- level-up offers
@@ -7419,7 +7435,7 @@ function evoInject(picks) {
   if (F) put(fusCard(F));
   return out;
 }
-function pickUpgrades() { const p = pickUpgrades0(); return (optOn('evolve') || optOn('fusion')) ? evoInject(p) : p; }
+function pickUpgrades() { let p = pickUpgrades0(); if (optOn('abilities')) p = optCall('abilities', () => abilInject(p), p); return (optOn('evolve') || optOn('fusion')) ? evoInject(p) : p; }
 function evoAfterPick(picks, u) { // a skipped Evolve / Fuse card comes back after 3 levels
   if (!picks || !player) return;
   if (picks.some(c => c && c.evo) && !(u && u.evo)) player.evoSkipUntil = player.level + EVO_SKIP_LEVELS;
@@ -7431,7 +7447,8 @@ function evoApply(id) {
     const E = EVO_BY_ID[id]; if (!E) return false;
     const a = atkOwned(E.from); if (!a || a.evo) return false;
     if (a.rank < ATK_MAX_RANK) a.rank = ATK_MAX_RANK;
-    a.evo = E.id; player.evo = E.id; atkHudSig = ''; foundMark('evo', E.id);
+    if (evoCount() >= EVO_MAX) return false; // 0.19a
+    a.evo = E.id; player.evo = E.id; (player.evos || (player.evos = [])).push(E.id); atkHudSig = ''; foundMark('evo', E.id);
     floats.push({ x: player.x, y: player.y - 34, text: '✨ ' + E.n, life: 1.4, vy: -28, color: '#ffd86a' });
     return true;
   }, false);
@@ -7445,8 +7462,8 @@ function fusApply(id) {
   }, false);
 }
 // lab / tests: grant at equal investment (no feats, no cards)
-function evoForce(id) { const E = id && id !== true ? EVO_BY_ID[id] : evoForClass(); if (!E) return false; let a = atkOwned(E.from); if (!a) { player.atks = player.atks || []; player.atks.push({ id: E.from, rank: ATK_MAX_RANK, cd: 0.4, at: 1 }); a = atkOwned(E.from); } a.rank = ATK_MAX_RANK; a.evo = null; return evoApply(E.id); }
-function fusForce(id) { const F = id && id !== true ? FUS_BY_ID[id] : FUSIONS.find(f => f.cls === player.style); if (!F) return false; player.fusion = null; return fusApply(F.id); }
+function evoForce(id) { const E = id && id !== true ? EVO_BY_ID[id] : evoForClass(); if (!E) return false; let a = atkOwned(E.from); if (!a) { player.atks = player.atks || []; player.atks.push({ id: E.from, rank: ATK_MAX_RANK, cd: 0.4, at: 1, abil: !!E.ability }); a = atkOwned(E.from); } a.rank = ATK_MAX_RANK; a.evo = null; return evoApply(E.id); }
+function fusForce(id) { const F = id && id !== true ? FUS_BY_ID[id] : FUSIONS.find(f => fusOwner(f)); if (!F) return false; player.fusion = null; return fusApply(F.id); }
 // ---- per-frame tick (from updateAttacks): toasts, guard stacks, follower ward, block charge, shatter queue
 function evoTick(dt) {
   const P = player;
@@ -7465,17 +7482,17 @@ function evoTick(dt) {
     const be = FUS_BY_ID[P.fusion].beh;
     if (be.blockEvery && !P.fusBlockReady && P.moving) { P.fusBlockT = (P.fusBlockT || 0) + dt; if (P.fusBlockT >= be.blockEvery) { P.fusBlockReady = true; P.fusBlockT = 0; } }
   }, 0);
-  const a = (P.atks || [])[0];
-  if (a && a.evo) optCall('evolve', () => {
+  for (const a of (P.atks || [])) if (a.evo && abilLive(a)) optCall('evolve', () => { // 0.19a: any evolved attack
     const D = atkDefOf(a);
     if (D.beh && D.beh.follow && P.moving) evoFollowWard(D, dt);
   }, 0);
 }
-function evoHudSig() {
-  const a = (player.atks || [])[0]; if (!a) return '';
-  if (a.evo) return 'E' + a.evo + (evoAwake() ? '' : 'z');
-  const E = evoForClass(); if (!E || player.style !== E.cls) return '';
-  const st = reqState(E.req); return st.filter(s => s.ok).length + '/' + st.length;
+function evoHudSig() { // 0.19a: every held attack
+  return (player.atks || []).map(a => {
+    if (a.evo) return 'E' + a.evo + (evoAwake() ? '' : 'z');
+    const E = evoFor(a); if (!E) return '';
+    const st = reqState(evoReqList(E)); return st.filter(s => s.ok).length + '/' + st.length;
+  }).join(';');
 }
 function evoGuardMul() { // Dragonfire Shield guard stacks: only while moving (the TAKEN_FLOOR still bounds total damage reduction)
   if (!player || !(player.evoGuardN > 0) || !(player.evoGuardT > 0) || !player.moving) return 1;
@@ -7690,24 +7707,25 @@ function evoHudBadge(a) {
   return optCall('evolve', () => {
     let h = '';
     if (a.evo) h += '<span class="evp on' + (evoAwake() ? '' : ' zz') + '">' + (evoAwake() ? '✨' : '💤') + '</span>';
-    else { const E = evoForClass(); if (E && E.from === a.id) { const st = reqState(E.req), k = st.filter(s => s.ok).length; h += '<span class="evp' + (k === st.length ? ' ready' : '') + '">✨' + k + '/' + st.length + '</span>'; } }
+    else { const E = evoCount() < EVO_MAX ? evoFor(a) : null; if (E && E.from === a.id) { const st = reqState(evoReqList(E)), k = st.filter(s => s.ok).length; h += '<span class="evp' + (k === st.length ? ' ready' : '') + '">✨' + k + '/' + st.length + '</span>'; } }
     if (player.fusion && FUS_BY_ID[player.fusion]) h += '<span class="fup">⚒</span>';
     return h;
   }, '');
 }
 function evoPauseHtml() {
   let h = '';
-  const E = evoForClass();
-  if (E) {
-    const a = atkOwned(E.from);
+  for (const a0 of (player.atks || [])) { // 0.19a: one line per held attack (signature + abilities); max 2 evolutions per run
+    const E = evoFor(a0); if (!E) continue;
+    const a = a0;
     if (a && a.evo) h += '<div class="pausebag-e evo-on">✨ <b>' + E.n + '</b> evolved' + (evoAwake() ? '' : ' · 💤 sleeping (move to wake it)') + '</div>';
-    else { const st = reqState(E.req); h += '<div class="pausebag-e evo-list">✨ ' + E.n + ': ' + st.map(s => (s.t === 'rank' || s.t === 'level') ? (s.t + ' ' + Math.min(s.have, s.need) + '/' + s.need + (s.ok ? ' ✓' : '')) : s.t === 'card' ? (s.label + (s.ok ? ' ✓' : ' ' + s.have + '/' + s.need)) : (s.label + ' ' + Math.min(s.have, s.need) + '/' + s.need + (s.ok ? ' ✓' : ''))).join(' · ') + '</div>'; }
+    else if (evoCount() >= EVO_MAX) h += '<div class="pausebag-e evo-list">✨ ' + E.n + ': ' + EVO_MAX + ' evolutions this run already (max)</div>';
+    else { const st = reqState(evoReqList(E)); h += '<div class="pausebag-e evo-list">✨ ' + E.n + ': ' + st.map(s => (s.t === 'rank' || s.t === 'level') ? (s.t + ' ' + Math.min(s.have, s.need) + '/' + s.need + (s.ok ? ' ✓' : '')) : s.t === 'card' ? (s.label + (s.ok ? ' ✓' : ' ' + s.have + '/' + s.need)) : (s.label + ' ' + Math.min(s.have, s.need) + '/' + s.need + (s.ok ? ' ✓' : ''))).join(' · ') + '</div>'; }
   }
   h += optCall('fusion', () => {
     if (player.fusion && FUS_BY_ID[player.fusion]) { const F = FUS_BY_ID[player.fusion]; return '<div class="pausebag-e fus-on">⚒ <b>' + F.n + '</b> fused · ' + F.line + '</div>'; }
     let o = '';
     for (const F of FUSIONS) {
-      if (F.cls !== player.style) continue;
+      if (!fusOwner(F)) continue; // 0.19a
       const st = reqState(F.in), miss = st.filter(s => !s.ok);
       if (miss.length > 1 || (miss.length === 1 && F.rarity === 'rare' && miss[0].t === 'item')) continue; // show only recipes one step away (rare: only once you hold the unique)
       o += '<div class="pausebag-e fus-list">⚒ ' + F.n + ': ' + (miss.length ? miss.map(s => s.label + ' ' + s.have + '/' + s.need).join(', ') : 'ready' + ((player.level || 1) < FUSION_MIN_LEVEL ? ' from level ' + FUSION_MIN_LEVEL : '')) + '</div>';
@@ -7718,16 +7736,197 @@ function evoPauseHtml() {
 }
 function evoEndLine() {
   const bits = [];
-  try { if (player && player.evo && EVO_BY_ID[player.evo]) bits.push('Evolved: ' + EVO_BY_ID[player.evo].icon + ' ' + EVO_BY_ID[player.evo].n); } catch (e) {}
+  try { const ev = (player && player.evos && player.evos.length) ? player.evos : (player && player.evo ? [player.evo] : []); const nm = ev.filter(id => EVO_BY_ID[id]).map(id => EVO_BY_ID[id].icon + ' ' + EVO_BY_ID[id].n); if (nm.length) bits.push('Evolved: ' + nm.join(', ')); } catch (e) {}
   try { if (player && player.fusion && FUS_BY_ID[player.fusion]) bits.push('Fused: ' + FUS_BY_ID[player.fusion].icon + ' ' + FUS_BY_ID[player.fusion].n); } catch (e) {}
   return bits.join(' · ');
 }
 function evoDebug() {
   const E = player ? evoForClass() : null;
   return { opt: JSON.parse(JSON.stringify(OPT)), evo: player ? player.evo : null, fusion: player ? player.fusion : null, feats: player ? Object.assign({}, player.feats || {}) : {},
-    req: E ? reqState(E.req) : [], fusReady: player ? fusReadyNow().map(f => f.id) : [], skip: player ? [player.evoSkipUntil || 0, player.fusSkipUntil || 0] : [], awake: evoAwake(),
+    req: E ? reqState(E.req) : [], reqAll: player ? (player.atks || []).map(a => { const X = evoFor(a); return X ? [X.id, reqState(evoReqList(X))] : null; }).filter(Boolean) : [], evos: player ? (player.evos || []).slice() : [], fusReady: player ? fusReadyNow().map(f => f.id) : [], skip: player ? [player.evoSkipUntil || 0, player.fusSkipUntil || 0] : [], awake: evoAwake(),
     found: save && save.found ? JSON.parse(JSON.stringify(save.found)) : null, evolutions: EVOLUTIONS.map(e => e.id), fusions: FUSIONS.map(f => f.id) };
 }
+
+/* ========== 0.19a THREE CLASSES + ABILITY POOL (data tables + hooks, fail-safe) ========== */
+// Spec: pitch-three-classes.md §7 (0.19a). Melee, Ranged and Magic are the only classes on the picker; the 9 others are
+// hidden, not deleted (?legacy=1 shows them again for dev; their code is removed in 0.19c). Their 9 signature attacks plus
+// Thrall Summon are ABILITIES any class can pick up during a run: 2 slots (run level 8 and 16), offered at level-ups
+// (50% per level-up while a slot is open, guaranteed after 3 misses, favoured x2, last run's picks x0.6), rank 1-5 with
+// the same rank gate as signatures. Every picked-up ability sleeps after 2.5 s standing still (footwork rule) and all
+// ability healing goes through healP() and the class heal budget.
+// Fail-safe: optInit/optCall('abilities'). If the tables or a hook throw, abilities switch off for the run (held ones go
+// quiet, no more offers) and the game plays as plain 0.18d Melee / Ranged / Magic. ?debug=1 shows "OPT abilities: off".
+const ABIL_SLOT_LEVELS = [8, 16], ABIL_CHANCE = 0.5, ABIL_PITY = 3, ABIL_FAV_W = 2, ABIL_LAST_W = 0.6;
+const EVO_MAX = 2, EVO_SECOND_LEVEL = 34; // up to 2 evolutions per run (signature + one ability); the second needs run level 34
+// Class table: the signature (level 5) and the 3 favoured abilities (offered twice as often). Base stats stay in STY/start()
+// for 0.19a (moving them is part of the 0.19c cleanup). Class rules (Momentum / Sweet spot / Glass) and twists are 0.19b.
+const CLASS_DEFS = {
+  melee:  { sig: 'bash',   favoured: ['log', 'harpoon', 'orbit'],    abilPow: 1.0, kit: 'The wall that walks forward' },
+  ranged: { sig: 'cannon', favoured: ['knives', 'darts', 'snare'],   abilPow: 1.5, kit: 'The skirmisher who never lets them close' },
+  magic:  { sig: 'bind',   favoured: ['trail', 'corpse', 'ward'],    abilPow: 1.6, kit: 'The crowd breaker, fragile' }
+};
+// abilPow (0.19a re-tune 2): abilities scale off mainDps() (hit / swing time), which is ~1.7x lower for Ranged and ~2.5x lower
+// for Magic than for Melee (their power sits in Twin shot / splash instead). Without it, 30-min bots had Melee 1.68x Ranged.
+function abilPow() { const C = player && CLASS_DEFS[player.style]; const v = C && +C.abilPow; return v > 0 && v < 3 ? v : 1; }
+// Thrall Summon (the Necromancer special Hatch kept, t135u) becomes its own ability with an attack row like the other 9.
+ATK_DEFS.thralls = { id: 'thralls', cls: 'none', type: 'summon', n: 'Thrall Summon', icon: '💀', col: '#b89ae8',
+  cd: [7, 6.5, 6, 5.5, 5], count: [1, 1, 2, 2, 3], life: [6, 6.5, 7, 7.5, 8], hitCd: 0.7, near: 320, mul: [0.30, 0.33, 0.36, 0.39, 0.42],
+  desc: r => 'Raise a thrall every ' + ATK_DEFS.thralls.cd[r] + 's (up to ' + ATK_DEFS.thralls.count[r] + ' at once, ' + ATK_DEFS.thralls.life[r] + 's each). Thralls fight beside you and draw the horde; kills near them leave corpses.' };
+// The ability pool. id = the ATK_DEFS row it uses (same code path in updateAttacks). tune = damage multiplier for the
+// 0.19a re-tune (applied in hurt() by source; set from qa-0.19a-abillab.js: rank-5 share of damage aimed at ~12-30%). cards = tagged level-up cards, only offered while you hold the ability:
+// keep = the card keeps its old effect (it already works for any class); dmg = the card now adds that much ability damage.
+const ABILITIES = [
+  { id: 'harpoon', was: 'fisher',      tune: 1.80, cards: [] },
+  { id: 'log',     was: 'woodcutter',  tune: 1.35, cards: [{ n: 'Seasoned oak', text: 'Rolling log hits 15% harder.', dmg: 1.15, max: 2 }] },
+  { id: 'orbit',   was: 'runecrafter', tune: 0.78, cards: [{ n: 'Catalyse', text: 'Rune orbit hits 15% harder.', dmg: 1.15, max: 2 }] },
+  { id: 'knives',  was: 'thief',       tune: 2.20, cards: [{ n: 'Palm', keep: true, max: 3 }] },
+  { id: 'darts',   was: 'slayer',      tune: 1.90, cards: [{ n: 'On task', keep: true, text: 'Slayer darts deal +20% more to your current assignment.', max: 2 }] },
+  { id: 'snare',   was: 'hunter',      tune: 1.10, cards: [{ n: 'Boxer', text: 'Bird snares hit 15% harder.', dmg: 1.15, max: 2 }] },
+  { id: 'trail',   was: 'firemaker',   tune: 0.70, cards: [{ n: 'Hotter fires', keep: true, text: 'Fire trail and other ground fires deal 25% more damage.', max: 2 }, { n: 'Firestarter', text: 'Fire trail hits 15% harder.', dmg: 1.15, max: 2 }] },
+  { id: 'corpse',  was: 'necromancer', tune: 1.60, cards: [] },
+  { id: 'ward',    was: 'priest',      tune: 1.00, cards: [] },
+  { id: 'thralls', was: 'necromancer', tune: 3.50, cards: [{ n: 'Dark apprentice', keep: true, max: 2 }] }
+];
+const ABIL_BY_ID = {};
+function classVisible(k) { return k === 'melee' || k === 'ranged' || k === 'magic' || LS_Q.get('legacy') === '1'; }
+function validateAbilities() {
+  if (!Array.isArray(ABILITIES) || !CLASS_DEFS) throw new Error('ABILITIES is not a list');
+  for (const k in ABIL_BY_ID) delete ABIL_BY_ID[k];
+  const sigs = Object.keys(CLASS_DEFS).map(k => CLASS_DEFS[k].sig), cardFix = [];
+  for (let i = ABILITIES.length - 1; i >= 0; i--) {
+    const A = ABILITIES[i], D = A && ATK_DEFS[A.id];
+    const bad = !A || !D || ABIL_BY_ID[A.id] || sigs.indexOf(A.id) >= 0 || !(A.tune > 0 && A.tune < 4) || !Array.isArray(A.cards);
+    if (bad) { noteErr('state', 'ability dropped: ' + (A && A.id), 'abilities'); ABILITIES.splice(i, 1); continue; }
+    A.cards = A.cards.filter(c => c && upgrades.some(u => u[0] === c.n) && (c.keep || (c.dmg > 1 && c.dmg < 2)));
+    for (const c of A.cards) cardFix.push([A.id, c]);
+    ABIL_BY_ID[A.id] = A;
+  }
+  for (const k in CLASS_DEFS) CLASS_DEFS[k].favoured = CLASS_DEFS[k].favoured.filter(id => ABIL_BY_ID[id]);
+  // tagged cards: retag the old class card to 'abil:<id>' so it is only offered while you hold that ability
+  for (const [id, c] of cardFix) {
+    const u = upgrades.find(x => x[0] === c.n);
+    u[3] = 'abil:' + id; if (c.text) u[1] = c.text; UPGRADE_MAX[c.n] = c.max || 2;
+    if (!c.keep) { const n = c.n; u[1] = c.text; u[2] = p => { p.cardN = p.cardN || {}; p.cardN[n] = (p.cardN[n] || 0) + 1; }; } // effect = ability damage (abilMulFor)
+  }
+}
+optInit('abilities', validateAbilities);
+function abilOn() { return optOn('abilities'); }
+function abilAwake() { return !!player && (player.stillT || 0) < EVO_STILL; }
+function abilLive(a) { return !a || !a.abil || (abilOn() && abilAwake()); } // a held ability works only while the system is on and you are moving
+function abilHeld() { return ((player && player.atks) || []).filter(a => a.abil); }
+function sigCount() { return ((player && player.atks) || []).filter(a => !a.abil).length; }
+function abilSlots() { const l = (player && player.level) || 1; let n = 0; for (const lv of ABIL_SLOT_LEVELS) if (l >= lv) n++; return n; }
+function abilTagOn(tag) { return typeof tag === 'string' && tag.indexOf('abil:') === 0 && abilOn() && !!atkOwned(tag.slice(5)); }
+function abilFav(id, cls) { const C = CLASS_DEFS[cls || (player && player.style)]; return !!(C && C.favoured.indexOf(id) >= 0); }
+function abilLast() { return (typeof save !== 'undefined' && save && Array.isArray(save.lastAbilities)) ? save.lastAbilities : []; }
+function abilWeight(id) { let w = abilFav(id) ? ABIL_FAV_W : 1; if (abilLast().indexOf(id) >= 0) w *= ABIL_LAST_W; return w; }
+function abilHash(k) { return mix32(Math.imul((runSeed | 0) + 13, 197) ^ mix32(((player && player.level) | 0) * 1009 + k * 7919 + 5171)) / 4294967296; } // own hash: never touches a game RNG stream
+function abilMulFor(id) { const A = ABIL_BY_ID[id]; if (!A) return 1; let m = A.tune; for (const c of A.cards) if (c.dmg) { const k = Math.min(cardPicks(c.n), c.max || 2); for (let i = 0; i < k; i++) m *= c.dmg; } return m; }
+function abilTick(dt) { // refresh the per-source damage table (read by hurt()) a few times a second
+  const P = player; P._abilT = (P._abilT || 0) - dt; if (P._abilT > 0 && P.abilMul) return;
+  P._abilT = 0.25; const m = P.abilMul || (P.abilMul = {});
+  for (const k in m) delete m[k];
+  const pw = abilPow(); for (const a of abilHeld()) m[a.id] = abilMulFor(a.id) * pw;
+  if (P._abilZz !== abilAwake()) { P._abilZz = abilAwake(); atkHudSig = ''; }
+}
+function abilChoose() { // weighted pick of one ability you don't hold (favoured x2, last run x0.6)
+  const pool = ABILITIES.filter(A => !atkOwned(A.id)); if (!pool.length) return null;
+  let tot = 0; const w = pool.map(A => { const x = abilWeight(A.id); tot += x; return x; });
+  let r = abilHash(2) * tot; for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r < 0) return pool[i]; }
+  return pool[pool.length - 1];
+}
+function abilCard(A) {
+  const D = ATK_DEFS[A.id], fav = abilFav(A.id), k = abilHeld().length + 1;
+  const c = [D.icon + ' ' + D.n + (fav ? ' ★' : ''), 'New ability (slot ' + k + '/' + ABIL_SLOT_LEVELS.length + ')' + (fav ? ' · ★ favoured by your class' : '') + ' · ' + D.desc(0), p => abilAdd(A.id)];
+  c.atk = A.id; c.atkNew = false; c.abilNew = true; return c;
+}
+function abilFullCard(picks) { // pitch 3.4: with full slots the ability offer turns into a rank-up for a held ability, or Spoils once all are maxed
+  const held = abilHeld(); if (!held.length) return null;
+  const inHand = new Set(picks.filter(u => u && u.atk).map(u => u.atk));
+  const ready = held.filter(a => a.rank < ATK_MAX_RANK && atkRankReady(a) && !inHand.has(a.id));
+  if (ready.length) {
+    const a = ready[Math.floor(abilHash(3) * ready.length) % ready.length];
+    const c = atkCards().find(x => x.atk === a.id && !x.atkNew); if (c) { c.abilFull = 'rank'; return c; }
+    return null;
+  }
+  if (held.every(a => a.rank >= ATK_MAX_RANK)) {
+    const a = held[Math.floor(abilHash(4) * held.length) % held.length], d = ATK_DEFS[a.id];
+    const c = Math.max(5, Math.round((15 + elapsed / 6) * coinMul()));
+    const sp = ['💰 Spoils', d.n + ' is maxed: take ' + c + ' coins instead.', p => addRunGold(c), undefined]; sp.abilFull = 'spoils'; return sp;
+  }
+  return null; // rank-up not ready yet (rank gate): no card this time
+}
+function abilInject(picks) { // level-up offer: 50% chance of one ability card; pity after 3 misses. Full slots -> rank-up / Spoils
+  if (!player || !Array.isArray(picks) || !picks.length) return picks;
+  if (abilSlots() <= 0) return picks;
+  const open = abilSlots() - abilHeld().length;
+  let st = player._abilOff;
+  if (!st || st.lv !== player.level) { // decide once per level (re-asking the same level gives the same answer)
+    const dry = player.abilDry || 0, show = dry >= ABIL_PITY || abilHash(1) < ABIL_CHANCE;
+    let c = null, id = null;
+    if (show && open > 0) { const A = abilChoose(); if (A) { id = A.id; c = abilCard(A); } }
+    else if (show) c = abilFullCard(picks);
+    st = player._abilOff = { lv: player.level, id, card: c };
+    player.abilDry = c ? 0 : (show && open <= 0 ? dry : dry + 1); player.abilSeen = (player.abilSeen || 0) + (c && id ? 1 : 0);
+  }
+  const c = st.card;
+  if (!c || (st.id && atkOwned(st.id)) || (c.abilFull === 'rank' && !(atkOwned(c.atk) && atkRankReady(atkOwned(c.atk))))) return picks;
+  if (picks.some(u => u === c || (u && c.atk && u.atk === c.atk))) return picks; // already in this hand
+  const out = picks.slice();
+  for (const i of [2, 1, 0]) if (i < out.length && out[i] && !out[i].atk && !out[i].evo && !out[i].fuse) { out[i] = c; return out; }
+  if (out.length < 3) out.push(c); else out[2] = c;
+  return out;
+}
+function abilAdd(id) {
+  return optCall('abilities', () => {
+    const A = ABIL_BY_ID[id]; if (!A || atkOwned(id) || abilHeld().length >= abilSlots()) return false;
+    player.atks.push({ id, rank: 1, cd: 0.4, at: player.level, abil: true });
+    if (id === 'darts' && !player.slayerTask && typeof rollSlayerTask === 'function') rollSlayerTask(); // the Slayer task runs while you hold darts
+    player._abilT = 0; abilTick(0); atkHudSig = ''; foundMark('abil', id);
+    floats.push({ x: player.x, y: player.y - 40, text: ATK_DEFS[id].icon + ' ' + ATK_DEFS[id].n, life: 1.3, vy: -28, color: '#9ff0e6' });
+    return true;
+  }, false);
+}
+// Thrall Summon: raise one thrall at a time up to the rank's count (no game RNG); hit damage is fixed at summon time
+function castSummon(a, D) {
+  const r = a.rank - 1;
+  let mine = 0; for (const t of thralls) if (t.abil && t.hp > 0) mine++;
+  if (mine >= D.count[r] || !atkNearest(player.x, player.y, D.near)) return false;
+  const n = (player.abilRaised = (player.abilRaised || 0) + 1), k = THRALL_KINDS[n % THRALL_KINDS.length];
+  const hp = Math.max(1, Math.round(k.hp * (1 + Math.max(0, elapsed - 60) / 180))), ang = (n * 2.4) % 6.283;
+  thralls.push({ x: player.x + Math.cos(ang) * 22, y: player.y + Math.sin(ang) * 22, r: k.r, hp, maxHp: hp, speed: k.speed, dmg: k.dmg, col: k.col, name: k.name,
+    life: D.life[r] + (player.thrallLifeCard || 0), atk: 0, kind: k.name, abil: true, hitDmg: atkDmg(D.mul[r], D.hitCd) });
+  fxBurst('summon', player.x, player.y, 40); behN('summon');
+  return true;
+}
+function abilEndRun() { // remember this run's abilities so the next run offers them a bit less (variety)
+  if (!abilOn() || !player) return;
+  save.lastAbilities = abilHeld().map(a => a.id).slice(0, ABIL_SLOT_LEVELS.length);
+}
+function abilBlurb(k) {
+  const C = CLASS_DEFS[k]; if (!C || !abilOn()) return '';
+  return '<br>🧩 Abilities: 2 slots (run levels 8 and 16) · favoured ' + C.favoured.map(id => ATK_DEFS[id].icon).join(' ');
+}
+// ---- evolutions for any held attack (signature or ability)
+function evoFor(a) { if (!a) return null; return EVOLUTIONS.find(E => E.from === a.id && (E.ability ? (!!a.abil && abilOn()) : E.cls === player.style)) || null; }
+function evoCount() { return ((player && player.atks) || []).filter(a => a.evo).length; }
+function evoReqList(E) { // the second evolution of a run needs run level EVO_SECOND_LEVEL
+  const a = atkOwned(E.from);
+  if (evoCount() >= 1 && !(a && a.evo)) return E.req.filter(r => r.t !== 'level').concat([{ t: 'level', min: EVO_SECOND_LEVEL }]);
+  return E.req;
+}
+function atkHudCell(a) {
+  const d = ATK_DEFS[a.id]; let pips = '';
+  for (let k = 0; k < ATK_MAX_RANK; k++) pips += '<span class="pip' + (k < a.rank ? ' on' : '') + '"></span>';
+  const dv = (a.evo && EVO_DEF[a.evo]) || d, zz = a.abil && !abilLive(a);
+  return '<div class="atks own' + (a.evo ? ' evo' : '') + (a.abil ? ' abil' : '') + (zz ? ' zz' : '') + '" title="' + dv.n + ' rank ' + a.rank + '">' + dv.icon + '<span class="pips">' + pips + '</span>' +
+    (zz && !a.evo ? '<span class="evp zz">💤</span>' : evoHudBadge(a)) + '</div>';
+}
+function abilDebug() {
+  return { opt: OPT.abilities ? Object.assign({}, OPT.abilities) : null, held: player ? abilHeld().map(a => a.id + ' r' + a.rank) : [], slots: player ? abilSlots() : 0,
+    dry: player ? player.abilDry || 0 : 0, mul: player && player.abilMul ? Object.assign({}, player.abilMul) : {}, last: abilLast().slice(), abilities: ABILITIES.map(A => A.id) };
+}
+try { if (typeof refreshClassPicker === 'function' && !playing) refreshClassPicker(); } catch (e) { noteErr('other', e, 'abilities picker'); } // show the ability line on the first menu
 
 function atkTargetsInRange(R) {
   const out = [];
@@ -7831,7 +8030,8 @@ function castLob(a, D) {
 function atkNoteKill(e) { // Necromancer corpses: a kill near a living thrall (or near you) leaves a fresh corpse
   if (!atkOwned('corpse') || !e || e.boss) return;
   const D = ATK_DEFS.corpse;
-  let ok = Math.hypot(e.x - player.x, e.y - player.y) < D.near;
+  const ca = atkOwned('corpse'), near = (ca && ca.abil) ? Math.max(D.near, Math.min(220, (player.range || 0) * 0.9)) : D.near; // 0.19a
+  let ok = Math.hypot(e.x - player.x, e.y - player.y) < near;
   if (!ok && typeof thralls !== 'undefined') for (const th of thralls) if (th.hp > 0 && Math.hypot(e.x - th.x, e.y - th.y) < D.near) { ok = true; break; }
   if (!ok) return;
   if (atkCorpses.length >= 8) atkCorpses.shift();
@@ -8018,14 +8218,16 @@ function updateAttacks(dt) {
   if (player.bashFx) { player.bashFx.t -= dt; if (player.bashFx.t <= 0) player.bashFx = null; }
   if (player.bashFx2) { player.bashFx2.t -= dt; if (player.bashFx2.t <= 0) player.bashFx2 = null; }
   if (OPT.evolve && (OPT.evolve.ok || (OPT.fusion && OPT.fusion.ok))) { try { evoTick(dt); } catch (e) { noteErr('other', e, 'evoTick'); } } // 0.18d
+  if (OPT.abilities && OPT.abilities.ok) optCall('abilities', () => abilTick(dt), 0); // 0.19a
   for (const a of player.atks) {
     const D = atkDefOf(a); if (!D) continue; // 0.18d: evolved def when evolved (and awake)
+    if (a.abil && !abilLive(a)) continue; // 0.19a footwork: abilities sleep after 2.5 s standing still (and stop if the system is off)
     if (D.type === 'orbit') { updateOrbit(dt, a); continue; }
     a.cd -= dt;
     if (a.cd > 0) continue;
     const r = a.rank - 1;
     const ok = D.type === 'bounce' ? castBounce(a, D) : D.type === 'lob' ? castLob(a, D) : D.type === 'pulse' ? castPulse(a, D)
-      : D.type === 'zone' ? castZone(a, D) : D.type === 'line' ? castLine(a, D) : false;
+      : D.type === 'zone' ? castZone(a, D) : D.type === 'line' ? castLine(a, D) : D.type === 'summon' ? optCall('abilities', () => castSummon(a, D), false) : false;
     a.cd = ok ? D.cd[r] : 0.2;
   }
   updateZones(dt);
@@ -8046,7 +8248,7 @@ function updateAttacks(dt) {
     if (d <= step + (o.t.r || 10) * 0.6) {
       o.x = o.t.x; o.y = o.t.y;
       let dmg = o.dmg;
-      if (o.id === 'darts' && (o.t.mini || o.t.boss || o.t.elite || (typeof isTaskEnemy === 'function' && isTaskEnemy(o.t)))) dmg = Math.round(dmg * ATK_DEFS.darts.bonus);
+      if (o.id === 'darts' && (o.t.mini || o.t.boss || o.t.elite || (typeof isTaskEnemy === 'function' && isTaskEnemy(o.t)))) dmg = Math.round(dmg * (ATK_DEFS.darts.bonus + ((player.taskCard && typeof isTaskEnemy === 'function' && isTaskEnemy(o.t)) ? player.taskCard : 0))); // 0.19a On task
       const crit = atkHit(o.t, dmg, o.id);
       if (o.id === 'knives' && rng() < ATK_DEFS.knives.pocket) pickpocketCoins(crit);
       o.hitList.push(o.t);
@@ -8114,7 +8316,7 @@ function drawAttackAura() {
   }
   const bf2 = player.bashFx2; // 0.18d Dragonfire Shield back cone
   if (bf2) { ctx.fillStyle = 'rgba(255,140,60,' + (0.35 * bf2.t / 0.22) + ')'; ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.arc(player.x, player.y, bf2.r, bf2.a - bf2.arc, bf2.a + bf2.arc); ctx.closePath(); ctx.fill(); }
-  if (player.evoWardFx > 0 && player.atks && player.atks[0]) { const D = atkDefOf(player.atks[0]); if (D && D.beh && D.beh.follow) { ctx.strokeStyle = 'rgba(255,240,170,0.75)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(player.x, player.y, D.rad[ATK_MAX_RANK - 1] * D.beh.follow.rad, 0, 7); ctx.stroke(); } }
+  if (player.evoWardFx > 0 && player.atks && player.atks[0]) { const D = atkDefOf(player.atks.find(x => x.id === 'ward') || player.atks[0]); if (D && D.beh && D.beh.follow) { ctx.strokeStyle = 'rgba(255,240,170,0.75)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(player.x, player.y, D.rad[ATK_MAX_RANK - 1] * D.beh.follow.rad, 0, 7); ctx.stroke(); } }
 }
 function drawAttackFx() {
   // lobs: landing ring + arcing ball
@@ -8152,7 +8354,7 @@ function drawAttackFx() {
   }
   // orbit runes
   const oa = atkOwned('orbit');
-  if (oa) {
+  if (oa && abilLive(oa)) { // 0.19a: a sleeping orbit is not drawn
     const D = atkDefOf(oa), r = oa.rank - 1, n = D.count[r], R = D.rad[r];
     ctx.strokeStyle = 'rgba(126,200,232,0.25)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(player.x, player.y, R, 0, 7); ctx.stroke();
     for (let k = 0; k < n; k++) {
@@ -8177,27 +8379,27 @@ function drawAttackFx() {
   }
   ctx.globalAlpha = 1;
 }
-function atkHudHtml() {
+function atkHudHtml() { // 0.19a: signature slot + 2 ability slots (rank pips; 💤 = asleep)
   const owned = player.atks || [];
   const slots = atkSlots();
   let h = '';
-  for (let i = 0; i < ATK_SLOT_LEVELS.length; i++) {
-    const a = owned[i];
-    if (a) {
-      const d = ATK_DEFS[a.id];
-      let pips = '';
-      for (let k = 0; k < ATK_MAX_RANK; k++) pips += '<span class="pip' + (k < a.rank ? ' on' : '') + '"></span>';
-      const dv = (a.evo && EVO_DEF[a.evo]) || d; // 0.18d
-      h += '<div class="atks own' + (a.evo ? ' evo' : '') + '" title="' + dv.n + ' rank ' + a.rank + '">' + dv.icon + '<span class="pips">' + pips + '</span>' + evoHudBadge(a) + '</div>';
-    } else if (i < slots) h += '<div class="atks open" title="Open attack slot">+</div>';
-    else h += '<div class="atks lock" title="Unlocks at level ' + ATK_SLOT_LEVELS[i] + '">🔒<br>Lv' + ATK_SLOT_LEVELS[i] + '</div>';
+  const sg = owned.find(a => !a.abil);
+  if (sg) h += atkHudCell(sg);
+  else if (slots > 0) h += '<div class="atks open" title="Open attack slot">+</div>';
+  else h += '<div class="atks lock" title="Unlocks at level ' + ATK_SLOT_LEVELS[0] + '">🔒<br>Lv' + ATK_SLOT_LEVELS[0] + '</div>';
+  if (!abilOn()) return h;
+  const ab = owned.filter(a => a.abil), n = abilSlots();
+  for (let i = 0; i < ABIL_SLOT_LEVELS.length; i++) {
+    if (ab[i]) h += atkHudCell(ab[i]);
+    else if (i < n) h += '<div class="atks open abil" title="Open ability slot">+</div>';
+    else h += '<div class="atks lock" title="Ability slot unlocks at level ' + ABIL_SLOT_LEVELS[i] + '">🔒<br>Lv' + ABIL_SLOT_LEVELS[i] + '</div>';
   }
   return h;
 }
 function renderAtkHud(force) {
   const el = $('atkHud');
   if (!el || !playing || !player) return;
-  const sig = atkSlots() + '|' + (player.atks || []).map(a => a.id + a.rank).join(',') + '|' + (player._evoSig || '');
+  const sig = atkSlots() + '/' + abilSlots() + '|' + (player.atks || []).map(a => a.id + a.rank + (a.abil && !abilLive(a) ? 'z' : '')).join(',') + '|' + (player._evoSig || '') + (abilOn() ? '' : 'X');
   if (force || sig !== atkHudSig) { el.innerHTML = atkHudHtml(); atkHudSig = sig; }
   if (force || elapsed - atkHudAt > 0.25 || atkHudAt < 0) {
     atkHudAt = elapsed;
@@ -8212,16 +8414,25 @@ function pauseAtkHtml() {
   h += '<div class="pausebag-i"><span class="pausebag-ic">⚔</span><div><div class="pausebag-n">' + (player.attackName || 'Main attack') + '</div><div class="pausebag-d">Class main attack (always on).</div></div></div>';
   const owned = player.atks || [];
   const slots = atkSlots();
-  for (let i = 0; i < ATK_SLOT_LEVELS.length; i++) {
-    const a = owned[i];
-    if (a) {
-      const d = ATK_DEFS[a.id];
-      let pips = '';
-      for (let k = 0; k < ATK_MAX_RANK; k++) pips += '<span class="pip' + (k < a.rank ? ' on' : '') + '"></span>';
-      const dv = (a.evo && EVO_DEF[a.evo]) || d; // 0.18d
-      h += '<div class="pausebag-i"><span class="pausebag-ic">' + dv.icon + '</span><div><div class="pausebag-n">' + dv.n + ' · rank ' + a.rank + '/' + ATK_MAX_RANK + '<span class="pips">' + pips + '</span></div><div class="pausebag-d">' + dv.desc(a.rank - 1) + '</div></div></div>';
-    } else if (i < slots) h += '<div class="pausebag-e">Open attack slot · pick an attack on your next level-up</div>';
-    else h += '<div class="pausebag-e">🔒 Attack slot unlocks at level ' + ATK_SLOT_LEVELS[i] + '</div>';
+  const row = (a, tag) => {
+    const d = ATK_DEFS[a.id];
+    let pips = '';
+    for (let k = 0; k < ATK_MAX_RANK; k++) pips += '<span class="pip' + (k < a.rank ? ' on' : '') + '"></span>';
+    const dv = (a.evo && EVO_DEF[a.evo]) || d; // 0.18d
+    return '<div class="pausebag-i"><span class="pausebag-ic">' + dv.icon + '</span><div><div class="pausebag-n">' + dv.n + ' · rank ' + a.rank + '/' + ATK_MAX_RANK + '<span class="pips">' + pips + '</span></div><div class="pausebag-d">' + tag + dv.desc(a.rank - 1) + (a.abil && !abilLive(a) ? ' 💤 sleeping (move to wake it)' : '') + '</div></div></div>';
+  };
+  const sg = owned.find(a => !a.abil);
+  if (sg) h += row(sg, 'Signature · ');
+  else if (slots > 0) h += '<div class="pausebag-e">Open attack slot · pick an attack on your next level-up</div>';
+  else h += '<div class="pausebag-e">🔒 Attack slot unlocks at level ' + ATK_SLOT_LEVELS[0] + '</div>';
+  if (abilOn()) { // 0.19a: 2 ability slots
+    const ab = owned.filter(a => a.abil), n = abilSlots();
+    for (let i = 0; i < ABIL_SLOT_LEVELS.length; i++) {
+      if (ab[i]) h += row(ab[i], 'Ability' + (abilFav(ab[i].id) ? ' ★' : '') + ' · ');
+      else if (i < n) h += '<div class="pausebag-e">Open ability slot ' + (i + 1) + ' · ability cards show up at level-ups</div>';
+      else h += '<div class="pausebag-e">🔒 Ability slot ' + (i + 1) + ' unlocks at level ' + ABIL_SLOT_LEVELS[i] + '</div>';
+    }
+    if (owned.some(a => a.abil)) h += '<div class="pausebag-e">Abilities sleep after 2.5s standing still and wake when you move.</div>';
   }
   try { h += evoPauseHtml(); } catch (e) { noteErr('other', e, 'evo pause'); } // 0.18d checklist
   return h + '</div>';
@@ -8268,7 +8479,7 @@ function levelUp() {
   // 0.4: show the choices in the regular overlay panel FIRST, before sound or anything else
   try {
     $('panel').innerHTML = '<h2>LEVEL UP!</h2><p>Choose one improvement for this run.</p>' +
-      picks.map((u, i) => '<button class="choice' + (u.atk ? ' atkcard' : '') + (u.evo ? ' evocard' : '') + (u.fuse ? ' fusecard' : '') + '" type="button" data-i="' + i + '"><strong>' +
+      picks.map((u, i) => '<button class="choice' + (u.abilNew ? ' abilcard' : u.atk ? ' atkcard' : '') + (u.evo ? ' evocard' : '') + (u.fuse ? ' fusecard' : '') + '" type="button" data-i="' + i + '"><strong>' +
         u[0] + '</strong><span class="small">' + ((u.evo || u.fuse) ? u[1] + '<span class="skiphint">Skip: comes back in 3 levels</span>' : cardText(u)) + '</span></button>').join(''); // 0.8a: tree-aware text
     $('overlay').style.display = 'flex';
     $('panel').querySelectorAll('button[data-i]').forEach(btn => {
@@ -8324,6 +8535,7 @@ function endRun(reason, extra) {
   if (!runEnded) {
     save.bossTotal = (save.bossTotal || 0) + bossesSlain;            // 0.6: lifetime boss kills
     save.bossBest = Math.max(save.bossBest || 0, bossesSlain);       // 0.6: most in one run
+    try { abilEndRun(); } catch (e) { noteErr('other', e, 'abilities end'); } // 0.19a
     resetJoystick(); // 0.4: hide the joystick when the run ends
     if (reason === 'extract') sfx('boss'); else sfx('death');
     const earned = runEarnedCoins();
@@ -8393,7 +8605,7 @@ function endRun(reason, extra) {
        Renown this run: <b>+${sum.renownRun + sum.renownEvent}</b> (spend it in 🌳 Mastery)${sum.renownEvent ? ` · events +${sum.renownEvent}` : ''}${extractRenownBit}<br><!-- 0.8a/0.9a -->
        Permanent renown: <b>${sum.renown}</b><br>
        King Black Dragon kills: <b>${sum.bossTotal}</b> total · best run <b>${sum.bossBest}</b><br><!-- 0.6 -->
-       ${ORDER.map(k => STY[k].sk + ' <b>' + sLvl(k) + '</b>').join(' · ')}</p>
+       ${ORDER.filter(classVisible).map(k => STY[k].sk + ' <b>' + sLvl(k) + '</b>').join(' · ')}</p>
     ${DEBUG ? '<p class="small">🐞 Run seed <b>' + seedText(runSeed) + '</b> · replay with ?debug=1&amp;seed=' + seedText(runSeed) + '</p>' : ''}
     <p class="small">Permanent coins, skills and renown are saved on this device. Run levels and upgrades reset. The bag is emptied; stash items stay in camp.</p>
     <button type="button" id="again">RETURN TO THE FRONTIER</button>`;
@@ -9696,6 +9908,7 @@ const LAB_SCORE = { 'Keen edge': 50, 'Quick hands': 48, 'Critical eye': 40, 'Lon
   'Mana shield': 10, 'Hard hat': 10, 'Hardened helm': 10, 'Soul vessel': 10, 'Mending': 10, 'Trail shoes': 10, 'Devotion': 12, 'Granite skin': 10, 'Fishy treats': 10, "Angler's outfit": 8 };
 function labCardScore(u) {
   if (!u) return -1;
+  if (u.abilNew) { const P = LAB.abilPref; if (!P) return 100; const i = P.indexOf(u.atk); return i < 0 ? -0.5 : 100 - i; } // 0.19a: build = ability preference
   if (u.atk) return 100;
   if (u.evo || u.fuse) return 90; // 0.18d: bots take Evolve / Fuse cards
   if (LAB_SCORE[u[0]] != null) return LAB_SCORE[u[0]];
@@ -9721,6 +9934,7 @@ function labDummy(x, y) {
     color: '#b08850', weak: null, hit: 0, slow: 0, cd: 1e9, windup: 0, windT: 0, slamT: 0, losT: 0, los: false, dead: false, side: 1 };
 }
 function labCat(src, e, dot) {
+  if (ABIL_BY_ID[src] && player && atkOwned(src) && atkOwned(src).abil) return 'ability'; // 0.19a
   if (ATK_DEFS[src]) return 'signature';
   if (src === 'special') return 'special';
   if (src === 'thralls') return 'summons';
@@ -9924,7 +10138,7 @@ function labRunMany(classes, levels, opts) {
   return out;
 }
 function labReport() {
-  return JSON.parse(JSON.stringify({ version: '0.18d', step: LAB_STEP, generated: new Date().toISOString(), method: {
+  return JSON.parse(JSON.stringify({ version: '0.19a', step: LAB_STEP, generated: new Date().toISOString(), method: {
     dummies: 'single dummy 80px from the player; cluster = 8 dummies (1 + ring of 7 at 26px) centred 80px away; player stands still; special used on cooldown',
     measure: '2s warm-up then 20s measured, fixed 1/30s steps, skill XP frozen',
     picks: 'level-ups use the seeded offer stream; pick = class attack card > Keen edge > Quick hands > Critical eye > class cards > Long reach > defensive',
@@ -9972,7 +10186,7 @@ function labOpen() {
 if (DEBUG) {
   try { dbgInitUi(); } catch (e) { noteErr('other', e, 'debug ui'); }
   window.LS_DEBUG = {
-    version: '0.18d',
+    version: '0.19a',
     evo: () => evoDebug(), opt: () => JSON.parse(JSON.stringify(OPT)), evoForce: id => evoForce(id), fusForce: id => fusForce(id), // 0.18d
     errors: () => JSON.parse(JSON.stringify(LS_ERR)),
     addLine: dbgAddLine, toggle: dbgToggle, render: dbgRender, stats: dbgStats,
@@ -9980,7 +10194,7 @@ if (DEBUG) {
     seed: () => runSeed, seedText: () => seedText(runSeed), setNextSeed: s => { nextSeedOverride = Math.abs(Math.floor(+s || 0)) % 1000000; return nextSeedOverride; },
     checkState: () => { lsCheckState(); return LS_ERR.state.n; },
     dpsRun: (cls, level, opts) => { const r = labRun(cls, level, opts); labRestoreMenu(); return JSON.parse(JSON.stringify(r)); },
-    dpsRunMany: (classes, levels, opts) => JSON.parse(JSON.stringify(labRunMany(classes || ORDER.slice(), levels || LAB_LEVELS.slice(), opts))),
+    dpsRunMany: (classes, levels, opts) => JSON.parse(JSON.stringify(labRunMany(classes || ORDER.filter(classVisible), levels || LAB_LEVELS.slice(), opts))),
     dpsReport: () => labReport(),
     dpsTable: () => labTableHtml(LAB.results),
     openLab: () => labOpen(),
