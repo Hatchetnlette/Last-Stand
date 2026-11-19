@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c1410">
-<title>Last Stand — Prototype 0.19a</title>
+<title>Last Stand — Prototype 0.19a2</title>
 <style>
 :root{
   --bg:#0c1410;--panel:#1a2a20;--gold:#e8c56a;--ink:#f3efe0;--muted:#a8b5a0;
@@ -355,7 +355,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="bagTip"></div>
 <div id="bagFull"><div class="sheet">
   <h2>BAG FULL</h2>
-  <p>Choose a slot to swap, or leave the find on the ground.</p>
+  <p id="bagFullHint">Choose a slot to swap, or leave the find on the ground.</p>
   <div class="newitem" id="bagFullName"></div>
   <div class="small" id="bagFullDesc"></div>
   <div class="slots" id="bagFullSlots"></div>
@@ -370,7 +370,7 @@ body.bagging #dpsMeter{pointer-events:none}
 <div id="overlay">
   <div class="panel menu-tight" id="panel">
     <h1>LAST STAND</h1>
-    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.19a</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
+    <div class="small">A RuneScape-flavored horde survivor · Prototype 0.19a2</div><!-- 0.13b: bag tooltips + pause-bag, food is passive gear, late hits have a small floor so trash is never zero-threat. 0.13a: long-haul foundations (freeze fix, orb/chest caps, trash scale after 5:00, gold rounding). 0.12c: unique unequip + item-chest banner; 0.12b: after a dragon kill, death is resolved before a level-up or bag sheet so the run can actually end and a new run can start. 0.12a: live DPS meter, hitsplats, goal text, minimap, clearer spell shapes. 0.11e: level-up cards that copied a generic stat were reworked; picker skips same-stat pairs and used one-shot cards. 0.11d: thrall HP scales with run time; 0.11c: Penance horn; 0.11b: synth SFX; 0.11a: new classes; 0.10a: items + 5-slot bag -->
     <p>Beyond the old frontier, the dead are stirring. Survive, gather XP, and extract at the shrine after the first dragon. Death keeps half your coins.</p>
     <p><b>Move</b> left side / WASD · <b>Combat</b> auto · <b>Dash</b> Space · <b>Special</b> on cooldown.</p>
     <!-- 0.9c: class dropdown (keeps Shop/Training/Mastery on-screen on small phones) -->
@@ -4971,12 +4971,29 @@ function tryAddItem(it) {
   return true;
 }
 
-function dropItemOnGround(it, x, y) {
+// 0.19a2 (Hatch t139u + t140u): an item YOU drop is gone the moment you drop it — no timer, no blink, nothing left on the floor,
+// so no edge arrow / minimap dot and no bag-full sheet reopening when you walk back. One rule per way of dropping:
+//   leave = "Leave it" on the bag-full sheet, swap = swapped out of a full bag, drop = Drop button in the bag tooltip.
+// keep:true puts that kind back on the ground exactly like 0.19a. Mini-boss luck drops, chests, caches, magnets and orbs
+// never pass through here, so they are untouched. No RNG is used. Fail-safe: if the rule lookup throws, the rule switches
+// off for the session and every drop goes to the ground as in 0.19a.
+let GROUND_RULES = { leave: { keep: false }, swap: { keep: false }, drop: { keep: false } };
+const groundRuleState = { on: true, err: '', deleted: 0 };
+function groundKeeps(why) {
+  if (!groundRuleState.on) return true;
+  try { const r = GROUND_RULES[why]; return r ? !!r.keep : true; }
+  catch (e) { groundRuleState.on = false; groundRuleState.err = String(e && e.message || e); noteErr('other', e, 'ground rules'); return true; }
+}
+function dropItemOnGround(it, x, y, why) {
+  // returns true when the item went to the ground (0.19a behaviour), false when it was deleted on the spot
+  if (!groundKeeps(why)) { groundRuleState.deleted++; return false; }
   // Left/dropped items stay on the ground until you walk away, then walk back over them.
   // Otherwise Leave/Drop puts the find at your feet (player.r+16 pickup, plus magnet) and
   // the bag-full sheet reopens on the next tick — or a manual drop is instantly bagged/sold.
   groundItems.push({ x: x, y: y, id: it.id, qty: it.qty || 1, t: 0, ignore: true, noPull: true });
+  return true;
 }
+function droppedMsg(id, onGround) { const d = itemDef(id); const n = d && d.n ? d.n : 'Item'; return onGround ? n + ' left on the ground' : '💨 ' + n + ' discarded'; }
 
 function offerItem(it) {
   if (tryAddItem(it)) return;
@@ -4991,6 +5008,11 @@ function openBagFull() {
   stopLoop();
   resetJoystick();
   const it = bagQueue[0], d = itemDef(it.id);
+  try { // 0.19a2
+    const kl = groundKeeps('leave'), ks = groundKeeps('swap');
+    $('bagLeave').textContent = kl ? 'Leave it on the ground' : 'Discard it';
+    $('bagFullHint').textContent = 'Choose a slot to swap' + (ks ? '' : ' (the old item is discarded)') + (kl ? ', or leave the find on the ground.' : ', or discard the find.');
+  } catch (e) { /* wording only */ }
   $('bagFullName').textContent = (d.icon || '') + ' ' + d.n;
   $('bagFullDesc').textContent = d.d;
   const row = $('bagFullSlots');
@@ -5003,16 +5025,16 @@ function openBagFull() {
     const incoming = bagQueue.shift();
     const evicted = bag[i];
     bag[i] = { id: incoming.id, qty: incoming.qty || 1 };
-    dropItemOnGround(evicted, player.x + 18, player.y + 8);
+    const onG = dropItemOnGround(evicted, player.x + 18, player.y + 8, 'swap');
     refreshItems();
     closeBagFullOrNext();
-    if (!toastBlocked()) toast((itemDef(evicted.id) || evicted).n ? (itemDef(evicted.id).n + ' left on the ground') : 'Item left on the ground');
+    if (!toastBlocked()) toast(droppedMsg(evicted.id, onG));
   });
   $('bagLeave').onclick = () => {
     const incoming = bagQueue.shift();
-    dropItemOnGround(incoming, player.x + 18, player.y + 8);
+    const onG = dropItemOnGround(incoming, player.x + 18, player.y + 8, 'leave');
     closeBagFullOrNext();
-    if (!toastBlocked()) toast((itemDef(incoming.id).n) + ' left on the ground');
+    if (!toastBlocked()) toast(droppedMsg(incoming.id, onG));
   };
   document.body.classList.add('bagging');
   $('bagFull').style.display = 'flex';
@@ -5068,9 +5090,9 @@ function bindBagTipButtons(i) {
   if ($('bagDrop')) $('bagDrop').onclick = ev => {
     ev.stopPropagation();
     const gone = bag.splice(i, 1)[0];
-    dropItemOnGround(gone, player.x + 18, player.y + 8);
+    const onG = dropItemOnGround(gone, player.x + 18, player.y + 8, 'drop');
     hideBagTip(); refreshItems();
-    toast(itemDef(gone.id).n + ' left on the ground');
+    toast(droppedMsg(gone.id, onG));
   };
   const tip = $('bagTip');
   if (tip) {
